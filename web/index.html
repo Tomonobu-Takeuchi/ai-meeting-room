@@ -1,0 +1,200 @@
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI-PERSONA会議室</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-base:#0D1117;--bg-surface:#161B22;--bg-elevated:#1C2333;--bg-hover:#21273A;
+      --border:#30363D;--border-subtle:#21262D;--text-primary:#E6EDF3;--text-secondary:#8B949E;
+      --text-muted:#484F58;--accent-blue:#2563EB;--accent-purple:#7C3AED;--accent-green:#16A34A;
+      --accent-red:#DC2626;--bubble-user:#1D4ED8;--bubble-member:#1C2333;--bubble-facilitator:#2D1B69;
+      --radius:10px;--radius-lg:16px;--shadow:0 4px 24px rgba(0,0,0,0.4);
+    }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Noto Sans JP',sans-serif;background:var(--bg-base);color:var(--text-primary);height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+    header{background:var(--bg-surface);border-bottom:1px solid var(--border);padding:0 20px;height:56px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:12px;}
+    .header-left{display:flex;align-items:center;gap:10px;}
+    .header-center{flex:1;text-align:center;}
+    .header-right{display:flex;align-items:center;gap:8px;}
+    .logo{font-family:'Space Mono',monospace;font-size:15px;font-weight:700;color:var(--text-primary);letter-spacing:0.5px;white-space:nowrap;}
+    .logo span{color:#7C3AED;}
+    .btn{padding:7px 14px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-elevated);color:var(--text-primary);font-size:12px;font-family:'Noto Sans JP',sans-serif;cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+    .btn:hover{background:var(--bg-hover);border-color:#484F58;}
+    .btn-primary{background:var(--accent-blue);border-color:var(--accent-blue);color:#fff;}
+    .btn-primary:hover{background:#1D4ED8;border-color:#1D4ED8;}
+    .btn-purple{background:var(--accent-purple);border-color:var(--accent-purple);color:#fff;}
+    .btn-purple:hover{background:#6D28D9;}
+    .btn-green{background:var(--accent-green);border-color:var(--accent-green);color:#fff;}
+    .btn-green:hover{background:#15803D;}
+    .btn:disabled{opacity:0.4;cursor:not-allowed;}
+    .theme-bar{background:var(--bg-surface);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+    .theme-bar input{flex:1;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius);padding:9px 14px;color:var(--text-primary);font-size:14px;font-family:'Noto Sans JP',sans-serif;outline:none;transition:border-color 0.15s;}
+    .theme-bar input:focus{border-color:var(--accent-blue);}
+    .theme-bar input::placeholder{color:var(--text-muted);}
+    .attach-btn{display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:var(--radius);border:1px dashed var(--border);background:transparent;color:var(--text-secondary);font-size:12px;cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+    .attach-btn:hover{border-color:var(--accent-blue);color:var(--accent-blue);}
+    .main-layout{display:flex;flex:1;overflow:hidden;}
+    .left-panel{width:240px;min-width:240px;background:var(--bg-surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+    .panel-header{padding:14px 16px 10px;font-size:11px;font-weight:700;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--border-subtle);display:flex;justify-content:space-between;align-items:center;}
+    .member-list{flex:1;overflow-y:auto;padding:8px;}
+    .member-card{padding:10px 12px;border-radius:var(--radius);cursor:pointer;transition:all 0.15s;display:flex;align-items:center;gap:10px;margin-bottom:4px;border:1px solid transparent;}
+    .member-card:hover{background:var(--bg-hover);}
+    .member-card.selected{border-color:var(--accent-blue);background:rgba(37,99,235,0.08);}
+    .member-card.speaking{border-color:#F59E0B;background:rgba(245,158,11,0.08);}
+    .member-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+    .member-info{flex:1;min-width:0;}
+    .member-name{font-size:13px;font-weight:500;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .member-role{font-size:11px;color:var(--text-secondary);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .member-status{width:8px;height:8px;border-radius:50%;background:var(--text-muted);flex-shrink:0;}
+    .member-status.online{background:var(--accent-green);box-shadow:0 0 6px rgba(22,163,74,0.6);}
+    .member-status.speaking{background:#F59E0B;box-shadow:0 0 6px rgba(245,158,11,0.6);animation:pulse 1s infinite;}
+    @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+    .panel-actions{padding:12px;border-top:1px solid var(--border);}
+    .chat-area{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+    .chat-messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px;}
+    .chat-messages::-webkit-scrollbar{width:6px;}
+    .chat-messages::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+    .message-row{display:flex;gap:10px;animation:fadeIn 0.3s ease;}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+    .message-row.user{flex-direction:row-reverse;}
+    .message-row.facilitator{flex-direction:column;align-items:center;}
+    .msg-avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;margin-top:2px;}
+    .msg-body{max-width:68%;}
+    .message-row.user .msg-body{align-items:flex-end;display:flex;flex-direction:column;}
+    .msg-name{font-size:11px;color:var(--text-secondary);margin-bottom:4px;padding:0 4px;}
+    .message-row.user .msg-name{text-align:right;}
+    .msg-bubble{padding:11px 14px;border-radius:14px;font-size:14px;line-height:1.65;white-space:pre-wrap;word-break:break-word;}
+    .message-row.member .msg-bubble{background:var(--bubble-member);border:1px solid var(--border);border-top-left-radius:4px;color:var(--text-primary);}
+    .message-row.user .msg-bubble{background:var(--bubble-user);border-top-right-radius:4px;color:#fff;}
+    .facilitator-banner{background:var(--bubble-facilitator);border:1px solid rgba(124,58,237,0.4);border-radius:var(--radius-lg);padding:12px 20px;max-width:80%;text-align:center;font-size:13px;line-height:1.7;color:#C4B5FD;}
+    .facilitator-label{font-size:10px;font-weight:700;letter-spacing:1.5px;color:#7C3AED;text-transform:uppercase;margin-bottom:6px;}
+    .typing-bubble{padding:12px 16px;background:var(--bubble-member);border:1px solid var(--border);border-radius:14px;border-top-left-radius:4px;display:inline-flex;gap:5px;align-items:center;}
+    .typing-dot{width:7px;height:7px;background:var(--text-muted);border-radius:50%;animation:typingPulse 1.2s infinite;}
+    .typing-dot:nth-child(2){animation-delay:0.2s;}
+    .typing-dot:nth-child(3){animation-delay:0.4s;}
+    @keyframes typingPulse{0%,80%,100%{transform:scale(0.7);opacity:0.4;}40%{transform:scale(1);opacity:1;}}
+    .msg-bubble.streaming::after{content:'▊';animation:blink 0.8s step-end infinite;color:var(--text-secondary);font-size:12px;}
+    @keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
+    .system-msg{text-align:center;font-size:12px;color:var(--text-muted);padding:4px;}
+    .chat-input-area{padding:16px 20px;background:var(--bg-surface);border-top:1px solid var(--border);display:flex;flex-direction:column;gap:10px;}
+    .input-row{display:flex;gap:10px;align-items:flex-end;}
+    .chat-input{flex:1;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius-lg);padding:11px 16px;color:var(--text-primary);font-size:14px;font-family:'Noto Sans JP',sans-serif;resize:none;outline:none;min-height:44px;max-height:120px;transition:border-color 0.15s;line-height:1.5;}
+    .chat-input:focus{border-color:var(--accent-blue);}
+    .chat-input::placeholder{color:var(--text-muted);}
+    .action-row{display:flex;align-items:center;gap:8px;}
+    .action-label{font-size:12px;color:var(--text-muted);margin-right:4px;}
+    .member-trigger-btn{padding:5px 10px;border-radius:20px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text-secondary);font-size:12px;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;gap:5px;}
+    .member-trigger-btn:hover{border-color:var(--accent-blue);color:var(--text-primary);background:var(--bg-hover);}
+    .member-trigger-btn.active{border-color:var(--accent-blue);color:#60A5FA;background:rgba(37,99,235,0.1);}
+    .welcome-screen{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px;padding:40px;}
+    .welcome-icon{font-size:56px;opacity:0.3;}
+    .welcome-title{font-size:20px;font-weight:500;color:var(--text-secondary);}
+    .welcome-sub{font-size:14px;color:var(--text-muted);text-align:center;line-height:1.8;}
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(4px);}
+    .modal-overlay.hidden{display:none;}
+    .modal{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:28px;width:440px;max-width:90vw;box-shadow:var(--shadow);}
+    .modal h2{font-size:16px;font-weight:700;margin-bottom:20px;}
+    .form-group{margin-bottom:16px;}
+    .form-group label{display:block;font-size:12px;color:var(--text-secondary);margin-bottom:6px;}
+    .form-group input,.form-group textarea{width:100%;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius);padding:9px 12px;color:var(--text-primary);font-size:13px;font-family:'Noto Sans JP',sans-serif;outline:none;transition:border-color 0.15s;}
+    .form-group input:focus,.form-group textarea:focus{border-color:var(--accent-blue);}
+    .form-group textarea{resize:vertical;min-height:70px;}
+    .form-row{display:flex;gap:10px;}
+    .form-row .form-group{flex:1;}
+    .modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:24px;}
+    .attachments-bar{display:flex;flex-wrap:wrap;gap:6px;}
+    .attachment-preview{display:flex;align-items:center;gap:8px;padding:7px 12px;background:var(--bg-elevated);border-radius:var(--radius);border:1px solid var(--border);font-size:12px;color:var(--text-secondary);}
+    .attachment-preview .remove-btn{margin-left:auto;cursor:pointer;color:var(--text-muted);font-size:14px;}
+    .attachment-preview .remove-btn:hover{color:var(--accent-red);}
+    .toast-container{position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:8px;z-index:200;}
+    .toast{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;font-size:13px;color:var(--text-primary);box-shadow:var(--shadow);animation:slideIn 0.3s ease;}
+    .toast.error{border-color:var(--accent-red);color:#FCA5A5;}
+    .toast.success{border-color:var(--accent-green);color:#86EFAC;}
+    @keyframes slideIn{from{transform:translateX(40px);opacity:0;}to{transform:translateX(0);opacity:1;}}
+    .session-bar{padding:6px 20px;background:rgba(37,99,235,0.1);border-bottom:1px solid rgba(37,99,235,0.2);font-size:12px;color:#60A5FA;display:flex;align-items:center;gap:8px;flex-shrink:0;}
+    .session-bar.hidden{display:none;}
+    .session-dot{width:7px;height:7px;border-radius:50%;background:#60A5FA;animation:pulse 2s infinite;}
+    .hidden{display:none!important;}
+    ::-webkit-scrollbar{width:6px;height:6px;}
+    ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+  </style>
+</head>
+<body>
+<header>
+  <div class="header-left">
+    <button class="btn" id="newMeetingBtn">＋ 新しい会議</button>
+  </div>
+  <div class="header-center">
+    <div class="logo">AI<span>-</span>PERSONA<span> 会議室</span></div>
+  </div>
+  <div class="header-right">
+    <button class="btn btn-purple" id="facilitatorBtn" disabled>🎯 ファシリテータ介入</button>
+  </div>
+</header>
+<div class="session-bar hidden" id="sessionBar">
+  <div class="session-dot"></div>
+  <span id="sessionInfo">会議進行中</span>
+</div>
+<div class="theme-bar">
+  <input type="text" id="topicInput" placeholder="📋  議題を入力してください（例：新製品のマーケティング戦略）" />
+  <label class="attach-btn" for="fileInput">📎 資料添付
+    <input type="file" id="fileInput" accept=".pdf,.docx,.doc" style="display:none" multiple />
+  </label>
+  <button class="btn btn-green" id="startMeetingBtn">▶ 会議開始</button>
+</div>
+<div id="attachmentsBar" class="attachments-bar" style="padding:6px 20px;background:var(--bg-surface);border-bottom:1px solid var(--border);display:none;"></div>
+<div class="main-layout">
+  <div class="left-panel">
+    <div class="panel-header">
+      <span>参加メンバー</span>
+      <button class="btn" id="addMemberBtn" style="padding:3px 8px;font-size:11px;">＋ 追加</button>
+    </div>
+    <div class="member-list" id="memberList"></div>
+    <div class="panel-actions">
+      <button class="btn btn-primary" id="autoDiscussBtn" style="width:100%" disabled>🤖 全員で議論する</button>
+    </div>
+  </div>
+  <div class="chat-area">
+    <div class="welcome-screen" id="welcomeScreen">
+      <div class="welcome-icon">🏛️</div>
+      <div class="welcome-title">AI-PERSONA 会議室</div>
+      <div class="welcome-sub">複数のデジタルペルソナを参加させ、<br />多角的な視点で議論をシミュレーションします。<br /><br />議題を入力して「会議開始」をクリックしてください。</div>
+    </div>
+    <div class="chat-messages hidden" id="chatMessages"></div>
+    <div class="chat-input-area hidden" id="chatInputArea">
+      <div class="action-row">
+        <span class="action-label">返答を促す：</span>
+        <div id="memberTriggers"></div>
+        <button class="btn" id="allRespondBtn" style="margin-left:auto;">全員に返答させる</button>
+      </div>
+      <div class="input-row">
+        <textarea class="chat-input" id="chatInput" placeholder="メッセージを入力... (Enter で送信、Shift+Enter で改行)" rows="1"></textarea>
+        <button class="btn btn-primary" id="sendBtn">送信</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay hidden" id="addPersonaModal">
+  <div class="modal">
+    <h2>🧑 ペルソナを追加</h2>
+    <div class="form-row">
+      <div class="form-group"><label>名前 *</label><input type="text" id="pName" placeholder="山田 太郎" /></div>
+      <div class="form-group"><label>アバター絵文字</label><input type="text" id="pAvatar" placeholder="👤" maxlength="2" value="👤" /></div>
+    </div>
+    <div class="form-group"><label>説明・肩書き *</label><input type="text" id="pDescription" placeholder="元商社マン、現在は投資家。財務と海外展開に詳しい。" /></div>
+    <div class="form-group"><label>性格・思考スタイル *</label><textarea id="pPersonality" placeholder="慎重で保守的。リスク管理を最優先。長期的視点で物事を考える。"></textarea></div>
+    <div class="form-group"><label>話し方の特徴 *</label><textarea id="pSpeakingStyle" placeholder="「リスクを考えると〜」「過去の事例では〜」という表現が多い。"></textarea></div>
+    <div class="form-group"><label>バックグラウンド</label><textarea id="pBackground" placeholder="大手商社に30年勤務後、独立。60代。"></textarea></div>
+    <div class="modal-footer">
+      <button class="btn" id="cancelAddPersona">キャンセル</button>
+      <button class="btn btn-primary" id="confirmAddPersona">追加する</button>
+    </div>
+  </div>
+</div>
+<div class="toast-container" id="toastContainer"></div>
+<script src="app.js"></script>
+</body>
+</html>
