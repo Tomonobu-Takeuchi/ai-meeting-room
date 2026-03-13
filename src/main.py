@@ -122,5 +122,5 @@ if __name__ == "__main__":
     if not api_key or api_key == "your_api_key_here":
         print("\n⚠️  警告: ANTHROPIC_API_KEY が設定されていません")
         print("   .env ファイルに ANTHROPIC_API_KEY=your_key を設定してください\n")
- port = int(os.getenv("PORT", 8765))
-app.run(debug=False, host="0.0.0.0", port=port, threaded=True)
+        port = int(os.getenv("PORT", 8765))
+        app.run(debug=False, host="0.0.0.0", port=port, threaded=True)
