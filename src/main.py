@@ -48,6 +48,17 @@ def add_persona():
     persona = persona_manager.add_custom_persona(data)
     return jsonify({"persona": persona})
 
+@app.route("/api/personas/<persona_id>", methods=["PUT"])
+def update_persona(persona_id):
+    """ペルソナ情報を更新する"""
+    data = request.json
+    if not data:
+        return jsonify({"error": "データがありません"}), 400
+    updated = persona_manager.update_persona(persona_id, data)
+    if updated is None:
+        return jsonify({"error": "ペルソナが見つかりません"}), 404
+    return jsonify({"persona": updated})
+
 @app.route("/api/meeting/start", methods=["POST"])
 def start_meeting():
     data = request.json
@@ -122,5 +133,5 @@ if __name__ == "__main__":
     if not api_key or api_key == "your_api_key_here":
         print("\n⚠️  警告: ANTHROPIC_API_KEY が設定されていません")
         print("   .env ファイルに ANTHROPIC_API_KEY=your_key を設定してください\n")
-        port = int(os.getenv("PORT", 8765))
-        app.run(debug=False, host="0.0.0.0", port=port, threaded=True)
+    port = int(os.getenv("PORT", 8765))
+    app.run(debug=False, host="0.0.0.0", port=port, threaded=True)

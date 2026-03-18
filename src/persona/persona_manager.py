@@ -148,5 +148,22 @@ class PersonaManager:
             json.dump(persona_data, f, ensure_ascii=False, indent=2)
         return persona_data
 
+    def update_persona(self, persona_id, update_data):
+        """既存ペルソナの情報を更新する"""
+        if persona_id not in self._personas:
+            return None
+        # 更新可能フィールドのみ反映（id・roleは変更不可）
+        allowed = ["name", "avatar", "color", "description", "personality", "speaking_style", "background"]
+        for key in allowed:
+            if key in update_data:
+                self._personas[persona_id][key] = update_data[key]
+        updated = self._personas[persona_id]
+        # カスタムペルソナはファイルにも保存
+        path = os.path.join(self.data_dir, f"{persona_id}.json")
+        if os.path.exists(path):
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(updated, f, ensure_ascii=False, indent=2)
+        return updated
+
     def to_dict_list(self):
         return list(self._personas.values())
