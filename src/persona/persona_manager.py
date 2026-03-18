@@ -74,7 +74,16 @@ class PersonaManager:
 
     def _load_defaults(self):
         for p in DEFAULT_PERSONAS:
-            self._personas[p["id"]] = p
+            # 保存済みファイルがあればそちらを優先（サーバー再起動後も設定を維持）
+            path = os.path.join(self.data_dir, f"{p['id']}.json")
+            if os.path.exists(path):
+                try:
+                    with open(path, encoding="utf-8") as f:
+                        self._personas[p["id"]] = json.load(f)
+                except Exception:
+                    self._personas[p["id"]] = p
+            else:
+                self._personas[p["id"]] = p
         self._personas["user"] = DEFAULT_USER_PERSONA
 
     def get_all_members(self):
@@ -158,11 +167,10 @@ class PersonaManager:
             if key in update_data:
                 self._personas[persona_id][key] = update_data[key]
         updated = self._personas[persona_id]
-        # カスタムペルソナはファイルにも保存
+        # デフォルト・カスタム問わず常にファイルに保存（サーバー再起動後も維持）
         path = os.path.join(self.data_dir, f"{persona_id}.json")
-        if os.path.exists(path):
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(updated, f, ensure_ascii=False, indent=2)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(updated, f, ensure_ascii=False, indent=2)
         return updated
 
     def to_dict_list(self):
