@@ -34,7 +34,7 @@ def get_personas():
 
 @app.route("/api/personas/members", methods=["GET"])
 def get_members():
-    return jsonify({"members": persona_manager.get_all_members()})
+    return jsonify({"members": persona_manager.get_all_personas()})
 
 @app.route("/api/personas/add", methods=["POST"])
 def add_persona():
@@ -67,7 +67,7 @@ def start_meeting():
     if not topic:
         return jsonify({"error": "議題を入力してください"}), 400
     if not member_ids:
-        member_ids = [p["id"] for p in persona_manager.get_all_members()]
+        member_ids = [p["id"] for p in persona_manager.get_all_personas()]
     session = meeting_room.create_session(topic, member_ids)
     return jsonify({
         "session_id": session["session_id"],
@@ -120,7 +120,7 @@ def health():
     return jsonify({
         "status": "ok",
         "api_key_set": bool(api_key and api_key != "your_api_key_here"),
-        "personas": len(persona_manager.get_all_members()),
+        "personas": len(persona_manager.get_all_personas()),
         "version": "Phase1-MVP"
     })
 
