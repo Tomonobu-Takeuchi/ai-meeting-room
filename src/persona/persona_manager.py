@@ -85,3 +85,5 @@ class PersonaManager:
 
     def get_default_personas(self):
         return DEFAULT_PERSONAS
+    def get_personas_by_ids(self, ids: list):
+        return [p for p in self.personas if p["id"] in ids]
