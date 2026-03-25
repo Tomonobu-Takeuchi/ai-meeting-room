@@ -19,8 +19,7 @@
     .header-left{display:flex;align-items:center;gap:10px;}
     .header-center{flex:1;text-align:center;}
     .header-right{display:flex;align-items:center;gap:8px;}
-    /* ★ タイトル文字を1.5倍に拡大 (15px → 22.5px) */
-    .logo{font-family:'Space Mono',monospace;font-size:22.5px;font-weight:700;color:var(--text-primary);letter-spacing:0.5px;white-space:nowrap;}
+    .logo{font-family:'Space Mono',monospace;font-size:15px;font-weight:700;color:var(--text-primary);letter-spacing:0.5px;white-space:nowrap;}
     .logo span{color:#7C3AED;}
     .btn{padding:7px 14px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-elevated);color:var(--text-primary);font-size:12px;font-family:'Noto Sans JP',sans-serif;cursor:pointer;transition:all 0.15s;white-space:nowrap;}
     .btn:hover{background:var(--bg-hover);border-color:#484F58;}
@@ -30,11 +29,6 @@
     .btn-purple:hover{background:#6D28D9;}
     .btn-green{background:var(--accent-green);border-color:var(--accent-green);color:#fff;}
     .btn-green:hover{background:#15803D;}
-    .btn-red{background:var(--accent-red);border-color:var(--accent-red);color:#fff;}
-    .btn-red:hover{background:#B91C1C;}
-    .btn-icon{padding:4px 7px;font-size:13px;border-radius:6px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text-secondary);cursor:pointer;transition:all 0.15s;line-height:1;}
-    .btn-icon:hover{background:var(--bg-hover);color:var(--text-primary);}
-    .btn-icon.danger:hover{border-color:var(--accent-red);color:var(--accent-red);}
     .btn:disabled{opacity:0.4;cursor:not-allowed;}
     .theme-bar{background:var(--bg-surface);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
     .theme-bar input{flex:1;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius);padding:9px 14px;color:var(--text-primary);font-size:14px;font-family:'Noto Sans JP',sans-serif;outline:none;transition:border-color 0.15s;}
@@ -46,22 +40,17 @@
     .left-panel{width:240px;min-width:240px;background:var(--bg-surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
     .panel-header{padding:14px 16px 10px;font-size:11px;font-weight:700;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--border-subtle);display:flex;justify-content:space-between;align-items:center;}
     .member-list{flex:1;overflow-y:auto;padding:8px;}
-    /* ★ メンバーカード：設定・削除ボタン用にlayoutを調整 */
-    .member-card{padding:8px 10px;border-radius:var(--radius);transition:all 0.15s;display:flex;align-items:center;gap:8px;margin-bottom:4px;border:1px solid transparent;}
+    .member-card{padding:10px 12px;border-radius:var(--radius);cursor:pointer;transition:all 0.15s;display:flex;align-items:center;gap:10px;margin-bottom:4px;border:1px solid transparent;}
     .member-card:hover{background:var(--bg-hover);}
     .member-card.selected{border-color:var(--accent-blue);background:rgba(37,99,235,0.08);}
     .member-card.speaking{border-color:#F59E0B;background:rgba(245,158,11,0.08);}
-    .member-card-main{display:flex;align-items:center;gap:8px;flex:1;min-width:0;cursor:pointer;}
-    .member-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;overflow:hidden;}
-    .member-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+    .member-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
     .member-info{flex:1;min-width:0;}
     .member-name{font-size:13px;font-weight:500;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .member-role{font-size:11px;color:var(--text-secondary);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .member-status{width:8px;height:8px;border-radius:50%;background:var(--text-muted);flex-shrink:0;}
     .member-status.online{background:var(--accent-green);box-shadow:0 0 6px rgba(22,163,74,0.6);}
     .member-status.speaking{background:#F59E0B;box-shadow:0 0 6px rgba(245,158,11,0.6);animation:pulse 1s infinite;}
-    /* ★ カードアクションボタンエリア */
-    .member-card-actions{display:flex;gap:3px;flex-shrink:0;align-items:center;}
     @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
     .panel-actions{padding:12px;border-top:1px solid var(--border);}
     .chat-area{flex:1;display:flex;flex-direction:column;overflow:hidden;}
@@ -72,8 +61,7 @@
     @keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
     .message-row.user{flex-direction:row-reverse;}
     .message-row.facilitator{flex-direction:column;align-items:center;}
-    .msg-avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;margin-top:2px;overflow:hidden;}
-    .msg-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+    .msg-avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;margin-top:2px;}
     .msg-body{max-width:68%;}
     .message-row.user .msg-body{align-items:flex-end;display:flex;flex-direction:column;}
     .msg-name{font-size:11px;color:var(--text-secondary);margin-bottom:4px;padding:0 4px;}
@@ -88,7 +76,7 @@
     .typing-dot:nth-child(2){animation-delay:0.2s;}
     .typing-dot:nth-child(3){animation-delay:0.4s;}
     @keyframes typingPulse{0%,80%,100%{transform:scale(0.7);opacity:0.4;}40%{transform:scale(1);opacity:1;}}
-    .msg-bubble.streaming::after{content:'▋';animation:blink 0.8s step-end infinite;color:var(--text-secondary);font-size:12px;}
+    .msg-bubble.streaming::after{content:'▊';animation:blink 0.8s step-end infinite;color:var(--text-secondary);font-size:12px;}
     @keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
     .system-msg{text-align:center;font-size:12px;color:var(--text-muted);padding:4px;}
     .chat-input-area{padding:16px 20px;background:var(--bg-surface);border-top:1px solid var(--border);display:flex;flex-direction:column;gap:10px;}
@@ -107,12 +95,11 @@
     .welcome-sub{font-size:14px;color:var(--text-muted);text-align:center;line-height:1.8;}
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(4px);}
     .modal-overlay.hidden{display:none;}
-    /* ★ モーダルを少し広く（学習データ関連追加のため） */
-    .modal{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:28px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow);}
+    .modal{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:28px;width:440px;max-width:90vw;box-shadow:var(--shadow);}
     .modal h2{font-size:16px;font-weight:700;margin-bottom:20px;}
     .form-group{margin-bottom:16px;}
     .form-group label{display:block;font-size:12px;color:var(--text-secondary);margin-bottom:6px;}
-    .form-group input,.form-group textarea,.form-group select{width:100%;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius);padding:9px 12px;color:var(--text-primary);font-size:13px;font-family:'Noto Sans JP',sans-serif;outline:none;transition:border-color 0.15s;}
+    .form-group input,.form-group textarea{width:100%;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius);padding:9px 12px;color:var(--text-primary);font-size:13px;font-family:'Noto Sans JP',sans-serif;outline:none;transition:border-color 0.15s;}
     .form-group input:focus,.form-group textarea:focus{border-color:var(--accent-blue);}
     .form-group textarea{resize:vertical;min-height:70px;}
     .form-row{display:flex;gap:10px;}
@@ -133,43 +120,12 @@
     .hidden{display:none!important;}
     ::-webkit-scrollbar{width:6px;height:6px;}
     ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
-
-    /* ★ アバター画像アップロードエリア */
-    .avatar-upload-area{display:flex;align-items:center;gap:12px;}
-    .avatar-preview{width:56px;height:56px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:28px;background:var(--bg-elevated);flex-shrink:0;overflow:hidden;cursor:pointer;transition:border-color 0.15s;}
-    .avatar-preview:hover{border-color:var(--accent-blue);}
-    .avatar-preview img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
-    .avatar-upload-controls{display:flex;flex-direction:column;gap:6px;flex:1;}
-    .avatar-emoji-input{width:100%;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius);padding:9px 12px;color:var(--text-primary);font-size:13px;font-family:'Noto Sans JP',sans-serif;outline:none;}
-    .avatar-emoji-input:focus{border-color:var(--accent-blue);}
-    .avatar-file-label{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:var(--radius);border:1px dashed var(--border);background:transparent;color:var(--text-secondary);font-size:12px;cursor:pointer;transition:all 0.15s;}
-    .avatar-file-label:hover{border-color:var(--accent-blue);color:var(--accent-blue);}
-
-    /* ★ 学習データ読み込みエリア */
-    .learn-data-section{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:16px;}
-    .learn-data-title{font-size:12px;font-weight:700;color:var(--accent-blue);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
-    .learn-data-btns{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
-    .learn-data-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:var(--radius);border:1px dashed var(--border);background:transparent;color:var(--text-secondary);font-size:12px;cursor:pointer;transition:all 0.15s;}
-    .learn-data-btn:hover{border-color:var(--accent-purple);color:var(--accent-purple);}
-    .learn-data-list{display:flex;flex-direction:column;gap:4px;max-height:100px;overflow-y:auto;}
-    .learn-data-item{display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg-base);border-radius:6px;font-size:11px;color:var(--text-secondary);}
-    .learn-data-item .remove-learn{margin-left:auto;cursor:pointer;color:var(--text-muted);font-size:13px;}
-    .learn-data-item .remove-learn:hover{color:var(--accent-red);}
-    .learn-status{font-size:11px;color:var(--accent-green);margin-top:6px;min-height:16px;}
-
-    /* 確認ダイアログ */
-    .confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:300;}
-    .confirm-overlay.hidden{display:none;}
-    .confirm-box{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;width:320px;box-shadow:var(--shadow);}
-    .confirm-box h3{font-size:15px;font-weight:700;margin-bottom:10px;}
-    .confirm-box p{font-size:13px;color:var(--text-secondary);margin-bottom:20px;line-height:1.6;}
-    .confirm-footer{display:flex;justify-content:flex-end;gap:8px;}
   </style>
 </head>
 <body>
 <header>
   <div class="header-left">
-    <button class="btn" id="newMeetingBtn">+ 新しい会議</button>
+    <button class="btn" id="newMeetingBtn">＋ 新しい会議</button>
   </div>
   <div class="header-center">
     <div class="logo">AI<span>-</span>PERSONA<span> 会議室</span></div>
@@ -183,7 +139,7 @@
   <span id="sessionInfo">会議進行中</span>
 </div>
 <div class="theme-bar">
-  <input type="text" id="topicInput" placeholder="📋 議題を入力してください（例：新製品のマーケティング戦略）" />
+  <input type="text" id="topicInput" placeholder="📋  議題を入力してください（例：新製品のマーケティング戦略）" />
   <label class="attach-btn" for="fileInput">📎 資料添付
     <input type="file" id="fileInput" accept=".pdf,.docx,.doc" style="display:none" multiple />
   </label>
@@ -194,11 +150,11 @@
   <div class="left-panel">
     <div class="panel-header">
       <span>参加メンバー</span>
-      <button class="btn" id="addMemberBtn" style="padding:3px 8px;font-size:11px;">+ 追加</button>
+      <button class="btn" id="addMemberBtn" style="padding:3px 8px;font-size:11px;">＋ 追加</button>
     </div>
     <div class="member-list" id="memberList"></div>
     <div class="panel-actions">
-      <button class="btn btn-primary" id="autoDiscussBtn" style="width:100%" disabled>💬 全員で議論する</button>
+      <button class="btn btn-primary" id="autoDiscussBtn" style="width:100%" disabled>🤖 全員で議論する</button>
     </div>
   </div>
   <div class="chat-area">
@@ -221,52 +177,16 @@
     </div>
   </div>
 </div>
-
-<!-- ★ ペルソナ追加モーダル -->
 <div class="modal-overlay hidden" id="addPersonaModal">
   <div class="modal">
-    <h2>👤 ペルソナを追加</h2>
-    <!-- ★ 学習データ読み込みセクション -->
-    <div class="learn-data-section">
-      <div class="learn-data-title">📚 ペルソナ学習データ</div>
-      <div class="learn-data-btns">
-        <label class="learn-data-btn" for="learnTextFile">📄 テキスト/PDF
-          <input type="file" id="learnTextFile" accept=".txt,.md,.pdf" style="display:none" multiple />
-        </label>
-        <label class="learn-data-btn" for="learnImageFile">🖼️ 画像
-          <input type="file" id="learnImageFile" accept="image/*" style="display:none" multiple />
-        </label>
-        <label class="learn-data-btn" for="learnAudioFile">🎵 音声（将来対応予定）
-          <input type="file" id="learnAudioFile" accept="audio/*" style="display:none" multiple disabled />
-        </label>
-        <label class="learn-data-btn" for="learnVideoFile">🎬 動画（将来対応予定）
-          <input type="file" id="learnVideoFile" accept="video/*" style="display:none" multiple disabled />
-        </label>
-      </div>
-      <div class="learn-data-list" id="learnDataList"></div>
-      <div class="learn-status" id="learnStatus"></div>
-    </div>
-    <!-- ★ アバター：絵文字 or 画像ファイル取り込み -->
-    <div class="form-group">
-      <label>アバター（絵文字 または 画像ファイル）</label>
-      <div class="avatar-upload-area">
-        <div class="avatar-preview" id="addAvatarPreview" onclick="document.getElementById('addAvatarImageFile').click()">👤</div>
-        <div class="avatar-upload-controls">
-          <input type="text" class="avatar-emoji-input" id="pAvatar" placeholder="絵文字を入力（例: 👤）" maxlength="2" value="👤" />
-          <label class="avatar-file-label">
-            📁 画像ファイルを選択
-            <input type="file" id="addAvatarImageFile" accept="image/*" style="display:none" />
-          </label>
-        </div>
-      </div>
-    </div>
+    <h2>🧑 ペルソナを追加</h2>
     <div class="form-row">
       <div class="form-group"><label>名前 *</label><input type="text" id="pName" placeholder="山田 太郎" /></div>
-      <div class="form-group"><label>テーマカラー</label><input type="color" id="pColor" value="#8B5CF6" style="height:38px;padding:4px;" /></div>
+      <div class="form-group"><label>アバター絵文字</label><input type="text" id="pAvatar" placeholder="👤" maxlength="2" value="👤" /></div>
     </div>
-    <div class="form-group"><label>肩書き・役割 *</label><input type="text" id="pDescription" placeholder="元マッコンサル、現在は戦略アドバイザー" /></div>
-    <div class="form-group"><label>性格・思考スタイル *</label><textarea id="pPersonality" placeholder="論理的で分析的。リスク管理を最優先に長期的視点で物事を考える。"></textarea></div>
-    <div class="form-group"><label>話し方の特徴 *</label><textarea id="pSpeakingStyle" placeholder="「リスクを考えると」「客観的な観点では」という表現が多い"></textarea></div>
+    <div class="form-group"><label>説明・肩書き *</label><input type="text" id="pDescription" placeholder="元商社マン、現在は投資家。財務と海外展開に詳しい。" /></div>
+    <div class="form-group"><label>性格・思考スタイル *</label><textarea id="pPersonality" placeholder="慎重で保守的。リスク管理を最優先。長期的視点で物事を考える。"></textarea></div>
+    <div class="form-group"><label>話し方の特徴 *</label><textarea id="pSpeakingStyle" placeholder="「リスクを考えると〜」「過去の事例では〜」という表現が多い。"></textarea></div>
     <div class="form-group"><label>バックグラウンド</label><textarea id="pBackground" placeholder="大手商社に30年勤務後、独立。60代。"></textarea></div>
     <div class="modal-footer">
       <button class="btn" id="cancelAddPersona">キャンセル</button>
@@ -274,73 +194,6 @@
     </div>
   </div>
 </div>
-
-<!-- ★ ペルソナ設定モーダル（編集） -->
-<div class="modal-overlay hidden" id="editPersonaModal">
-  <div class="modal">
-    <h2>⚙️ ペルソナ設定</h2>
-    <input type="hidden" id="editPersonaId" />
-    <!-- ★ 学習データ読み込みセクション -->
-    <div class="learn-data-section">
-      <div class="learn-data-title">📚 ペルソナ学習データ</div>
-      <div class="learn-data-btns">
-        <label class="learn-data-btn" for="editLearnTextFile">📄 テキスト/PDF
-          <input type="file" id="editLearnTextFile" accept=".txt,.md,.pdf" style="display:none" multiple />
-        </label>
-        <label class="learn-data-btn" for="editLearnImageFile">🖼️ 画像
-          <input type="file" id="editLearnImageFile" accept="image/*" style="display:none" multiple />
-        </label>
-        <label class="learn-data-btn" for="editLearnAudioFile">🎵 音声（将来対応予定）
-          <input type="file" id="editLearnAudioFile" accept="audio/*" style="display:none" multiple disabled />
-        </label>
-        <label class="learn-data-btn" for="editLearnVideoFile">🎬 動画（将来対応予定）
-          <input type="file" id="editLearnVideoFile" accept="video/*" style="display:none" multiple disabled />
-        </label>
-      </div>
-      <div class="learn-data-list" id="editLearnDataList"></div>
-      <div class="learn-status" id="editLearnStatus"></div>
-    </div>
-    <!-- ★ アバター：絵文字 or 画像ファイル取り込み -->
-    <div class="form-group">
-      <label>アバター（絵文字 または 画像ファイル）</label>
-      <div class="avatar-upload-area">
-        <div class="avatar-preview" id="editAvatarPreview" onclick="document.getElementById('editAvatarImageFile').click()">👤</div>
-        <div class="avatar-upload-controls">
-          <input type="text" class="avatar-emoji-input" id="eAvatar" placeholder="絵文字を入力（例: 👤）" maxlength="2" />
-          <label class="avatar-file-label">
-            📁 画像ファイルを選択
-            <input type="file" id="editAvatarImageFile" accept="image/*" style="display:none" />
-          </label>
-        </div>
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group"><label>名前 *</label><input type="text" id="eName" /></div>
-      <div class="form-group"><label>テーマカラー</label><input type="color" id="eColor" value="#8B5CF6" style="height:38px;padding:4px;" /></div>
-    </div>
-    <div class="form-group"><label>肩書き・役割 *</label><input type="text" id="eDescription" /></div>
-    <div class="form-group"><label>性格・思考スタイル *</label><textarea id="ePersonality"></textarea></div>
-    <div class="form-group"><label>話し方の特徴 *</label><textarea id="eSpeakingStyle"></textarea></div>
-    <div class="form-group"><label>バックグラウンド</label><textarea id="eBackground"></textarea></div>
-    <div class="modal-footer">
-      <button class="btn" id="cancelEditPersona">キャンセル</button>
-      <button class="btn btn-primary" id="confirmEditPersona">保存する</button>
-    </div>
-  </div>
-</div>
-
-<!-- ★ 削除確認ダイアログ -->
-<div class="confirm-overlay hidden" id="deleteConfirmOverlay">
-  <div class="confirm-box">
-    <h3>🗑️ メンバーを削除</h3>
-    <p id="deleteConfirmText">このメンバーを削除してもよろしいですか？</p>
-    <div class="confirm-footer">
-      <button class="btn" id="cancelDeleteBtn">キャンセル</button>
-      <button class="btn btn-red" id="confirmDeleteBtn">削除する</button>
-    </div>
-  </div>
-</div>
-
 <div class="toast-container" id="toastContainer"></div>
 <script src="app.js"></script>
 </body>
