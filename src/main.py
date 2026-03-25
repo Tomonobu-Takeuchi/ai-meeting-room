@@ -1,13 +1,16 @@
 """
 AI-PERSONA会議室 - メインサーバー
 """
+import io
 import os
 import sys
+import json
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from flask import Flask, Response, jsonify, request, send_from_directory
+from flask import Flask, Response, jsonify, request, send_from_directory, send_file
 from dotenv import load_dotenv
+import anthropic
 
 from src.persona.persona_manager import PersonaManager
 from src.meeting.meeting_room import MeetingRoom
@@ -50,7 +53,6 @@ def add_persona():
 
 @app.route("/api/personas/<persona_id>", methods=["PUT"])
 def update_persona(persona_id):
-    """ペルソナ情報を更新する"""
     data = request.json
     if not data:
         return jsonify({"error": "データがありません"}), 400
@@ -92,6 +94,111 @@ def post_message(session_id):
     msg = meeting_room.add_message(session_id, "user", "user", content)
     return jsonify({"message": msg})
 
+@app.route("/api/meeting/<session_id>/minutes", methods=["POST"])
+def generate_minutes(session_id):
+    summary = meeting_room.get_session_summary(session_id)
+    if not summary:
+        return jsonify({"error": "セッションが見つかりません"}), 404
+    try:
+        from docx import Document
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from datetime import datetime
+
+        discussion = ""
+        for msg in summary.get("messages", []):
+            if msg["persona_id"] == "user":
+                name = "ユーザー"
+            elif msg["persona_id"] == "facilitator":
+                name = "ファシリテータ"
+            else:
+                persona = next((m for m in summary["members"] if m["id"] == msg["persona_id"]), None)
+                name = persona["name"] if persona else msg["persona_id"]
+            discussion += f"{name}: {msg['content']}\n\n"
+
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        member_names = ", ".join([m["name"] for m in summary["members"]])
+
+        prompt = f"""以下の会議の議論から議事録を作成してください。
+
+議題：{summary['topic']}
+参加者：{member_names}
+
+議論内容：
+{discussion if discussion else "（議論なし）"}
+
+以下のJSON形式のみで出力してください（マークダウン記号なし）：
+{{
+  "conclusion": "会議の結論を2〜3文で記述",
+  "opinions": {{
+    "参加者名": "その参加者の主な意見を1〜2文で"
+  }},
+  "next_steps": "今後の進め方（改行区切り、各行を・で始める）"
+}}
+
+opinionsには全参加者分を含めてください。JSONのみ出力してください。"""
+
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1500,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        text = response.content[0].text.strip()
+        text = text.replace("```json", "").replace("```", "").strip()
+        minutes_data = json.loads(text)
+
+        doc = Document()
+
+        title = doc.add_heading('AI-PERSONA 会議議事録', 0)
+        title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        doc.add_paragraph()
+
+        now = datetime.now()
+        info_items = [
+            ("日時", now.strftime("%Y年%m月%d日 %H:%M")),
+            ("場所", "AI仮想会議室"),
+            ("議題", summary["topic"]),
+            ("参加メンバー", member_names),
+        ]
+        for label, value in info_items:
+            p = doc.add_paragraph()
+            run = p.add_run(f"{label}：")
+            run.bold = True
+            p.add_run(value)
+
+        doc.add_paragraph()
+        doc.add_heading('■ 結論', 1)
+        doc.add_paragraph(minutes_data.get("conclusion", ""))
+        doc.add_paragraph()
+
+        doc.add_heading('■ 参加者の主な意見', 1)
+        for name, opinion in minutes_data.get("opinions", {}).items():
+            p = doc.add_paragraph()
+            run = p.add_run(f"{name}：")
+            run.bold = True
+            p.add_run(opinion)
+        doc.add_paragraph()
+
+        doc.add_heading('■ 今後の進め方', 1)
+        for step in minutes_data.get("next_steps", "").split('\n'):
+            step = step.strip().lstrip('・').strip()
+            if step:
+                doc.add_paragraph(step, style='List Bullet')
+
+        buf = io.BytesIO()
+        doc.save(buf)
+        buf.seek(0)
+
+        topic_short = summary["topic"][:20].replace('/', '_').replace('\\', '_')
+        filename = f'議事録_{topic_short}_{now.strftime("%Y%m%d")}.docx'
+
+        return send_file(
+            buf, as_attachment=True, download_name=filename,
+            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/api/stream/member/<session_id>/<persona_id>")
 def stream_member(session_id, persona_id):
     trigger = request.args.get("trigger", None)
@@ -131,7 +238,6 @@ if __name__ == "__main__":
     print("=" * 50)
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key or api_key == "your_api_key_here":
-        print("\n⚠️  警告: ANTHROPIC_API_KEY が設定されていません")
-        print("   .env ファイルに ANTHROPIC_API_KEY=your_key を設定してください\n")
+        print("\n⚠️  警告: ANTHROPIC_API_KEY が設定されていません\n")
     port = int(os.getenv("PORT", 8765))
     app.run(debug=False, host="0.0.0.0", port=port, threaded=True)
