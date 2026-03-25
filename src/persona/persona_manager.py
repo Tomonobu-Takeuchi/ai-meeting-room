@@ -66,6 +66,9 @@ class PersonaManager:
                 return p
         return None
 
+    def get_personas_by_ids(self, ids: list):
+        return [p for p in self.personas if p["id"] in ids]
+
     def add_custom_persona(self, persona: dict):
         self.personas.append(persona)
         filepath = os.path.join(self.data_dir, f"{persona['id']}.json")
@@ -85,5 +88,19 @@ class PersonaManager:
 
     def get_default_personas(self):
         return DEFAULT_PERSONAS
-    def get_personas_by_ids(self, ids: list):
-        return [p for p in self.personas if p["id"] in ids]
+
+    def get_facilitator(self):
+        return {
+            "id": "facilitator",
+            "name": "ファシリテータ",
+            "role": "会議の進行役",
+            "color": "#9B59B6",
+            "icon": "🎯",
+            "avatar": "🎯"
+        }
+
+    def build_system_prompt(self, persona: dict) -> str:
+        return persona.get("prompt", f"あなたは{persona['name']}です。{persona.get('description', '')}の立場で発言してください。")
+
+    def build_facilitator_prompt(self, topic: str = "") -> str:
+        return f"あなたは会議のファシリテータです。議題「{topic}」について、参加者の意見をまとめ、議論を整理してください。"
