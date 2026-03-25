@@ -99,8 +99,11 @@ class PersonaManager:
             "avatar": "🎯"
         }
 
-    def build_system_prompt(self, persona: dict) -> str:
-        return persona.get("prompt", f"あなたは{persona['name']}です。{persona.get('description', '')}の立場で発言してください。")
+    def build_system_prompt(self, persona: dict, topic: str = "", members: list = None) -> str:
+        base = persona.get("prompt", f"あなたは{persona['name']}です。{persona.get('description', '')}の立場で発言してください。")
+        member_names = "、".join([m["name"] for m in (members or []) if m["id"] != persona["id"]])
+        return f"{base}\n\n議題：「{topic}」\n参加者：{member_names}\n\n200文字以内で簡潔に発言してください。"
 
-    def build_facilitator_prompt(self, topic: str = "") -> str:
-        return f"あなたは会議のファシリテータです。議題「{topic}」について、参加者の意見をまとめ、議論を整理してください。"
+    def build_facilitator_prompt(self, topic: str = "", members: list = None, discussion: str = "") -> str:
+        member_names = "、".join([m["name"] for m in (members or [])])
+        return f"あなたは会議のファシリテータです。\n議題：「{topic}」\n参加者：{member_names}\n\n議論内容：\n{discussion}\n\n議論を整理し、次のステップを100文字以内で示してください。"
