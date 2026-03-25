@@ -9,6 +9,8 @@ DEFAULT_PERSONAS = [
         "description": "三国志時代の天才軍師。卓越した戦略眼と先見の明を持ち、複雑な状況を俯瞰して最善策を導く。",
         "color": "#4A90D9",
         "icon": "⚔️",
+        "avatar": "⚔️",
+        "background": "",
         "prompt": "あなたは三国志の軍師・諸葛亮孔明です。卓越した戦略眼で物事を分析し、長期的視点から最善策を提案してください。故事や比喩を交えながら、論理的かつ格調高い言葉で語ってください。"
     },
     {
@@ -18,6 +20,8 @@ DEFAULT_PERSONAS = [
         "description": "豊臣秀吉。農民から天下人へ。人たらしの才能と実行力で不可能を可能にする行動派リーダー。",
         "color": "#E85D4A",
         "icon": "🏯",
+        "avatar": "🏯",
+        "background": "",
         "prompt": "あなたは豊臣秀吉です。農民から天下人になった実行力と人たらしの才能を持ちます。前向きで豪快、庶民的な視点も忘れず、どんな困難も知恵と行動力で乗り越える姿勢で発言してください。"
     },
     {
@@ -27,6 +31,8 @@ DEFAULT_PERSONAS = [
         "description": "某国立大学の教授。専門は経営学・組織論。データと理論に基づいた客観的分析が得意。",
         "color": "#27AE60",
         "icon": "🎓",
+        "avatar": "🎓",
+        "background": "",
         "prompt": "あなたは某国立大学の経営学・組織論の教授です。データと学術理論に基づいて客観的に分析し、実証研究の知見を活かしながら、論理的かつ丁寧な言葉で見解を述べてください。"
     }
 ]
@@ -40,15 +46,18 @@ class PersonaManager:
     def _load_personas(self):
         personas = []
         if os.path.exists(self.data_dir):
-            for filename in os.listdir(self.data_dir):
+            for filename in sorted(os.listdir(self.data_dir)):
                 if filename.endswith(".json"):
                     with open(os.path.join(self.data_dir, filename), "r", encoding="utf-8") as f:
                         personas.append(json.load(f))
         if not personas:
-            personas = DEFAULT_PERSONAS
+            personas = list(DEFAULT_PERSONAS)
         return personas
 
     def get_all_personas(self):
+        return self.personas
+
+    def to_dict_list(self):
         return self.personas
 
     def get_persona(self, persona_id: str):
@@ -57,12 +66,22 @@ class PersonaManager:
                 return p
         return None
 
-    def add_persona(self, persona: dict):
+    def add_custom_persona(self, persona: dict):
         self.personas.append(persona)
         filepath = os.path.join(self.data_dir, f"{persona['id']}.json")
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(persona, f, ensure_ascii=False, indent=2)
         return persona
+
+    def add_persona(self, persona: dict):
+        return self.add_custom_persona(persona)
+
+    def update_persona(self, persona_id: str, data: dict):
+        for i, p in enumerate(self.personas):
+            if p["id"] == persona_id:
+                self.personas[i].update(data)
+                return self.personas[i]
+        return None
 
     def get_default_personas(self):
         return DEFAULT_PERSONAS
