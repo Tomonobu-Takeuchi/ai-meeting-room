@@ -2,7 +2,7 @@
  * AI-PERSONA会議室 - フロントエンドロジック（音声モード対応版）
  */
 
-// ★ ペルソナごとの音声設定（rate上げで速い口調）
+// ★ ペルソナごとの音声設定
 const VOICE_SETTINGS = {
   'koumei':      { pitch: 0.95, rate: 1.20, voiceName: 'Ichiro'  }, // 落ち着いた中年男性
   'hideyoshi':   { pitch: 1.00, rate: 1.40, voiceName: 'Ichiro'  }, // 陽気な年配男性
@@ -17,6 +17,7 @@ const State = {
   addLearnFiles: [], editLearnFiles: [], deletePendingId: null,
   voiceMode: false, isSpeaking: false, isRecognizing: false,
   recognition: null, jaVoices: [],
+  speakEndResolve: null, // ★ 読み上げ完了を通知するPromise resolve
 };
 
 const $ = id => document.getElementById(id);
@@ -95,9 +96,9 @@ function selectVoice(personaId) {
   return voices[0];
 }
 
-// ★ cancel()後200ms待ってspeak()→Ichiro無音バグ回避
+// ★ Promiseを返す。読み上げ完了（onend/onerror）でresolve
 function speakText(text, personaId, targetEl = null) {
-  if (!State.voiceMode || !window.speechSynthesis) return;
+  if (!State.voiceMode || !window.speechSynthesis) return Promise.resolve();
   if (State.jaVoices.length === 0) loadVoices();
 
   const fixedText = text
@@ -115,20 +116,37 @@ function speakText(text, personaId, targetEl = null) {
   const voice = selectVoice(personaId);
   if (voice) utterance.voice = voice;
 
-  utterance.onstart = () => { State.isSpeaking = true; if (targetEl) targetEl.classList.add('voice-speaking'); };
-  utterance.onend = () => { State.isSpeaking = false; if (targetEl) targetEl.classList.remove('voice-speaking'); };
-  utterance.onerror = () => { State.isSpeaking = false; if (targetEl) targetEl.classList.remove('voice-speaking'); };
+  return new Promise((resolve) => {
+    // 前のspeakEndResolveがあれば解放
+    if (State.speakEndResolve) { State.speakEndResolve(); State.speakEndResolve = null; }
+    State.speakEndResolve = resolve;
 
-  window.speechSynthesis.cancel();
-  setTimeout(() => {
-    if (!State.voiceMode) return;
-    window.speechSynthesis.speak(utterance);
-  }, 200);
+    utterance.onstart = () => {
+      State.isSpeaking = true;
+      if (targetEl) targetEl.classList.add('voice-speaking');
+    };
+    const done = () => {
+      State.isSpeaking = false;
+      if (targetEl) targetEl.classList.remove('voice-speaking');
+      if (State.speakEndResolve) { State.speakEndResolve(); State.speakEndResolve = null; }
+    };
+    utterance.onend = done;
+    utterance.onerror = done;
+
+    // cancel()直後にspeak()するとIchiroが無音になるため200ms遅延
+    window.speechSynthesis.cancel();
+    setTimeout(() => {
+      if (!State.voiceMode) { done(); return; }
+      window.speechSynthesis.speak(utterance);
+    }, 200);
+  });
 }
 
 function stopSpeaking() {
   if (window.speechSynthesis) window.speechSynthesis.cancel();
   State.isSpeaking = false;
+  // 待機中のPromiseを解放
+  if (State.speakEndResolve) { State.speakEndResolve(); State.speakEndResolve = null; }
   document.querySelectorAll('.voice-speaking').forEach(el => el.classList.remove('voice-speaking'));
 }
 
@@ -542,7 +560,7 @@ async function sendUserMessage() {
   catch (e) { showToast('送信エラー: ' + e.message, 'error'); }
 }
 
-// ★ stopSpeaking()削除→speakTextの200ms遅延中にキャンセルされないよう
+// ★ speakPromiseをdoneイベントで解決するPromiseとして返す
 async function triggerMemberResponse(personaId, trigger = null) {
   if (!State.sessionId || State.isStreaming) return;
   State.isStreaming = true; setStreamingButtons(true);
@@ -553,28 +571,39 @@ async function triggerMemberResponse(personaId, trigger = null) {
   if (trigger) url += `?trigger=${encodeURIComponent(trigger)}`;
   const evtSource = new EventSource(url);
   let streamEl = null, fullText = '';
-  evtSource.onmessage = (e) => {
-    const data = JSON.parse(e.data);
-    if (data.type === 'chunk') {
-      typingEl?.remove();
-      if (!streamEl) streamEl = addStreamingBubble(persona);
-      appendToStreamingBubble(streamEl, data.text);
-      fullText += data.text;
-    } else if (data.type === 'done') {
-      streamEl?.querySelector('.msg-bubble')?.classList.remove('streaming');
-      evtSource.close(); State.isStreaming = false;
-      setStreamingButtons(false); setMemberSpeaking(personaId, false); scrollToBottom();
-      if (State.voiceMode && fullText) speakText(fullText, personaId, streamEl?.querySelector('.msg-bubble'));
-    } else if (data.type === 'error') {
-      typingEl?.remove(); streamEl?.remove(); evtSource.close();
+
+  return new Promise((resolve) => {
+    evtSource.onmessage = async (e) => {
+      const data = JSON.parse(e.data);
+      if (data.type === 'chunk') {
+        typingEl?.remove();
+        if (!streamEl) streamEl = addStreamingBubble(persona);
+        appendToStreamingBubble(streamEl, data.text);
+        fullText += data.text;
+      } else if (data.type === 'done') {
+        streamEl?.querySelector('.msg-bubble')?.classList.remove('streaming');
+        evtSource.close(); State.isStreaming = false;
+        setStreamingButtons(false); setMemberSpeaking(personaId, false); scrollToBottom();
+        if (State.voiceMode && fullText) {
+          // ★ 読み上げ完了を待ってからresolve
+          await speakText(fullText, personaId, streamEl?.querySelector('.msg-bubble'));
+        }
+        resolve();
+      } else if (data.type === 'error') {
+        typingEl?.remove(); streamEl?.remove(); evtSource.close();
+        State.isStreaming = false; setStreamingButtons(false); setMemberSpeaking(personaId, false);
+        showToast('エラー: ' + data.message, 'error');
+        resolve();
+      }
+    };
+    evtSource.onerror = () => {
+      typingEl?.remove(); evtSource.close();
       State.isStreaming = false; setStreamingButtons(false); setMemberSpeaking(personaId, false);
-      showToast('エラー: ' + data.message, 'error');
-    }
-  };
-  evtSource.onerror = () => { typingEl?.remove(); evtSource.close(); State.isStreaming = false; setStreamingButtons(false); setMemberSpeaking(personaId, false); };
+      resolve();
+    };
+  });
 }
 
-// ★ stopSpeaking()削除（同上）
 async function invokeFacilitator() {
   if (!State.sessionId || State.isStreaming) return;
   State.isStreaming = true; setStreamingButtons(true);
@@ -600,12 +629,11 @@ async function invokeFacilitator() {
   evtSource.onerror = () => { typingEl?.remove(); evtSource.close(); State.isStreaming = false; setStreamingButtons(false); };
 }
 
+// ★ triggerMemberResponseがspeakText完了まで待つのでwaitForSpeakEnd不要
 async function allRespond() {
   if (!State.sessionId || State.isStreaming) return;
   for (const member of State.members.filter(m => State.selectedMemberIds.includes(m.id))) {
     await triggerMemberResponse(member.id);
-    await waitForStreamEnd();
-    if (State.voiceMode) await waitForSpeakEnd();
   }
 }
 
@@ -613,23 +641,11 @@ async function autoDiscuss() {
   if (!State.sessionId || State.isStreaming) return;
   for (const member of State.members.filter(m => State.selectedMemberIds.includes(m.id))) {
     await triggerMemberResponse(member.id);
-    await waitForStreamEnd();
-    if (State.voiceMode) await waitForSpeakEnd();
   }
 }
 
 function waitForStreamEnd() {
   return new Promise(resolve => { const c = setInterval(() => { if (!State.isStreaming) { clearInterval(c); resolve(); } }, 100); });
-}
-
-// ★ 300ms待ってからisSpeaking監視（200ms遅延＋読み上げ開始を考慮）
-function waitForSpeakEnd() {
-  return new Promise(resolve => {
-    setTimeout(() => {
-      let count = 0;
-      const c = setInterval(() => { count++; if (!State.isSpeaking || count > 300) { clearInterval(c); resolve(); } }, 100);
-    }, 300);
-  });
 }
 
 async function submitAddPersona() {
