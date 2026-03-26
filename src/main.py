@@ -5,40 +5,40 @@ import io
 import os
 import sys
 import json
-
+ 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
+ 
 from flask import Flask, Response, jsonify, request, send_from_directory, send_file
 from dotenv import load_dotenv
 import anthropic
-
+ 
 from src.persona.persona_manager import PersonaManager
 from src.meeting.meeting_room import MeetingRoom
-
+ 
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
-
+ 
 app = Flask(
     __name__,
     static_folder=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web"),
     static_url_path=""
 )
-
+ 
 persona_manager = PersonaManager()
 meeting_room = MeetingRoom(persona_manager)
-
-
+ 
+ 
 @app.route("/")
 def index():
     return send_from_directory(app.static_folder, "index.html")
-
+ 
 @app.route("/api/personas", methods=["GET"])
 def get_personas():
     return jsonify({"personas": persona_manager.to_dict_list()})
-
+ 
 @app.route("/api/personas/members", methods=["GET"])
 def get_members():
     return jsonify({"members": persona_manager.get_all_personas()})
-
+ 
 @app.route("/api/personas/add", methods=["POST"])
 def add_persona():
     data = request.json
@@ -50,7 +50,7 @@ def add_persona():
     data.setdefault("background", "")
     persona = persona_manager.add_custom_persona(data)
     return jsonify({"persona": persona})
-
+ 
 @app.route("/api/personas/<persona_id>", methods=["PUT"])
 def update_persona(persona_id):
     data = request.json
@@ -60,7 +60,7 @@ def update_persona(persona_id):
     if updated is None:
         return jsonify({"error": "ペルソナが見つかりません"}), 404
     return jsonify({"persona": updated})
-
+ 
 @app.route("/api/meeting/start", methods=["POST"])
 def start_meeting():
     data = request.json
@@ -77,14 +77,14 @@ def start_meeting():
         "members": session["members"],
         "facilitator": session["facilitator"]
     })
-
+ 
 @app.route("/api/meeting/<session_id>", methods=["GET"])
 def get_session(session_id):
     summary = meeting_room.get_session_summary(session_id)
     if not summary:
         return jsonify({"error": "セッションが見つかりません"}), 404
     return jsonify(summary)
-
+ 
 @app.route("/api/meeting/<session_id>/message", methods=["POST"])
 def post_message(session_id):
     data = request.json
@@ -93,17 +93,25 @@ def post_message(session_id):
         return jsonify({"error": "メッセージを入力してください"}), 400
     msg = meeting_room.add_message(session_id, "user", "user", content)
     return jsonify({"message": msg})
-
+ 
 @app.route("/api/meeting/<session_id>/minutes", methods=["POST"])
 def generate_minutes(session_id):
     summary = meeting_room.get_session_summary(session_id)
     if not summary:
         return jsonify({"error": "セッションが見つかりません"}), 404
     try:
-        from docx import Document
-        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.lib.units import mm
+        from reportlab.lib.colors import HexColor
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.cidfonts import UnicodeCIDFont
         from datetime import datetime
-
+ 
+        pdfmetrics.registerFont(UnicodeCIDFont('HeiseiKakuGo-W5'))
+        FONT = 'HeiseiKakuGo-W5'
+ 
         discussion = ""
         for msg in summary.get("messages", []):
             if msg["persona_id"] == "user":
@@ -114,18 +122,18 @@ def generate_minutes(session_id):
                 persona = next((m for m in summary["members"] if m["id"] == msg["persona_id"]), None)
                 name = persona["name"] if persona else msg["persona_id"]
             discussion += f"{name}: {msg['content']}\n\n"
-
+ 
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         member_names = ", ".join([m["name"] for m in summary["members"]])
-
+ 
         prompt = f"""以下の会議の議論から議事録を作成してください。
-
+ 
 議題：{summary['topic']}
 参加者：{member_names}
-
+ 
 議論内容：
 {discussion if discussion else "（議論なし）"}
-
+ 
 以下のJSON形式のみで出力してください（マークダウン記号なし）：
 {{
   "conclusion": "会議の結論を2〜3文で記述",
@@ -134,71 +142,82 @@ def generate_minutes(session_id):
   }},
   "next_steps": "今後の進め方（改行区切り、各行を・で始める）"
 }}
-
+ 
 opinionsには全参加者分を含めてください。JSONのみ出力してください。"""
-
+ 
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=1500,
             messages=[{"role": "user", "content": prompt}]
         )
-
+ 
         text = response.content[0].text.strip()
         text = text.replace("```json", "").replace("```", "").strip()
         minutes_data = json.loads(text)
-
-        doc = Document()
-
-        title = doc.add_heading('AI-PERSONA 会議議事録', 0)
-        title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        doc.add_paragraph()
-
+ 
         now = datetime.now()
-        info_items = [
-            ("日時", now.strftime("%Y年%m月%d日 %H:%M")),
-            ("場所", "AI仮想会議室"),
-            ("議題", summary["topic"]),
-            ("参加メンバー", member_names),
-        ]
-        for label, value in info_items:
-            p = doc.add_paragraph()
-            run = p.add_run(f"{label}：")
-            run.bold = True
-            p.add_run(value)
-
-        doc.add_paragraph()
-        doc.add_heading('■ 結論', 1)
-        doc.add_paragraph(minutes_data.get("conclusion", ""))
-        doc.add_paragraph()
-
-        doc.add_heading('■ 参加者の主な意見', 1)
-        for name, opinion in minutes_data.get("opinions", {}).items():
-            p = doc.add_paragraph()
-            run = p.add_run(f"{name}：")
-            run.bold = True
-            p.add_run(opinion)
-        doc.add_paragraph()
-
-        doc.add_heading('■ 今後の進め方', 1)
-        for step in minutes_data.get("next_steps", "").split('\n'):
+        buf = io.BytesIO()
+        doc = SimpleDocTemplate(buf, pagesize=A4,
+            leftMargin=20*mm, rightMargin=20*mm,
+            topMargin=20*mm, bottomMargin=20*mm)
+ 
+        def make_style(size=11, bold=False, color=None):
+            s = ParagraphStyle('s', fontName=FONT, fontSize=size,
+                leading=size * 1.8, wordWrap='CJK')
+            if color:
+                s.textColor = HexColor(color)
+            return s
+ 
+        story = []
+        story.append(Paragraph('AI-PERSONA 会議議事録', make_style(18, color='#1a1a2e')))
+        story.append(Spacer(1, 6*mm))
+        story.append(HRFlowable(width='100%', thickness=1, color=HexColor('#7C3AED')))
+        story.append(Spacer(1, 4*mm))
+ 
+        for label, value in [
+            ('日時', now.strftime('%Y年%m月%d日 %H:%M')),
+            ('場所', 'AI仮想会議室'),
+            ('議題', summary['topic']),
+            ('参加メンバー', member_names),
+        ]:
+            story.append(Paragraph(f'<b>{label}：</b>{value}', make_style(10)))
+            story.append(Spacer(1, 1*mm))
+ 
+        story.append(Spacer(1, 5*mm))
+        story.append(Paragraph('■ 結論', make_style(13, color='#2563EB')))
+        story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
+        story.append(Spacer(1, 2*mm))
+        story.append(Paragraph(minutes_data.get('conclusion', ''), make_style(10)))
+ 
+        story.append(Spacer(1, 5*mm))
+        story.append(Paragraph('■ 参加者の主な意見', make_style(13, color='#2563EB')))
+        story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
+        story.append(Spacer(1, 2*mm))
+        for name, opinion in minutes_data.get('opinions', {}).items():
+            story.append(Paragraph(f'<b>{name}：</b>{opinion}', make_style(10)))
+            story.append(Spacer(1, 1*mm))
+ 
+        story.append(Spacer(1, 5*mm))
+        story.append(Paragraph('■ 今後の進め方', make_style(13, color='#2563EB')))
+        story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
+        story.append(Spacer(1, 2*mm))
+        for step in minutes_data.get('next_steps', '').split('\n'):
             step = step.strip().lstrip('・').strip()
             if step:
-                doc.add_paragraph(step, style='List Bullet')
-
-        buf = io.BytesIO()
-        doc.save(buf)
+                story.append(Paragraph(f'・{step}', make_style(10)))
+                story.append(Spacer(1, 1*mm))
+ 
+        doc.build(story)
         buf.seek(0)
-
-        topic_short = summary["topic"][:20].replace('/', '_').replace('\\', '_')
-        filename = f'議事録_{topic_short}_{now.strftime("%Y%m%d")}.docx'
-
-        return send_file(
-            buf, as_attachment=True, download_name=filename,
-            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        )
+ 
+        topic_short = summary['topic'][:20].replace('/', '_').replace('\\', '_')
+        filename = f'議事録_{topic_short}_{now.strftime("%Y%m%d")}.pdf'
+ 
+        return send_file(buf, as_attachment=True, download_name=filename,
+            mimetype='application/pdf')
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
+ 
 @app.route("/api/stream/member/<session_id>/<persona_id>")
 def stream_member(session_id, persona_id):
     trigger = request.args.get("trigger", None)
@@ -206,21 +225,21 @@ def stream_member(session_id, persona_id):
         yield from meeting_room.generate_member_response_stream(session_id, persona_id, trigger)
     return Response(generate(), mimetype="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-
+ 
 @app.route("/api/stream/facilitator/<session_id>")
 def stream_facilitator(session_id):
     def generate():
         yield from meeting_room.generate_facilitator_response_stream(session_id)
     return Response(generate(), mimetype="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-
+ 
 @app.route("/api/stream/auto/<session_id>")
 def stream_auto(session_id):
     def generate():
         yield from meeting_room.generate_auto_discussion_stream(session_id)
     return Response(generate(), mimetype="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-
+ 
 @app.route("/api/health")
 def health():
     api_key = os.getenv("ANTHROPIC_API_KEY")
@@ -230,7 +249,7 @@ def health():
         "personas": len(persona_manager.get_all_personas()),
         "version": "Phase1-MVP"
     })
-
+ 
 if __name__ == "__main__":
     print("=" * 50)
     print("  AI-PERSONA会議室 起動中...")
@@ -241,3 +260,4 @@ if __name__ == "__main__":
         print("\n⚠️  警告: ANTHROPIC_API_KEY が設定されていません\n")
     port = int(os.getenv("PORT", 8765))
     app.run(debug=False, host="0.0.0.0", port=port, threaded=True)
+ 

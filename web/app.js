@@ -7,7 +7,7 @@ const State = {
   avatarImages: {}, addAvatarDataUrl: null, editAvatarDataUrl: null,
   addLearnFiles: [], editLearnFiles: [], deletePendingId: null,
 };
-
+ 
 const $ = id => document.getElementById(id);
 const DOM = {
   newMeetingBtn: $('newMeetingBtn'), facilitatorBtn: $('facilitatorBtn'),
@@ -38,7 +38,7 @@ const DOM = {
   minutesBar: $('minutesBar'),
   minutesBtn: $('minutesBtn'),
 };
-
+ 
 const API = {
   async get(path) {
     const res = await fetch(path);
@@ -62,47 +62,42 @@ const API = {
     return res.json();
   },
 };
-
+ 
 async function init() {
   try {
     const data = await API.get('/api/personas/members');
     State.members = data.members;
     renderMemberList();
   } catch (e) { showToast('ペルソナ読み込み失敗: ' + e.message, 'error'); }
-
+ 
   DOM.newMeetingBtn.addEventListener('click', resetMeeting);
-  DOM.startMeetingBtn.addEventListener('click', showMemberSelectModal); // ★ ポップアップに変更
+  DOM.startMeetingBtn.addEventListener('click', showMemberSelectModal);
   DOM.facilitatorBtn.addEventListener('click', invokeFacilitator);
   DOM.autoDiscussBtn.addEventListener('click', autoDiscuss);
   DOM.sendBtn.addEventListener('click', sendUserMessage);
   DOM.allRespondBtn.addEventListener('click', allRespond);
-
-  // ★ メンバー選択モーダル
+ 
   DOM.cancelMemberSelect.addEventListener('click', () => DOM.memberSelectModal.classList.add('hidden'));
   DOM.confirmMemberSelect.addEventListener('click', startMeetingFromModal);
-
-  // ★ まとめる・議事録
+ 
   DOM.summarizeBtn.addEventListener('click', summarizeMeeting);
   DOM.minutesBtn.addEventListener('click', downloadMinutes);
-
-  // ペルソナ追加モーダル
+ 
   DOM.addMemberBtn.addEventListener('click', openAddModal);
   DOM.cancelAddPersona.addEventListener('click', closeAddModal);
   DOM.confirmAddPersona.addEventListener('click', submitAddPersona);
-
-  // ペルソナ編集モーダル
+ 
   DOM.cancelEditPersona.addEventListener('click', closeEditModal);
   DOM.confirmEditPersona.addEventListener('click', submitEditPersona);
-
-  // 削除確認
+ 
   DOM.cancelDeleteBtn.addEventListener('click', () => {
     DOM.deleteConfirmOverlay.classList.add('hidden');
     State.deletePendingId = null;
   });
   DOM.confirmDeleteBtn.addEventListener('click', executeDeletion);
-
+ 
   DOM.fileInput.addEventListener('change', handleFileAttach);
-
+ 
   $('pAvatar').addEventListener('input', () => {
     if (!State.addAvatarDataUrl) DOM.addAvatarPreview.innerHTML = $('pAvatar').value || '👤';
   });
@@ -125,7 +120,7 @@ async function init() {
   $('learnImageFile').addEventListener('change', (e) => handleLearnFiles(e, 'add', 'image'));
   $('editLearnTextFile').addEventListener('change', (e) => handleLearnFiles(e, 'edit', 'text'));
   $('editLearnImageFile').addEventListener('change', (e) => handleLearnFiles(e, 'edit', 'image'));
-
+ 
   DOM.chatInput.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendUserMessage(); }
   });
@@ -134,7 +129,7 @@ async function init() {
     DOM.chatInput.style.height = Math.min(DOM.chatInput.scrollHeight, 120) + 'px';
   });
 }
-
+ 
 // ===== ★ メンバー選択ポップアップ =====
 function showMemberSelectModal() {
   const topic = DOM.topicInput.value.trim();
@@ -158,7 +153,7 @@ function showMemberSelectModal() {
   });
   DOM.memberSelectModal.classList.remove('hidden');
 }
-
+ 
 async function startMeetingFromModal() {
   const checked = DOM.memberCheckList.querySelectorAll('input[type="checkbox"]:checked');
   if (checked.length === 0) { showToast('最低1人選択してください', 'error'); return; }
@@ -166,7 +161,7 @@ async function startMeetingFromModal() {
   DOM.memberSelectModal.classList.add('hidden');
   await startMeeting();
 }
-
+ 
 // ===== ★ まとめる =====
 async function summarizeMeeting() {
   if (!State.sessionId || State.isStreaming) return;
@@ -183,7 +178,7 @@ async function summarizeMeeting() {
       appendToFacilitatorBanner(streamEl, data.text);
     } else if (data.type === 'done') {
       evtSource.close(); State.isStreaming = false; setStreamingButtons(false);
-      DOM.minutesBar.classList.remove('hidden'); // ★ 議事録ボタン表示
+      DOM.minutesBar.classList.remove('hidden');
       scrollToBottom();
     } else if (data.type === 'error') {
       typingEl?.remove(); streamEl?.remove(); evtSource.close();
@@ -198,8 +193,8 @@ async function summarizeMeeting() {
     DOM.summarizeBtn.disabled = false;
   };
 }
-
-// ===== ★ 議事録ダウンロード =====
+ 
+// ===== ★ 議事録ダウンロード（PDF） =====
 async function downloadMinutes() {
   if (!State.sessionId) return;
   const btn = DOM.minutesBtn;
@@ -216,7 +211,7 @@ async function downloadMinutes() {
     const a = document.createElement('a');
     a.href = url;
     const topic = State.topic.slice(0, 20).replace(/[/\\]/g, '_');
-    a.download = `議事録_${topic}_${new Date().toISOString().slice(0, 10)}.docx`;
+    a.download = `議事録_${topic}_${new Date().toISOString().slice(0, 10)}.pdf`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -226,10 +221,10 @@ async function downloadMinutes() {
     showToast('ダウンロードエラー: ' + e.message, 'error');
   } finally {
     btn.disabled = false;
-    btn.textContent = '📄 議事録をダウンロード（Word）';
+    btn.textContent = '📄 議事録をダウンロード（PDF）';
   }
 }
-
+ 
 // ===== 学習データ処理 =====
 async function handleLearnFiles(e, mode, type) {
   const files = Array.from(e.target.files);
@@ -249,7 +244,7 @@ async function handleLearnFiles(e, mode, type) {
   }
   renderLearnDataList(mode); e.target.value = '';
 }
-
+ 
 function readFileAsText(file) {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -258,7 +253,7 @@ function readFileAsText(file) {
     reader.readAsText(file, 'UTF-8');
   });
 }
-
+ 
 function readFileAsDataUrl(file) {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -267,7 +262,7 @@ function readFileAsDataUrl(file) {
     reader.readAsDataURL(file);
   });
 }
-
+ 
 function renderLearnDataList(mode) {
   const listKey = mode === 'add' ? 'addLearnFiles' : 'editLearnFiles';
   const listEl = mode === 'add' ? DOM.learnDataList : DOM.editLearnDataList;
@@ -285,20 +280,20 @@ function renderLearnDataList(mode) {
     });
   });
 }
-
+ 
 function buildBackgroundFromLearnData(existingBackground, learnFiles) {
   if (learnFiles.length === 0) return existingBackground;
   const texts = learnFiles.filter(f => f.type === 'text' || f.type === 'pdf').map(f => f.content).join('\n\n');
   if (!texts) return existingBackground;
   return existingBackground ? existingBackground + '\n\n--- 学習データ ---\n' + texts.slice(0, 2000) : texts.slice(0, 2000);
 }
-
+ 
 // ===== メンバーリスト描画 =====
 function renderMemberList() {
   DOM.memberList.innerHTML = '';
   if (State.selectedMemberIds.length === 0)
     State.selectedMemberIds = State.members.map(m => m.id);
-
+ 
   State.members.forEach(member => {
     const isSelected = State.selectedMemberIds.includes(member.id);
     const card = document.createElement('div');
@@ -327,7 +322,7 @@ function renderMemberList() {
   });
   renderMemberTriggers();
 }
-
+ 
 function toggleMemberSelection(memberId) {
   if (State.sessionId) return;
   const idx = State.selectedMemberIds.indexOf(memberId);
@@ -335,7 +330,7 @@ function toggleMemberSelection(memberId) {
   else State.selectedMemberIds.push(memberId);
   renderMemberList();
 }
-
+ 
 function renderMemberTriggers() {
   DOM.memberTriggers.innerHTML = '';
   State.members.filter(m => State.selectedMemberIds.includes(m.id)).forEach(member => {
@@ -346,7 +341,7 @@ function renderMemberTriggers() {
     DOM.memberTriggers.appendChild(btn);
   });
 }
-
+ 
 // ===== 追加モーダル =====
 function openAddModal() {
   State.addAvatarDataUrl = null; State.addLearnFiles = [];
@@ -358,7 +353,7 @@ function openAddModal() {
   DOM.addPersonaModal.classList.remove('hidden');
 }
 function closeAddModal() { DOM.addPersonaModal.classList.add('hidden'); }
-
+ 
 // ===== 編集モーダル =====
 function openEditModal(memberId) {
   const member = State.members.find(m => m.id === memberId);
@@ -379,7 +374,7 @@ function openEditModal(memberId) {
   DOM.editPersonaModal.classList.remove('hidden');
 }
 function closeEditModal() { DOM.editPersonaModal.classList.add('hidden'); State.editAvatarDataUrl = null; State.editLearnFiles = []; }
-
+ 
 async function submitEditPersona() {
   const memberId = $('editPersonaId').value;
   const name = $('eName').value.trim();
@@ -399,7 +394,7 @@ async function submitEditPersona() {
     showToast(`${name} の設定を保存しました`, 'success');
   } catch (e) { showToast('保存エラー: ' + e.message, 'error'); }
 }
-
+ 
 // ===== 削除確認 =====
 function openDeleteConfirm(memberId) {
   const member = State.members.find(m => m.id === memberId);
@@ -408,7 +403,7 @@ function openDeleteConfirm(memberId) {
   DOM.deleteConfirmText.textContent = `「${member.name}」を参加メンバーから削除してもよろしいですか？`;
   DOM.deleteConfirmOverlay.classList.remove('hidden');
 }
-
+ 
 function executeDeletion() {
   const memberId = State.deletePendingId; if (!memberId) return;
   const member = State.members.find(m => m.id === memberId);
@@ -423,7 +418,7 @@ function executeDeletion() {
   State.deletePendingId = null;
   showToast(`${memberName} を削除しました`, 'success');
 }
-
+ 
 // ===== 会議制御 =====
 async function startMeeting() {
   const topic = DOM.topicInput.value.trim();
@@ -440,7 +435,7 @@ async function startMeeting() {
     DOM.sessionBar.classList.remove('hidden');
     DOM.sessionInfo.textContent = `会議ID: ${State.sessionId} ・ 議題: ${State.topic}`;
     DOM.facilitatorBtn.disabled = false; DOM.autoDiscussBtn.disabled = false;
-    DOM.summarizeBtn.disabled = false; // ★ まとめるボタン有効化
+    DOM.summarizeBtn.disabled = false;
     DOM.topicInput.disabled = true; DOM.startMeetingBtn.disabled = true;
     renderMemberList(); renderMemberTriggers();
     addSystemMessage(`会議を開始しました。議題：${State.topic}`);
@@ -449,7 +444,7 @@ async function startMeeting() {
   } catch (e) { showToast('会議開始エラー: ' + e.message, 'error'); }
   finally { setLoading(false); }
 }
-
+ 
 function resetMeeting() {
   if (State.sessionId && !confirm('現在の会議を終了して新しい会議を始めますか？')) return;
   State.sessionId = null; State.topic = ''; State.selectedMemberIds = [];
@@ -457,14 +452,14 @@ function resetMeeting() {
   DOM.chatMessages.innerHTML = '';
   DOM.chatMessages.classList.add('hidden'); DOM.chatInputArea.classList.add('hidden');
   DOM.welcomeScreen.classList.remove('hidden'); DOM.sessionBar.classList.add('hidden');
-  DOM.minutesBar.classList.add('hidden'); // ★ 議事録バー非表示
+  DOM.minutesBar.classList.add('hidden');
   DOM.topicInput.disabled = false; DOM.topicInput.value = '';
   DOM.startMeetingBtn.disabled = false; DOM.facilitatorBtn.disabled = true;
-  DOM.autoDiscussBtn.disabled = true; DOM.summarizeBtn.disabled = true; // ★
+  DOM.autoDiscussBtn.disabled = true; DOM.summarizeBtn.disabled = true;
   State.selectedMemberIds = State.members.map(m => m.id);
   renderMemberList();
 }
-
+ 
 async function sendUserMessage() {
   const content = DOM.chatInput.value.trim();
   if (!content || !State.sessionId || State.isStreaming) return;
@@ -473,7 +468,7 @@ async function sendUserMessage() {
   try { await API.post(`/api/meeting/${State.sessionId}/message`, { content }); }
   catch (e) { showToast('送信エラー: ' + e.message, 'error'); }
 }
-
+ 
 async function triggerMemberResponse(personaId, trigger = null) {
   if (!State.sessionId || State.isStreaming) return;
   State.isStreaming = true; setStreamingButtons(true);
@@ -506,7 +501,7 @@ async function triggerMemberResponse(personaId, trigger = null) {
     State.isStreaming = false; setStreamingButtons(false); setMemberSpeaking(personaId, false);
   };
 }
-
+ 
 async function invokeFacilitator() {
   if (!State.sessionId || State.isStreaming) return;
   State.isStreaming = true; setStreamingButtons(true);
@@ -529,7 +524,7 @@ async function invokeFacilitator() {
   };
   evtSource.onerror = () => { typingEl?.remove(); evtSource.close(); State.isStreaming = false; setStreamingButtons(false); };
 }
-
+ 
 async function allRespond() {
   if (!State.sessionId || State.isStreaming) return;
   for (const member of State.members.filter(m => State.selectedMemberIds.includes(m.id))) {
@@ -537,7 +532,7 @@ async function allRespond() {
     await waitForStreamEnd();
   }
 }
-
+ 
 async function autoDiscuss() {
   if (!State.sessionId || State.isStreaming) return;
   for (const member of State.members.filter(m => State.selectedMemberIds.includes(m.id))) {
@@ -545,13 +540,13 @@ async function autoDiscuss() {
     await waitForStreamEnd();
   }
 }
-
+ 
 function waitForStreamEnd() {
   return new Promise(resolve => {
     const check = setInterval(() => { if (!State.isStreaming) { clearInterval(check); resolve(); } }, 100);
   });
 }
-
+ 
 // ===== ペルソナ追加 =====
 async function submitAddPersona() {
   const name = $('pName').value.trim();
@@ -571,14 +566,14 @@ async function submitAddPersona() {
     showToast(`${name} を追加しました`, 'success');
   } catch (e) { showToast('追加エラー: ' + e.message, 'error'); }
 }
-
+ 
 function handleFileAttach(e) {
   Array.from(e.target.files).forEach(file => {
     if (!State.attachedFiles.find(f => f.name === file.name)) State.attachedFiles.push(file);
   });
   renderAttachments(); e.target.value = '';
 }
-
+ 
 function renderAttachments() {
   if (State.attachedFiles.length === 0) { DOM.attachmentsBar.style.display = 'none'; return; }
   DOM.attachmentsBar.style.display = 'flex';
@@ -589,7 +584,7 @@ function renderAttachments() {
     btn.addEventListener('click', () => { State.attachedFiles.splice(parseInt(btn.dataset.idx), 1); renderAttachments(); });
   });
 }
-
+ 
 function addMessage(msg) {
   const persona = msg.persona_id === 'user'
     ? { name: 'あなた', avatar: '👤', color: '#2563EB' }
@@ -608,12 +603,12 @@ function addMessage(msg) {
   }
   DOM.chatMessages.appendChild(row); scrollToBottom(); return row;
 }
-
+ 
 function addSystemMessage(text) {
   const el = document.createElement('div'); el.className = 'system-msg'; el.textContent = text;
   DOM.chatMessages.appendChild(el); scrollToBottom();
 }
-
+ 
 function addTypingIndicator(persona, isFacilitator = false) {
   const row = document.createElement('div');
   row.className = `message-row ${isFacilitator ? 'facilitator' : 'member'} typing-row`;
@@ -630,7 +625,7 @@ function addTypingIndicator(persona, isFacilitator = false) {
   }
   DOM.chatMessages.appendChild(row); scrollToBottom(); return row;
 }
-
+ 
 function addStreamingBubble(persona) {
   const row = document.createElement('div'); row.className = 'message-row member';
   const avatarContent = State.avatarImages[persona.id]
@@ -640,23 +635,23 @@ function addStreamingBubble(persona) {
     <div class="msg-body"><div class="msg-name">${persona.name}</div><div class="msg-bubble streaming"></div></div>`;
   DOM.chatMessages.appendChild(row); scrollToBottom(); return row;
 }
-
+ 
 function appendToStreamingBubble(row, text) {
   const bubble = row.querySelector('.msg-bubble');
   if (bubble) { bubble.textContent += text; scrollToBottom(); }
 }
-
+ 
 function addFacilitatorBanner() {
   const row = document.createElement('div'); row.className = 'message-row facilitator';
   row.innerHTML = `<div class="facilitator-banner"><div class="facilitator-label">🎯 ファシリテーター</div><div class="facilitator-text"></div></div>`;
   DOM.chatMessages.appendChild(row); scrollToBottom(); return row;
 }
-
+ 
 function appendToFacilitatorBanner(row, text) {
   const el = row.querySelector('.facilitator-text');
   if (el) { el.textContent += text; scrollToBottom(); }
 }
-
+ 
 function setMemberSpeaking(personaId, isSpeaking) {
   DOM.memberList.querySelectorAll('.member-card').forEach(card => {
     const s = card.querySelector('.member-status');
@@ -669,25 +664,26 @@ function setMemberSpeaking(personaId, isSpeaking) {
     if (btn.dataset.id === personaId) btn.classList.toggle('active', isSpeaking);
   });
 }
-
+ 
 function setStreamingButtons(isStreaming) {
   DOM.sendBtn.disabled = isStreaming; DOM.allRespondBtn.disabled = isStreaming;
   DOM.autoDiscussBtn.disabled = isStreaming; DOM.facilitatorBtn.disabled = isStreaming;
   DOM.memberTriggers.querySelectorAll('.member-trigger-btn').forEach(btn => btn.disabled = isStreaming);
 }
-
+ 
 function setLoading(isLoading) {
   DOM.startMeetingBtn.disabled = isLoading;
   DOM.startMeetingBtn.textContent = isLoading ? '⏳ 開始中...' : '▶ 会議開始';
 }
-
+ 
 function scrollToBottom() { DOM.chatMessages.scrollTop = DOM.chatMessages.scrollHeight; }
-
+ 
 function showToast(msg, type = 'info') {
   const toast = document.createElement('div'); toast.className = `toast ${type}`; toast.textContent = msg;
   DOM.toastContainer.appendChild(toast); setTimeout(() => toast.remove(), 3500);
 }
-
+ 
 function escapeHtml(text) { const d = document.createElement('div'); d.textContent = text; return d.innerHTML; }
-
+ 
 document.addEventListener('DOMContentLoaded', init);
+ 
