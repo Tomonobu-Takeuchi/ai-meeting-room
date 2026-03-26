@@ -2,12 +2,12 @@
  * AI-PERSONA会議室 - フロントエンドロジック（音声モード対応版）
  */
 
-// ★ ペルソナごとの音声設定
+// ★ ペルソナごとの音声設定（rate上げで速い口調）
 const VOICE_SETTINGS = {
-  'koumei':      { pitch: 0.95, rate: 0.82, voiceName: 'Ichiro'  }, // 落ち着いた中年男性
-  'hideyoshi':   { pitch: 1.00, rate: 1.08, voiceName: 'Ichiro'  }, // 陽気な年配男性
-  'professor':   { pitch: 1.00, rate: 0.95, voiceName: 'Ichiro'  }, // 若い男性
-  'facilitator': { pitch: 1.10, rate: 1.00, voiceName: 'Haruka'  }, // 若い女性
+  'koumei':      { pitch: 0.95, rate: 1.20, voiceName: 'Ichiro'  }, // 落ち着いた中年男性
+  'hideyoshi':   { pitch: 1.00, rate: 1.40, voiceName: 'Ichiro'  }, // 陽気な年配男性
+  'professor':   { pitch: 1.00, rate: 1.30, voiceName: 'Ichiro'  }, // 若い男性
+  'facilitator': { pitch: 1.10, rate: 1.25, voiceName: 'Haruka'  }, // 若い女性
 };
 
 const State = {
@@ -95,12 +95,11 @@ function selectVoice(personaId) {
   return voices[0];
 }
 
-// ★ cancel()後に200ms待ってからspeak()することでIchiro音声の無音バグを回避
+// ★ cancel()後200ms待ってspeak()→Ichiro無音バグ回避
 function speakText(text, personaId, targetEl = null) {
   if (!State.voiceMode || !window.speechSynthesis) return;
   if (State.jaVoices.length === 0) loadVoices();
 
-  // ★ 漢字の読み間違いを修正
   const fixedText = text
     .replace(/秀吉/g, 'ひでよし')
     .replace(/孔明/g, 'こうめい')
@@ -120,10 +119,9 @@ function speakText(text, personaId, targetEl = null) {
   utterance.onend = () => { State.isSpeaking = false; if (targetEl) targetEl.classList.remove('voice-speaking'); };
   utterance.onerror = () => { State.isSpeaking = false; if (targetEl) targetEl.classList.remove('voice-speaking'); };
 
-  // ★ cancel()直後にspeak()するとIchiroが無音になるため200ms遅延
   window.speechSynthesis.cancel();
   setTimeout(() => {
-    if (!State.voiceMode) return; // 待機中にOFFになった場合はスキップ
+    if (!State.voiceMode) return;
     window.speechSynthesis.speak(utterance);
   }, 200);
 }
@@ -544,9 +542,9 @@ async function sendUserMessage() {
   catch (e) { showToast('送信エラー: ' + e.message, 'error'); }
 }
 
+// ★ stopSpeaking()削除→speakTextの200ms遅延中にキャンセルされないよう
 async function triggerMemberResponse(personaId, trigger = null) {
   if (!State.sessionId || State.isStreaming) return;
-  if (State.voiceMode) stopSpeaking();
   State.isStreaming = true; setStreamingButtons(true);
   const persona = State.members.find(m => m.id === personaId); if (!persona) return;
   const typingEl = addTypingIndicator(persona);
@@ -576,9 +574,9 @@ async function triggerMemberResponse(personaId, trigger = null) {
   evtSource.onerror = () => { typingEl?.remove(); evtSource.close(); State.isStreaming = false; setStreamingButtons(false); setMemberSpeaking(personaId, false); };
 }
 
+// ★ stopSpeaking()削除（同上）
 async function invokeFacilitator() {
   if (!State.sessionId || State.isStreaming) return;
-  if (State.voiceMode) stopSpeaking();
   State.isStreaming = true; setStreamingButtons(true);
   const typingEl = addTypingIndicator(State.facilitator, true);
   const evtSource = new EventSource(`/api/stream/facilitator/${State.sessionId}`);
@@ -623,10 +621,14 @@ async function autoDiscuss() {
 function waitForStreamEnd() {
   return new Promise(resolve => { const c = setInterval(() => { if (!State.isStreaming) { clearInterval(c); resolve(); } }, 100); });
 }
+
+// ★ 300ms待ってからisSpeaking監視（200ms遅延＋読み上げ開始を考慮）
 function waitForSpeakEnd() {
   return new Promise(resolve => {
-    let count = 0;
-    const c = setInterval(() => { count++; if (!State.isSpeaking || count > 300) { clearInterval(c); resolve(); } }, 100);
+    setTimeout(() => {
+      let count = 0;
+      const c = setInterval(() => { count++; if (!State.isSpeaking || count > 300) { clearInterval(c); resolve(); } }, 100);
+    }, 300);
   });
 }
 
