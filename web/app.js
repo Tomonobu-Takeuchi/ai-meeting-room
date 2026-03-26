@@ -83,9 +83,7 @@ function loadVoices() {
   State.jaVoices = voices.filter(v => v.lang.startsWith('ja'));
 }
 
-// ★ voiceNameで音声を選択
 function selectVoice(personaId) {
-  // 音声リストが空なら再ロード
   if (State.jaVoices.length === 0) loadVoices();
   const voices = State.jaVoices;
   if (voices.length === 0) return null;
@@ -97,11 +95,11 @@ function selectVoice(personaId) {
   return voices[0];
 }
 
+// ★ cancel()後に200ms待ってからspeak()することでIchiro音声の無音バグを回避
 function speakText(text, personaId, targetEl = null) {
   if (!State.voiceMode || !window.speechSynthesis) return;
-  // 音声リストが空なら再ロード
   if (State.jaVoices.length === 0) loadVoices();
-  window.speechSynthesis.cancel();
+
   // ★ 漢字の読み間違いを修正
   const fixedText = text
     .replace(/秀吉/g, 'ひでよし')
@@ -109,6 +107,7 @@ function speakText(text, personaId, targetEl = null) {
     .replace(/諸葛/g, 'しょかつ')
     .replace(/ファシリテータ/g, 'ふぁしりてーたー');
   const speakStr = fixedText.length > 500 ? fixedText.slice(0, 500) + '…' : fixedText;
+
   const utterance = new SpeechSynthesisUtterance(speakStr);
   utterance.lang = 'ja-JP';
   const settings = VOICE_SETTINGS[personaId] || { pitch: 1.0, rate: 1.0 };
@@ -116,10 +115,17 @@ function speakText(text, personaId, targetEl = null) {
   utterance.rate = settings.rate;
   const voice = selectVoice(personaId);
   if (voice) utterance.voice = voice;
+
   utterance.onstart = () => { State.isSpeaking = true; if (targetEl) targetEl.classList.add('voice-speaking'); };
   utterance.onend = () => { State.isSpeaking = false; if (targetEl) targetEl.classList.remove('voice-speaking'); };
   utterance.onerror = () => { State.isSpeaking = false; if (targetEl) targetEl.classList.remove('voice-speaking'); };
-  window.speechSynthesis.speak(utterance);
+
+  // ★ cancel()直後にspeak()するとIchiroが無音になるため200ms遅延
+  window.speechSynthesis.cancel();
+  setTimeout(() => {
+    if (!State.voiceMode) return; // 待機中にOFFになった場合はスキップ
+    window.speechSynthesis.speak(utterance);
+  }, 200);
 }
 
 function stopSpeaking() {
