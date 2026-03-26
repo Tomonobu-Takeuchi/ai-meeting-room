@@ -10,6 +10,9 @@ const VOICE_SETTINGS = {
   'facilitator': { pitch: 1.10, rate: 1.25, voiceName: 'Haruka'  }, // 若い女性
 };
 
+// ★ iOS判定
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
 const State = {
   sessionId: null, topic: '', members: [], facilitator: null,
   selectedMemberIds: [], isStreaming: false, attachedFiles: [], streamingMessages: {},
@@ -17,7 +20,7 @@ const State = {
   addLearnFiles: [], editLearnFiles: [], deletePendingId: null,
   voiceMode: false, isSpeaking: false, isRecognizing: false,
   recognition: null, jaVoices: [],
-  speakEndResolve: null, // ★ 読み上げ完了を通知するPromise resolve
+  speakEndResolve: null,
 };
 
 const $ = id => document.getElementById(id);
@@ -96,7 +99,7 @@ function selectVoice(personaId) {
   return voices[0];
 }
 
-// ★ Promiseを返す。読み上げ完了（onend/onerror）でresolve
+// ★ iOSはcancel()不要・遅延不要。PCはIchiro無音バグのため200ms遅延
 function speakText(text, personaId, targetEl = null) {
   if (!State.voiceMode || !window.speechSynthesis) return Promise.resolve();
   if (State.jaVoices.length === 0) loadVoices();
@@ -117,7 +120,6 @@ function speakText(text, personaId, targetEl = null) {
   if (voice) utterance.voice = voice;
 
   return new Promise((resolve) => {
-    // 前のspeakEndResolveがあれば解放
     if (State.speakEndResolve) { State.speakEndResolve(); State.speakEndResolve = null; }
     State.speakEndResolve = resolve;
 
@@ -133,19 +135,23 @@ function speakText(text, personaId, targetEl = null) {
     utterance.onend = done;
     utterance.onerror = done;
 
-    // cancel()直後にspeak()するとIchiroが無音になるため200ms遅延
-    window.speechSynthesis.cancel();
-    setTimeout(() => {
-      if (!State.voiceMode) { done(); return; }
+    if (isIOS) {
+      // ★ iOSはcancel()せず直接speak()（cancel()するとiOSでは次のspeak()がブロックされる）
       window.speechSynthesis.speak(utterance);
-    }, 200);
+    } else {
+      // PCはcancel()後200ms待つことでIchiro無音バグを回避
+      window.speechSynthesis.cancel();
+      setTimeout(() => {
+        if (!State.voiceMode) { done(); return; }
+        window.speechSynthesis.speak(utterance);
+      }, 200);
+    }
   });
 }
 
 function stopSpeaking() {
   if (window.speechSynthesis) window.speechSynthesis.cancel();
   State.isSpeaking = false;
-  // 待機中のPromiseを解放
   if (State.speakEndResolve) { State.speakEndResolve(); State.speakEndResolve = null; }
   document.querySelectorAll('.voice-speaking').forEach(el => el.classList.remove('voice-speaking'));
 }
@@ -196,6 +202,13 @@ function toggleVoiceMode() {
     DOM.topicMicBtn.classList.remove('hidden');
     if (State.sessionId) DOM.micBtn.classList.remove('hidden');
     loadVoices();
+    // ★ iOS対応：ユーザー操作タイミングで無音発話してspeechSynthesisをアンロック
+    if (isIOS && window.speechSynthesis) {
+      const unlock = new SpeechSynthesisUtterance('');
+      unlock.volume = 0;
+      unlock.onend = () => loadVoices(); // アンロック後に音声リストを再取得
+      window.speechSynthesis.speak(unlock);
+    }
     showToast('音声モードON：AIの発言を読み上げます', 'success');
   } else {
     DOM.voiceModeBtn.classList.remove('active');
@@ -560,7 +573,6 @@ async function sendUserMessage() {
   catch (e) { showToast('送信エラー: ' + e.message, 'error'); }
 }
 
-// ★ speakPromiseをdoneイベントで解決するPromiseとして返す
 async function triggerMemberResponse(personaId, trigger = null) {
   if (!State.sessionId || State.isStreaming) return;
   State.isStreaming = true; setStreamingButtons(true);
@@ -585,7 +597,6 @@ async function triggerMemberResponse(personaId, trigger = null) {
         evtSource.close(); State.isStreaming = false;
         setStreamingButtons(false); setMemberSpeaking(personaId, false); scrollToBottom();
         if (State.voiceMode && fullText) {
-          // ★ 読み上げ完了を待ってからresolve
           await speakText(fullText, personaId, streamEl?.querySelector('.msg-bubble'));
         }
         resolve();
@@ -629,7 +640,6 @@ async function invokeFacilitator() {
   evtSource.onerror = () => { typingEl?.remove(); evtSource.close(); State.isStreaming = false; setStreamingButtons(false); };
 }
 
-// ★ triggerMemberResponseがspeakText完了まで待つのでwaitForSpeakEnd不要
 async function allRespond() {
   if (!State.sessionId || State.isStreaming) return;
   for (const member of State.members.filter(m => State.selectedMemberIds.includes(m.id))) {
