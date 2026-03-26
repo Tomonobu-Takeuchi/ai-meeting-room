@@ -11,7 +11,7 @@
       --bg-base:#0D1117;--bg-surface:#161B22;--bg-elevated:#1C2333;--bg-hover:#21273A;
       --border:#30363D;--border-subtle:#21262D;--text-primary:#E6EDF3;--text-secondary:#8B949E;
       --text-muted:#484F58;--accent-blue:#2563EB;--accent-purple:#7C3AED;--accent-green:#16A34A;
-      --accent-red:#DC2626;--accent-orange:#D97706;
+      --accent-red:#DC2626;--accent-orange:#D97706;--accent-teal:#0891B2;
       --bubble-user:#1D4ED8;--bubble-member:#1C2333;--bubble-facilitator:#2D1B69;
       --radius:10px;--radius-lg:16px;--shadow:0 4px 24px rgba(0,0,0,0.4);
     }
@@ -20,7 +20,6 @@
     header{background:var(--bg-surface);border-bottom:1px solid var(--border);padding:0 20px;height:56px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:12px;}
     .header-left,.header-right{display:flex;align-items:center;gap:8px;}
     .header-center{flex:1;text-align:center;}
-    /* ★ ロゴ文字を1.5倍に */
     .logo{font-family:'Space Mono',monospace;font-size:22px;font-weight:700;color:var(--text-primary);letter-spacing:0.5px;white-space:nowrap;}
     .logo span{color:#7C3AED;}
     .btn{padding:7px 14px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-elevated);color:var(--text-primary);font-size:12px;font-family:'Noto Sans JP',sans-serif;cursor:pointer;transition:all 0.15s;white-space:nowrap;}
@@ -33,6 +32,15 @@
     .btn-green:hover{background:#15803D;}
     .btn-orange{background:var(--accent-orange);border-color:var(--accent-orange);color:#fff;}
     .btn-orange:hover{background:#B45309;}
+    .btn-voice{background:var(--bg-elevated);border-color:var(--accent-teal);color:var(--accent-teal);}
+    .btn-voice:hover{background:rgba(8,145,178,0.15);}
+    .btn-voice.active{background:var(--accent-teal);border-color:var(--accent-teal);color:#fff;animation:voicePulse 2s infinite;}
+    @keyframes voicePulse{0%,100%{box-shadow:0 0 0 0 rgba(8,145,178,0.4);}50%{box-shadow:0 0 0 6px rgba(8,145,178,0);}}
+    .btn-mic{padding:7px 12px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-elevated);color:var(--text-secondary);font-size:16px;cursor:pointer;transition:all 0.15s;flex-shrink:0;line-height:1;}
+    .btn-mic:hover{border-color:var(--accent-teal);color:var(--accent-teal);}
+    .btn-mic.recording{background:var(--accent-red);border-color:var(--accent-red);color:#fff;animation:micPulse 0.8s infinite;}
+    @keyframes micPulse{0%,100%{opacity:1;}50%{opacity:0.5;}}
+    .btn-mic:disabled{opacity:0.4;cursor:not-allowed;}
     .btn:disabled{opacity:0.4;cursor:not-allowed;}
     .btn-icon{width:26px;height:26px;border-radius:6px;border:1px solid transparent;background:transparent;color:var(--text-muted);font-size:13px;cursor:pointer;transition:all 0.15s;display:inline-flex;align-items:center;justify-content:center;}
     .btn-icon:hover{border-color:var(--border);background:var(--bg-hover);color:var(--text-secondary);}
@@ -44,27 +52,26 @@
     .attach-btn{display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:var(--radius);border:1px dashed var(--border);background:transparent;color:var(--text-secondary);font-size:12px;cursor:pointer;transition:all 0.15s;white-space:nowrap;}
     .attach-btn:hover{border-color:var(--accent-blue);color:var(--accent-blue);}
     .main-layout{display:flex;flex:1;overflow:hidden;}
-    /* ★ 左パネル幅を2/3に縮小 */
     .left-panel{width:160px;min-width:160px;background:var(--bg-surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
-    .panel-header{padding:10px 10px 8px;font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--border-subtle);display:flex;justify-content:space-between;align-items:center;}
-    .member-list{flex:1;overflow-y:auto;padding:6px;}
-    .member-card{padding:6px 8px;border-radius:var(--radius);cursor:pointer;transition:all 0.15s;display:flex;flex-direction:column;margin-bottom:4px;border:1px solid transparent;}
+    .panel-header{padding:14px 16px 10px;font-size:11px;font-weight:700;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--border-subtle);display:flex;justify-content:space-between;align-items:center;}
+    .member-list{flex:1;overflow-y:auto;padding:8px;}
+    .member-card{padding:8px 10px;border-radius:var(--radius);cursor:pointer;transition:all 0.15s;display:flex;flex-direction:column;margin-bottom:4px;border:1px solid transparent;}
     .member-card:hover{background:var(--bg-hover);}
     .member-card.selected{border-color:var(--accent-blue);background:rgba(37,99,235,0.08);}
     .member-card.speaking{border-color:#F59E0B;background:rgba(245,158,11,0.08);}
-    .member-card-main{display:flex;align-items:center;gap:6px;width:100%;}
-    .member-card-actions{display:flex;gap:4px;justify-content:flex-end;margin-top:4px;opacity:0;transition:opacity 0.15s;}
+    .member-card-main{display:flex;align-items:center;gap:10px;width:100%;}
+    .member-card-actions{display:flex;gap:4px;justify-content:flex-end;margin-top:5px;opacity:0;transition:opacity 0.15s;}
     .member-card:hover .member-card-actions{opacity:1;}
-    .member-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;overflow:hidden;}
+    .member-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;overflow:hidden;}
     .member-avatar img{width:100%;height:100%;object-fit:cover;}
     .member-info{flex:1;min-width:0;}
-    .member-name{font-size:12px;font-weight:500;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-    .member-role{font-size:10px;color:var(--text-secondary);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-    .member-status{width:7px;height:7px;border-radius:50%;background:var(--text-muted);flex-shrink:0;}
+    .member-name{font-size:13px;font-weight:500;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .member-role{font-size:11px;color:var(--text-secondary);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .member-status{width:8px;height:8px;border-radius:50%;background:var(--text-muted);flex-shrink:0;}
     .member-status.online{background:var(--accent-green);box-shadow:0 0 6px rgba(22,163,74,0.6);}
     .member-status.speaking{background:#F59E0B;box-shadow:0 0 6px rgba(245,158,11,0.6);animation:pulse 1s infinite;}
     @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
-    .panel-actions{padding:8px;border-top:1px solid var(--border);}
+    .panel-actions{padding:12px;border-top:1px solid var(--border);}
     .chat-area{flex:1;display:flex;flex-direction:column;overflow:hidden;}
     .chat-messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px;}
     .chat-messages::-webkit-scrollbar{width:6px;}
@@ -82,7 +89,9 @@
     .msg-bubble{padding:11px 14px;border-radius:14px;font-size:14px;line-height:1.65;white-space:pre-wrap;word-break:break-word;}
     .message-row.member .msg-bubble{background:var(--bubble-member);border:1px solid var(--border);border-top-left-radius:4px;color:var(--text-primary);}
     .message-row.user .msg-bubble{background:var(--bubble-user);border-top-right-radius:4px;color:#fff;}
+    .msg-bubble.voice-speaking{border-color:var(--accent-teal)!important;box-shadow:0 0 8px rgba(8,145,178,0.4);}
     .facilitator-banner{background:var(--bubble-facilitator);border:1px solid rgba(124,58,237,0.4);border-radius:var(--radius-lg);padding:12px 20px;max-width:80%;text-align:center;font-size:13px;line-height:1.7;color:#C4B5FD;}
+    .facilitator-banner.voice-speaking{border-color:var(--accent-teal)!important;box-shadow:0 0 8px rgba(8,145,178,0.4);}
     .facilitator-label{font-size:10px;font-weight:700;letter-spacing:1.5px;color:#7C3AED;text-transform:uppercase;margin-bottom:6px;}
     .facilitator-text{text-align:left;}
     .typing-bubble{padding:12px 16px;background:var(--bubble-member);border:1px solid var(--border);border-radius:14px;border-top-left-radius:4px;display:inline-flex;gap:5px;align-items:center;}
@@ -93,11 +102,14 @@
     .msg-bubble.streaming::after{content:'▊';animation:blink 0.8s step-end infinite;color:var(--text-secondary);font-size:12px;}
     @keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
     .system-msg{text-align:center;font-size:12px;color:var(--text-muted);padding:4px;}
+    .voice-mode-bar{padding:6px 20px;background:rgba(8,145,178,0.1);border-bottom:1px solid rgba(8,145,178,0.3);font-size:12px;color:#67E8F9;display:flex;align-items:center;gap:8px;flex-shrink:0;}
+    .voice-mode-bar.hidden{display:none;}
+    .voice-dot{width:7px;height:7px;border-radius:50%;background:#67E8F9;flex-shrink:0;animation:voiceDotPulse 1.5s infinite;}
+    @keyframes voiceDotPulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
     .minutes-bar{padding:12px 20px;background:rgba(22,163,74,0.1);border-top:1px solid rgba(22,163,74,0.3);display:flex;align-items:center;justify-content:center;gap:14px;flex-shrink:0;animation:fadeIn 0.4s ease;}
-    /* ★ 入力エリアをコンパクトに */
-    .chat-input-area{padding:10px 16px;background:var(--bg-surface);border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px;flex-shrink:0;}
+    .chat-input-area{padding:16px 20px;background:var(--bg-surface);border-top:1px solid var(--border);display:flex;flex-direction:column;gap:10px;flex-shrink:0;}
     .input-row{display:flex;gap:8px;align-items:flex-end;}
-    .chat-input{flex:1;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius-lg);padding:9px 14px;color:var(--text-primary);font-size:14px;font-family:'Noto Sans JP',sans-serif;resize:none;outline:none;min-height:40px;max-height:100px;transition:border-color 0.15s;line-height:1.5;}
+    .chat-input{flex:1;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius-lg);padding:11px 16px;color:var(--text-primary);font-size:14px;font-family:'Noto Sans JP',sans-serif;resize:none;outline:none;min-height:44px;max-height:120px;transition:border-color 0.15s;line-height:1.5;}
     .chat-input:focus{border-color:var(--accent-blue);}
     .chat-input::placeholder{color:var(--text-muted);}
     .action-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
@@ -180,12 +192,22 @@
   <span id="sessionInfo">会議進行中</span>
 </div>
 
+<!-- ★ 音声モードバー -->
+<div class="voice-mode-bar hidden" id="voiceModeBar">
+  <div class="voice-dot"></div>
+  <span>🎙️ 音声モード ON ― AIの発言を読み上げます。マイクボタンで音声入力できます。</span>
+  <button class="btn" id="stopSpeakBtn" style="margin-left:auto;padding:3px 8px;font-size:11px;">⏹ 読み上げ停止</button>
+</div>
+
 <div class="theme-bar">
   <input type="text" id="topicInput" placeholder="📋  議題を入力してください（例：新製品のマーケティング戦略）" />
+  <!-- ★ 議題欄の音声入力ボタン（音声モードON時のみ表示） -->
+  <button class="btn-mic hidden" id="topicMicBtn" title="議題を音声入力">🎤</button>
   <label class="attach-btn" for="fileInput">📎 資料添付
     <input type="file" id="fileInput" accept=".pdf,.docx,.doc" style="display:none" multiple />
   </label>
   <button class="btn btn-green" id="startMeetingBtn">▶ 会議開始</button>
+  <button class="btn btn-voice" id="voiceModeBtn">🎙️ 音声モード</button>
 </div>
 
 <div id="attachmentsBar" class="attachments-bar" style="padding:6px 20px;background:var(--bg-surface);border-bottom:1px solid var(--border);display:none;"></div>
@@ -193,12 +215,12 @@
 <div class="main-layout">
   <div class="left-panel">
     <div class="panel-header">
-      <span>メンバー</span>
-      <button class="btn" id="addMemberBtn" style="padding:2px 6px;font-size:10px;">＋</button>
+      <span>参加メンバー</span>
+      <button class="btn" id="addMemberBtn" style="padding:3px 8px;font-size:11px;">＋ 追加</button>
     </div>
     <div class="member-list" id="memberList"></div>
     <div class="panel-actions">
-      <button class="btn btn-primary" id="autoDiscussBtn" style="width:100%;font-size:11px;padding:6px 8px;" disabled>🤖 全員で議論</button>
+      <button class="btn btn-primary" id="autoDiscussBtn" style="width:100%" disabled>🤖 全員で議論する</button>
     </div>
   </div>
 
@@ -210,13 +232,11 @@
     </div>
     <div class="chat-messages hidden" id="chatMessages"></div>
 
-    <!-- 議事録ダウンロードバー -->
     <div class="minutes-bar hidden" id="minutesBar">
       <span style="font-size:13px;color:#86EFAC;">✅ 議論がまとまりました</span>
-      <button class="btn btn-green" id="minutesBtn">📄 議事録をダウンロード（Word）</button>
+      <button class="btn btn-green" id="minutesBtn">📄 議事録をダウンロード（PDF）</button>
     </div>
 
-    <!-- ★ 返答ボタンと入力欄を一体化してコンパクトに -->
     <div class="chat-input-area hidden" id="chatInputArea">
       <div class="action-row">
         <span class="action-label">返答：</span>
@@ -225,6 +245,7 @@
       </div>
       <div class="input-row">
         <textarea class="chat-input" id="chatInput" placeholder="メッセージを入力... (Enter で送信、Shift+Enter で改行)" rows="1"></textarea>
+        <button class="btn-mic hidden" id="micBtn" title="音声入力（クリックで開始・停止）">🎤</button>
         <button class="btn btn-primary" id="sendBtn">送信</button>
       </div>
     </div>
