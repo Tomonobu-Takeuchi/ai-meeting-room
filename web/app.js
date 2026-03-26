@@ -1,14 +1,18 @@
+
+コピー
+
 /**
  * AI-PERSONA会議室 - フロントエンドロジック（音声モード対応版）
  */
-
+ 
+// ★ ペルソナごとの音声設定（voiceName: 使用する音声の名前の一部）
 const VOICE_SETTINGS = {
-  'koumei':      { pitch: 0.70, rate: 0.82 },
-  'hideyoshi':   { pitch: 1.35, rate: 1.05 },
-  'professor':   { pitch: 0.85, rate: 0.88 },
-  'facilitator': { pitch: 1.00, rate: 0.93 },
+  'koumei':      { pitch: 0.90, rate: 0.80, voiceName: 'Ichiro'  }, // 落ち着いた中年男性
+  'hideyoshi':   { pitch: 1.05, rate: 1.10, voiceName: 'Ichiro'  }, // 陽気な年配男性
+  'professor':   { pitch: 1.10, rate: 1.00, voiceName: 'Google'  }, // 若い男性
+  'facilitator': { pitch: 1.15, rate: 1.00, voiceName: 'Haruka'  }, // 若い女性
 };
-
+ 
 const State = {
   sessionId: null, topic: '', members: [], facilitator: null,
   selectedMemberIds: [], isStreaming: false, attachedFiles: [], streamingMessages: {},
@@ -17,7 +21,7 @@ const State = {
   voiceMode: false, isSpeaking: false, isRecognizing: false,
   recognition: null, jaVoices: [],
 };
-
+ 
 const $ = id => document.getElementById(id);
 const DOM = {
   newMeetingBtn: $('newMeetingBtn'), facilitatorBtn: $('facilitatorBtn'),
@@ -50,9 +54,9 @@ const DOM = {
   voiceModeBar: $('voiceModeBar'),
   stopSpeakBtn: $('stopSpeakBtn'),
   micBtn: $('micBtn'),
-  topicMicBtn: $('topicMicBtn'), // ★ 議題欄マイクボタン
+  topicMicBtn: $('topicMicBtn'),
 };
-
+ 
 const API = {
   async get(path) {
     const res = await fetch(path);
@@ -76,24 +80,34 @@ const API = {
     return res.json();
   },
 };
-
+ 
 function loadVoices() {
   const voices = window.speechSynthesis.getVoices();
   State.jaVoices = voices.filter(v => v.lang.startsWith('ja'));
 }
-
+ 
+// ★ voiceNameで音声を選択
 function selectVoice(personaId) {
   const voices = State.jaVoices;
   if (voices.length === 0) return null;
-  const map = { koumei: 0, hideyoshi: 1, professor: 2, facilitator: 3 };
-  const idx = (map[personaId] ?? 0) % voices.length;
-  return voices[idx];
+  const settings = VOICE_SETTINGS[personaId];
+  if (settings?.voiceName) {
+    const found = voices.find(v => v.name.includes(settings.voiceName));
+    if (found) return found;
+  }
+  return voices[0];
 }
-
+ 
 function speakText(text, personaId, targetEl = null) {
   if (!State.voiceMode || !window.speechSynthesis) return;
   window.speechSynthesis.cancel();
-  const speakStr = text.length > 500 ? text.slice(0, 500) + '…' : text;
+  // ★ 漢字の読み間違いを修正
+  const fixedText = text
+    .replace(/秀吉/g, 'ひでよし')
+    .replace(/孔明/g, 'こうめい')
+    .replace(/諸葛/g, 'しょかつ')
+    .replace(/ファシリテータ/g, 'ふぁしりてーたー');
+  const speakStr = fixedText.length > 500 ? fixedText.slice(0, 500) + '…' : fixedText;
   const utterance = new SpeechSynthesisUtterance(speakStr);
   utterance.lang = 'ja-JP';
   const settings = VOICE_SETTINGS[personaId] || { pitch: 1.0, rate: 1.0 };
@@ -106,14 +120,13 @@ function speakText(text, personaId, targetEl = null) {
   utterance.onerror = () => { State.isSpeaking = false; if (targetEl) targetEl.classList.remove('voice-speaking'); };
   window.speechSynthesis.speak(utterance);
 }
-
+ 
 function stopSpeaking() {
   if (window.speechSynthesis) window.speechSynthesis.cancel();
   State.isSpeaking = false;
   document.querySelectorAll('.voice-speaking').forEach(el => el.classList.remove('voice-speaking'));
 }
-
-// ★ 汎用音声入力関数（対象inputとボタンを引数で受け取る）
+ 
 function startVoiceInput(targetInput, micButton) {
   if (State.isRecognizing) {
     if (State.recognition) State.recognition.stop();
@@ -150,14 +163,14 @@ function startVoiceInput(targetInput, micButton) {
   };
   recognition.start();
 }
-
+ 
 function toggleVoiceMode() {
   State.voiceMode = !State.voiceMode;
   if (State.voiceMode) {
     DOM.voiceModeBtn.classList.add('active');
     DOM.voiceModeBtn.textContent = '🔊 音声モード ON';
     DOM.voiceModeBar.classList.remove('hidden');
-    DOM.topicMicBtn.classList.remove('hidden'); // ★ 議題欄マイク表示
+    DOM.topicMicBtn.classList.remove('hidden');
     if (State.sessionId) DOM.micBtn.classList.remove('hidden');
     loadVoices();
     showToast('音声モードON：AIの発言を読み上げます', 'success');
@@ -165,46 +178,44 @@ function toggleVoiceMode() {
     DOM.voiceModeBtn.classList.remove('active');
     DOM.voiceModeBtn.textContent = '🎙️ 音声モード';
     DOM.voiceModeBar.classList.add('hidden');
-    DOM.topicMicBtn.classList.add('hidden'); // ★ 議題欄マイク非表示
+    DOM.topicMicBtn.classList.add('hidden');
     DOM.micBtn.classList.add('hidden');
     stopSpeaking();
     if (State.isRecognizing && State.recognition) State.recognition.stop();
     showToast('音声モードOFF', 'info');
   }
 }
-
+ 
 async function init() {
   if (window.speechSynthesis) {
     loadVoices();
     window.speechSynthesis.onvoiceschanged = loadVoices;
   }
-
+ 
   try {
     const data = await API.get('/api/personas/members');
     State.members = data.members;
     renderMemberList();
   } catch (e) { showToast('ペルソナ読み込み失敗: ' + e.message, 'error'); }
-
+ 
   DOM.newMeetingBtn.addEventListener('click', resetMeeting);
   DOM.startMeetingBtn.addEventListener('click', showMemberSelectModal);
   DOM.facilitatorBtn.addEventListener('click', invokeFacilitator);
   DOM.autoDiscussBtn.addEventListener('click', autoDiscuss);
   DOM.sendBtn.addEventListener('click', sendUserMessage);
   DOM.allRespondBtn.addEventListener('click', allRespond);
-
+ 
   DOM.cancelMemberSelect.addEventListener('click', () => DOM.memberSelectModal.classList.add('hidden'));
   DOM.confirmMemberSelect.addEventListener('click', startMeetingFromModal);
-
+ 
   DOM.summarizeBtn.addEventListener('click', summarizeMeeting);
   DOM.minutesBtn.addEventListener('click', downloadMinutes);
-
+ 
   DOM.voiceModeBtn.addEventListener('click', toggleVoiceMode);
   DOM.stopSpeakBtn.addEventListener('click', stopSpeaking);
-  // ★ チャット入力欄マイク
   DOM.micBtn.addEventListener('click', () => startVoiceInput(DOM.chatInput, DOM.micBtn));
-  // ★ 議題欄マイク
   DOM.topicMicBtn.addEventListener('click', () => startVoiceInput(DOM.topicInput, DOM.topicMicBtn));
-
+ 
   DOM.addMemberBtn.addEventListener('click', openAddModal);
   DOM.cancelAddPersona.addEventListener('click', closeAddModal);
   DOM.confirmAddPersona.addEventListener('click', submitAddPersona);
@@ -213,7 +224,7 @@ async function init() {
   DOM.cancelDeleteBtn.addEventListener('click', () => { DOM.deleteConfirmOverlay.classList.add('hidden'); State.deletePendingId = null; });
   DOM.confirmDeleteBtn.addEventListener('click', executeDeletion);
   DOM.fileInput.addEventListener('change', handleFileAttach);
-
+ 
   $('pAvatar').addEventListener('input', () => { if (!State.addAvatarDataUrl) DOM.addAvatarPreview.innerHTML = $('pAvatar').value || '👤'; });
   $('addAvatarImageFile').addEventListener('change', (e) => {
     const file = e.target.files[0]; if (!file) return;
@@ -232,14 +243,14 @@ async function init() {
   $('learnImageFile').addEventListener('change', (e) => handleLearnFiles(e, 'add', 'image'));
   $('editLearnTextFile').addEventListener('change', (e) => handleLearnFiles(e, 'edit', 'text'));
   $('editLearnImageFile').addEventListener('change', (e) => handleLearnFiles(e, 'edit', 'image'));
-
+ 
   DOM.chatInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendUserMessage(); } });
   DOM.chatInput.addEventListener('input', () => {
     DOM.chatInput.style.height = 'auto';
     DOM.chatInput.style.height = Math.min(DOM.chatInput.scrollHeight, 120) + 'px';
   });
 }
-
+ 
 function showMemberSelectModal() {
   const topic = DOM.topicInput.value.trim();
   if (!topic) { showToast('議題を入力してください', 'error'); DOM.topicInput.focus(); return; }
@@ -262,7 +273,7 @@ function showMemberSelectModal() {
   });
   DOM.memberSelectModal.classList.remove('hidden');
 }
-
+ 
 async function startMeetingFromModal() {
   const checked = DOM.memberCheckList.querySelectorAll('input[type="checkbox"]:checked');
   if (checked.length === 0) { showToast('最低1人選択してください', 'error'); return; }
@@ -270,7 +281,7 @@ async function startMeetingFromModal() {
   DOM.memberSelectModal.classList.add('hidden');
   await startMeeting();
 }
-
+ 
 async function summarizeMeeting() {
   if (!State.sessionId || State.isStreaming) return;
   State.isStreaming = true; setStreamingButtons(true);
@@ -299,7 +310,7 @@ async function summarizeMeeting() {
   };
   evtSource.onerror = () => { typingEl?.remove(); evtSource.close(); State.isStreaming = false; setStreamingButtons(false); DOM.summarizeBtn.disabled = false; };
 }
-
+ 
 async function downloadMinutes() {
   if (!State.sessionId) return;
   const btn = DOM.minutesBtn;
@@ -319,7 +330,7 @@ async function downloadMinutes() {
   } catch (e) { showToast('ダウンロードエラー: ' + e.message, 'error'); }
   finally { btn.disabled = false; btn.textContent = '📄 議事録をダウンロード（PDF）'; }
 }
-
+ 
 async function handleLearnFiles(e, mode, type) {
   const files = Array.from(e.target.files);
   const listKey = mode === 'add' ? 'addLearnFiles' : 'editLearnFiles';
@@ -338,14 +349,14 @@ async function handleLearnFiles(e, mode, type) {
   }
   renderLearnDataList(mode); e.target.value = '';
 }
-
+ 
 function readFileAsText(file) {
   return new Promise((resolve) => { const r = new FileReader(); r.onload = (e) => resolve(e.target.result); r.onerror = () => resolve(''); r.readAsText(file, 'UTF-8'); });
 }
 function readFileAsDataUrl(file) {
   return new Promise((resolve) => { const r = new FileReader(); r.onload = (e) => resolve(e.target.result); r.onerror = () => resolve(''); r.readAsDataURL(file); });
 }
-
+ 
 function renderLearnDataList(mode) {
   const listKey = mode === 'add' ? 'addLearnFiles' : 'editLearnFiles';
   const listEl = mode === 'add' ? DOM.learnDataList : DOM.editLearnDataList;
@@ -359,14 +370,14 @@ function renderLearnDataList(mode) {
     btn.addEventListener('click', () => { const k = btn.dataset.mode === 'add' ? 'addLearnFiles' : 'editLearnFiles'; State[k].splice(parseInt(btn.dataset.idx), 1); renderLearnDataList(btn.dataset.mode); });
   });
 }
-
+ 
 function buildBackgroundFromLearnData(existingBackground, learnFiles) {
   if (learnFiles.length === 0) return existingBackground;
   const texts = learnFiles.filter(f => f.type === 'text' || f.type === 'pdf').map(f => f.content).join('\n\n');
   if (!texts) return existingBackground;
   return existingBackground ? existingBackground + '\n\n--- 学習データ ---\n' + texts.slice(0, 2000) : texts.slice(0, 2000);
 }
-
+ 
 function renderMemberList() {
   DOM.memberList.innerHTML = '';
   if (State.selectedMemberIds.length === 0) State.selectedMemberIds = State.members.map(m => m.id);
@@ -395,7 +406,7 @@ function renderMemberList() {
   });
   renderMemberTriggers();
 }
-
+ 
 function toggleMemberSelection(memberId) {
   if (State.sessionId) return;
   const idx = State.selectedMemberIds.indexOf(memberId);
@@ -403,7 +414,7 @@ function toggleMemberSelection(memberId) {
   else State.selectedMemberIds.push(memberId);
   renderMemberList();
 }
-
+ 
 function renderMemberTriggers() {
   DOM.memberTriggers.innerHTML = '';
   State.members.filter(m => State.selectedMemberIds.includes(m.id)).forEach(member => {
@@ -414,7 +425,7 @@ function renderMemberTriggers() {
     DOM.memberTriggers.appendChild(btn);
   });
 }
-
+ 
 function openAddModal() {
   State.addAvatarDataUrl = null; State.addLearnFiles = [];
   DOM.addAvatarPreview.innerHTML = '👤'; $('pAvatar').value = '👤';
@@ -425,7 +436,7 @@ function openAddModal() {
   DOM.addPersonaModal.classList.remove('hidden');
 }
 function closeAddModal() { DOM.addPersonaModal.classList.add('hidden'); }
-
+ 
 function openEditModal(memberId) {
   const member = State.members.find(m => m.id === memberId); if (!member) return;
   State.editAvatarDataUrl = State.avatarImages[memberId] || null; State.editLearnFiles = [];
@@ -438,7 +449,7 @@ function openEditModal(memberId) {
   DOM.editPersonaModal.classList.remove('hidden');
 }
 function closeEditModal() { DOM.editPersonaModal.classList.add('hidden'); State.editAvatarDataUrl = null; State.editLearnFiles = []; }
-
+ 
 async function submitEditPersona() {
   const memberId = $('editPersonaId').value;
   const name = $('eName').value.trim(), avatar = $('eAvatar').value.trim() || '👤';
@@ -455,14 +466,14 @@ async function submitEditPersona() {
     showToast(`${name} の設定を保存しました`, 'success');
   } catch (e) { showToast('保存エラー: ' + e.message, 'error'); }
 }
-
+ 
 function openDeleteConfirm(memberId) {
   const member = State.members.find(m => m.id === memberId); if (!member) return;
   State.deletePendingId = memberId;
   DOM.deleteConfirmText.textContent = `「${member.name}」を参加メンバーから削除してもよろしいですか？`;
   DOM.deleteConfirmOverlay.classList.remove('hidden');
 }
-
+ 
 function executeDeletion() {
   const memberId = State.deletePendingId; if (!memberId) return;
   const member = State.members.find(m => m.id === memberId);
@@ -474,7 +485,7 @@ function executeDeletion() {
   renderMemberList(); DOM.deleteConfirmOverlay.classList.add('hidden'); State.deletePendingId = null;
   showToast(`${memberName} を削除しました`, 'success');
 }
-
+ 
 async function startMeeting() {
   const topic = DOM.topicInput.value.trim();
   if (!topic) { showToast('議題を入力してください', 'error'); return; }
@@ -498,7 +509,7 @@ async function startMeeting() {
   } catch (e) { showToast('会議開始エラー: ' + e.message, 'error'); }
   finally { setLoading(false); }
 }
-
+ 
 function resetMeeting() {
   if (State.sessionId && !confirm('現在の会議を終了して新しい会議を始めますか？')) return;
   stopSpeaking();
@@ -515,7 +526,7 @@ function resetMeeting() {
   State.selectedMemberIds = State.members.map(m => m.id);
   renderMemberList();
 }
-
+ 
 async function sendUserMessage() {
   const content = DOM.chatInput.value.trim();
   if (!content || !State.sessionId || State.isStreaming) return;
@@ -525,7 +536,7 @@ async function sendUserMessage() {
   try { await API.post(`/api/meeting/${State.sessionId}/message`, { content }); }
   catch (e) { showToast('送信エラー: ' + e.message, 'error'); }
 }
-
+ 
 async function triggerMemberResponse(personaId, trigger = null) {
   if (!State.sessionId || State.isStreaming) return;
   if (State.voiceMode) stopSpeaking();
@@ -557,7 +568,7 @@ async function triggerMemberResponse(personaId, trigger = null) {
   };
   evtSource.onerror = () => { typingEl?.remove(); evtSource.close(); State.isStreaming = false; setStreamingButtons(false); setMemberSpeaking(personaId, false); };
 }
-
+ 
 async function invokeFacilitator() {
   if (!State.sessionId || State.isStreaming) return;
   if (State.voiceMode) stopSpeaking();
@@ -583,7 +594,7 @@ async function invokeFacilitator() {
   };
   evtSource.onerror = () => { typingEl?.remove(); evtSource.close(); State.isStreaming = false; setStreamingButtons(false); };
 }
-
+ 
 async function allRespond() {
   if (!State.sessionId || State.isStreaming) return;
   for (const member of State.members.filter(m => State.selectedMemberIds.includes(m.id))) {
@@ -592,7 +603,7 @@ async function allRespond() {
     if (State.voiceMode) await waitForSpeakEnd();
   }
 }
-
+ 
 async function autoDiscuss() {
   if (!State.sessionId || State.isStreaming) return;
   for (const member of State.members.filter(m => State.selectedMemberIds.includes(m.id))) {
@@ -601,7 +612,7 @@ async function autoDiscuss() {
     if (State.voiceMode) await waitForSpeakEnd();
   }
 }
-
+ 
 function waitForStreamEnd() {
   return new Promise(resolve => { const c = setInterval(() => { if (!State.isStreaming) { clearInterval(c); resolve(); } }, 100); });
 }
@@ -611,7 +622,7 @@ function waitForSpeakEnd() {
     const c = setInterval(() => { count++; if (!State.isSpeaking || count > 300) { clearInterval(c); resolve(); } }, 100);
   });
 }
-
+ 
 async function submitAddPersona() {
   const name = $('pName').value.trim(), avatar = $('pAvatar').value.trim() || '👤';
   const description = $('pDescription').value.trim(), personality = $('pPersonality').value.trim();
@@ -626,12 +637,12 @@ async function submitAddPersona() {
     showToast(`${name} を追加しました`, 'success');
   } catch (e) { showToast('追加エラー: ' + e.message, 'error'); }
 }
-
+ 
 function handleFileAttach(e) {
   Array.from(e.target.files).forEach(file => { if (!State.attachedFiles.find(f => f.name === file.name)) State.attachedFiles.push(file); });
   renderAttachments(); e.target.value = '';
 }
-
+ 
 function renderAttachments() {
   if (State.attachedFiles.length === 0) { DOM.attachmentsBar.style.display = 'none'; return; }
   DOM.attachmentsBar.style.display = 'flex';
@@ -642,7 +653,7 @@ function renderAttachments() {
     btn.addEventListener('click', () => { State.attachedFiles.splice(parseInt(btn.dataset.idx), 1); renderAttachments(); });
   });
 }
-
+ 
 function addMessage(msg) {
   const persona = msg.persona_id === 'user' ? { name: 'あなた', avatar: '👤', color: '#2563EB' }
     : (State.members.find(m => m.id === msg.persona_id) || State.facilitator || {});
@@ -659,12 +670,12 @@ function addMessage(msg) {
   }
   DOM.chatMessages.appendChild(row); scrollToBottom(); return row;
 }
-
+ 
 function addSystemMessage(text) {
   const el = document.createElement('div'); el.className = 'system-msg'; el.textContent = text;
   DOM.chatMessages.appendChild(el); scrollToBottom();
 }
-
+ 
 function addTypingIndicator(persona, isFacilitator = false) {
   const row = document.createElement('div');
   row.className = `message-row ${isFacilitator ? 'facilitator' : 'member'} typing-row`;
@@ -680,7 +691,7 @@ function addTypingIndicator(persona, isFacilitator = false) {
   }
   DOM.chatMessages.appendChild(row); scrollToBottom(); return row;
 }
-
+ 
 function addStreamingBubble(persona) {
   const row = document.createElement('div'); row.className = 'message-row member';
   const avatarContent = State.avatarImages[persona.id] ? `<img src="${State.avatarImages[persona.id]}" alt="${persona.name}" />` : persona.avatar;
@@ -689,23 +700,23 @@ function addStreamingBubble(persona) {
     <div class="msg-body"><div class="msg-name">${persona.name}</div><div class="msg-bubble streaming"></div></div>`;
   DOM.chatMessages.appendChild(row); scrollToBottom(); return row;
 }
-
+ 
 function appendToStreamingBubble(row, text) {
   const bubble = row.querySelector('.msg-bubble');
   if (bubble) { bubble.textContent += text; scrollToBottom(); }
 }
-
+ 
 function addFacilitatorBanner() {
   const row = document.createElement('div'); row.className = 'message-row facilitator';
   row.innerHTML = `<div class="facilitator-banner"><div class="facilitator-label">🎯 ファシリテーター</div><div class="facilitator-text"></div></div>`;
   DOM.chatMessages.appendChild(row); scrollToBottom(); return row;
 }
-
+ 
 function appendToFacilitatorBanner(row, text) {
   const el = row.querySelector('.facilitator-text');
   if (el) { el.textContent += text; scrollToBottom(); }
 }
-
+ 
 function setMemberSpeaking(personaId, isSpeaking) {
   DOM.memberList.querySelectorAll('.member-card').forEach(card => {
     const s = card.querySelector('.member-status');
@@ -718,27 +729,26 @@ function setMemberSpeaking(personaId, isSpeaking) {
     if (btn.dataset.id === personaId) btn.classList.toggle('active', isSpeaking);
   });
 }
-
+ 
 function setStreamingButtons(isStreaming) {
   DOM.sendBtn.disabled = isStreaming; DOM.allRespondBtn.disabled = isStreaming;
   DOM.autoDiscussBtn.disabled = isStreaming; DOM.facilitatorBtn.disabled = isStreaming;
   DOM.memberTriggers.querySelectorAll('.member-trigger-btn').forEach(btn => btn.disabled = isStreaming);
 }
-
+ 
 function setLoading(isLoading) {
   DOM.startMeetingBtn.disabled = isLoading;
   DOM.startMeetingBtn.textContent = isLoading ? '⏳ 開始中...' : '▶ 会議開始';
 }
-
+ 
 function scrollToBottom() { DOM.chatMessages.scrollTop = DOM.chatMessages.scrollHeight; }
-
+ 
 function showToast(msg, type = 'info') {
   const toast = document.createElement('div'); toast.className = `toast ${type}`; toast.textContent = msg;
   DOM.toastContainer.appendChild(toast); setTimeout(() => toast.remove(), 3500);
 }
-
+ 
 function escapeHtml(text) { const d = document.createElement('div'); d.textContent = text; return d.innerHTML; }
-
+ 
 document.addEventListener('DOMContentLoaded', init);
-
  
