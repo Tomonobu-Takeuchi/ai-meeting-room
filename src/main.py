@@ -251,6 +251,29 @@ def stream_auto(session_id):
     return Response(generate(), mimetype="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
+@app.route("/api/personas/<persona_id>/learn", methods=["GET"])
+def get_learn_data(persona_id):
+    """ペルソナの学習データ一覧取得"""
+    data = persona_manager.get_all_learn_data(persona_id)
+    return jsonify({"learn_data": data, "count": len(data)})
+
+@app.route("/api/personas/<persona_id>/learn", methods=["POST"])
+def add_learn_data(persona_id):
+    """ペルソナに学習データを追加（RAGベクトル保存）"""
+    data = request.json
+    content = data.get("content", "").strip()
+    source = data.get("source", "")
+    if not content:
+        return jsonify({"error": "コンテンツが空です"}), 400
+    count = persona_manager.add_learn_data(persona_id, content, source)
+    return jsonify({"message": "学習データを保存しました", "total_count": count})
+
+@app.route("/api/personas/<persona_id>/learn/<int:learn_id>", methods=["DELETE"])
+def delete_learn_data(persona_id, learn_id):
+    """学習データを削除"""
+    persona_manager.delete_learn_data(persona_id, learn_id)
+    return jsonify({"message": "削除しました"})
+
 @app.route("/api/learn/fetch-url", methods=["POST"])
 def fetch_learn_url():
     """WebページのテキストをAI学習データとして取得"""
