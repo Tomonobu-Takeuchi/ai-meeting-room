@@ -1,109 +1,214 @@
-import json
-import os
+"""
+persona_manager.py - ペルソナ管理（PostgreSQL永続化版）
+"""
+import uuid
+from src.database import get_connection
 
-DEFAULT_PERSONAS = [
-    {
-        "id": "koumei",
-        "name": "諸葛亮孔明",
-        "role": "三国志の戦略家",
-        "description": "三国志時代の天才軍師。卓越した戦略眼と先見の明を持ち、複雑な状況を俯瞰して最善策を導く。",
-        "color": "#4A90D9",
-        "icon": "⚔️",
-        "avatar": "⚔️",
-        "background": "",
-        "prompt": "あなたは三国志の軍師・諸葛亮孔明です。卓越した戦略眼で物事を分析し、長期的視点から最善策を提案してください。故事や比喩を交えながら、論理的かつ格調高い言葉で語ってください。"
-    },
-    {
-        "id": "hideyoshi",
-        "name": "秀吉",
-        "role": "戦国時代の武将",
-        "description": "豊臣秀吉。農民から天下人へ。人たらしの才能と実行力で不可能を可能にする行動派リーダー。",
-        "color": "#E85D4A",
-        "icon": "🏯",
-        "avatar": "🏯",
-        "background": "",
-        "prompt": "あなたは豊臣秀吉です。農民から天下人になった実行力と人たらしの才能を持ちます。前向きで豪快、庶民的な視点も忘れず、どんな困難も知恵と行動力で乗り越える姿勢で発言してください。"
-    },
-    {
-        "id": "professor",
-        "name": "教授",
-        "role": "某国立大学の教授",
-        "description": "某国立大学の教授。専門は経営学・組織論。データと理論に基づいた客観的分析が得意。",
-        "color": "#27AE60",
-        "icon": "🎓",
-        "avatar": "🎓",
-        "background": "",
-        "prompt": "あなたは某国立大学の経営学・組織論の教授です。データと学術理論に基づいて客観的に分析し、実証研究の知見を活かしながら、論理的かつ丁寧な言葉で見解を述べてください。"
-    }
-]
 
 class PersonaManager:
-    def __init__(self, data_dir: str = "data/personas"):
-        self.data_dir = data_dir
-        os.makedirs(data_dir, exist_ok=True)
-        self.personas = self._load_personas()
+    """ペルソナのCRUD操作をPostgreSQLで管理"""
 
-    def _load_personas(self):
-        personas = []
-        if os.path.exists(self.data_dir):
-            for filename in sorted(os.listdir(self.data_dir)):
-                if filename.endswith(".json"):
-                    with open(os.path.join(self.data_dir, filename), "r", encoding="utf-8") as f:
-                        personas.append(json.load(f))
-        if not personas:
-            personas = list(DEFAULT_PERSONAS)
-        return personas
+    # ===== 取得系 =====
 
-    def get_all_personas(self):
-        return self.personas
+    def get_all_members(self):
+        """全ペルソナを取得（facilitator含む）"""
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM personas ORDER BY role DESC, created_at ASC")
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        return [dict(r) for r in rows]
 
-    def to_dict_list(self):
-        return self.personas
-
-    def get_persona(self, persona_id: str):
-        for p in self.personas:
-            if p["id"] == persona_id:
-                return p
-        return None
-
-    def get_personas_by_ids(self, ids: list):
-        return [p for p in self.personas if p["id"] in ids]
-
-    def add_custom_persona(self, persona: dict):
-        self.personas.append(persona)
-        filepath = os.path.join(self.data_dir, f"{persona['id']}.json")
-        with open(filepath, "w", encoding="utf-8") as f:
-            json.dump(persona, f, ensure_ascii=False, indent=2)
-        return persona
-
-    def add_persona(self, persona: dict):
-        return self.add_custom_persona(persona)
-
-    def update_persona(self, persona_id: str, data: dict):
-        for i, p in enumerate(self.personas):
-            if p["id"] == persona_id:
-                self.personas[i].update(data)
-                return self.personas[i]
-        return None
-
-    def get_default_personas(self):
-        return DEFAULT_PERSONAS
+    def get_members_only(self):
+        """memberロールのペルソナのみ取得"""
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT * FROM personas WHERE role = 'member' ORDER BY created_at ASC"
+        )
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        return [dict(r) for r in rows]
 
     def get_facilitator(self):
-        return {
-            "id": "facilitator",
-            "name": "ファシリテータ",
-            "role": "会議の進行役",
-            "color": "#9B59B6",
-            "icon": "🎯",
-            "avatar": "🎯"
+        """ファシリテータを取得"""
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT * FROM personas WHERE role = 'facilitator' ORDER BY created_at ASC LIMIT 1"
+        )
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        return dict(row) if row else None
+
+    def get_persona_by_id(self, persona_id):
+        """IDでペルソナを取得"""
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM personas WHERE id = %s", (persona_id,))
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        return dict(row) if row else None
+
+    def get_personas_by_ids(self, ids):
+        """複数IDでペルソナを取得"""
+        if not ids:
+            return []
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT * FROM personas WHERE id = ANY(%s) ORDER BY created_at ASC",
+            (ids,)
+        )
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        # ids の順番に並べ替え
+        id_order = {pid: i for i, pid in enumerate(ids)}
+        return sorted([dict(r) for r in rows], key=lambda p: id_order.get(p['id'], 999))
+
+    # ===== 追加・更新・削除 =====
+
+    def add_persona(self, data):
+        """新規ペルソナを追加"""
+        persona_id = data.get('id') or str(uuid.uuid4())[:8]
+        persona = {
+            'id':            persona_id,
+            'name':          data.get('name', '').strip(),
+            'avatar':        data.get('avatar', '👤').strip() or '👤',
+            'description':   data.get('description', '').strip(),
+            'personality':   data.get('personality', '').strip(),
+            'speaking_style': data.get('speaking_style', '').strip(),
+            'background':    data.get('background', '').strip(),
+            'color':         data.get('color', '#8B5CF6'),
+            'role':          data.get('role', 'member'),
         }
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO personas (id, name, avatar, description, personality,
+                speaking_style, background, color, role)
+            VALUES (%(id)s, %(name)s, %(avatar)s, %(description)s, %(personality)s,
+                %(speaking_style)s, %(background)s, %(color)s, %(role)s)
+            ON CONFLICT (id) DO UPDATE SET
+                name=EXCLUDED.name, avatar=EXCLUDED.avatar,
+                description=EXCLUDED.description, personality=EXCLUDED.personality,
+                speaking_style=EXCLUDED.speaking_style, background=EXCLUDED.background,
+                color=EXCLUDED.color, role=EXCLUDED.role
+            RETURNING *
+        """, persona)
+        row = cur.fetchone()
+        conn.commit()
+        cur.close()
+        conn.close()
+        return dict(row)
 
-    def build_system_prompt(self, persona: dict, topic: str = "", members: list = None) -> str:
-        base = persona.get("prompt", f"あなたは{persona['name']}です。{persona.get('description', '')}の立場で発言してください。")
-        member_names = "、".join([m["name"] for m in (members or []) if m["id"] != persona["id"]])
-        return f"{base}\n\n議題：「{topic}」\n参加者：{member_names}\n\n200文字以内で簡潔に発言してください。"
+    def update_persona(self, persona_id, data):
+        """ペルソナ情報を更新"""
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE personas SET
+                name           = %(name)s,
+                avatar         = %(avatar)s,
+                description    = %(description)s,
+                personality    = %(personality)s,
+                speaking_style = %(speaking_style)s,
+                background     = %(background)s,
+                color          = %(color)s
+            WHERE id = %(id)s
+            RETURNING *
+        """, {
+            'id':            persona_id,
+            'name':          data.get('name', '').strip(),
+            'avatar':        data.get('avatar', '👤').strip() or '👤',
+            'description':   data.get('description', '').strip(),
+            'personality':   data.get('personality', '').strip(),
+            'speaking_style': data.get('speaking_style', '').strip(),
+            'background':    data.get('background', '').strip(),
+            'color':         data.get('color', '#8B5CF6'),
+        })
+        row = cur.fetchone()
+        conn.commit()
+        cur.close()
+        conn.close()
+        return dict(row) if row else None
 
-    def build_facilitator_prompt(self, topic: str = "", members: list = None, discussion: str = "") -> str:
-        member_names = "、".join([m["name"] for m in (members or [])])
-        return f"あなたは会議のファシリテータです。\n議題：「{topic}」\n参加者：{member_names}\n\n議論内容：\n{discussion}\n\n議論を整理し、次のステップを100文字以内で示してください。"
+    def delete_persona(self, persona_id):
+        """ペルソナを削除（デフォルトペルソナは削除不可）"""
+        protected = {'koumei', 'hideyoshi', 'professor', 'facilitator'}
+        if persona_id in protected:
+            return False, 'デフォルトペルソナは削除できません'
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM personas WHERE id = %s RETURNING id", (persona_id,))
+        row = cur.fetchone()
+        conn.commit()
+        cur.close()
+        conn.close()
+        if row:
+            return True, '削除しました'
+        return False, 'ペルソナが見つかりません'
+
+    # ===== プロンプト生成 =====
+
+    def build_system_prompt(self, persona, topic, history_text='', learn_data=''):
+        """ペルソナのシステムプロンプトを生成"""
+        prompt = f"""あなたは「{persona['name']}」です。
+
+【キャラクター設定】
+{persona['description']}
+
+【性格・思考スタイル】
+{persona['personality']}
+
+【話し方の特徴】
+{persona['speaking_style']}
+
+【バックグラウンド】
+{persona.get('background', '')}
+"""
+        if learn_data:
+            prompt += f"\n【学習データ・参考情報】\n{learn_data[:2000]}\n"
+
+        prompt += f"""
+【会議のルール】
+- 議題：「{topic}」について議論しています
+- あなた自身の立場・価値観・専門性から意見を述べてください
+- 他のメンバーの発言を踏まえて発言してください
+- 200〜400字程度で簡潔に発言してください
+- キャラクターとして一貫して振る舞ってください
+"""
+        if history_text:
+            prompt += f"\n【これまでの会話】\n{history_text}"
+
+        return prompt
+
+    def build_facilitator_prompt(self, facilitator, topic, history_text, mode='guide'):
+        """ファシリテータのプロンプトを生成"""
+        if mode == 'summarize':
+            instruction = "議論全体を振り返り、各メンバーの主な意見・共通点・相違点・結論を整理してください。"
+        else:
+            instruction = "議論の進行を促し、次の論点や深掘りすべき点を提示してください。"
+
+        prompt = f"""あなたは会議のファシリテータ「{facilitator['name']}」です。
+
+【役割】
+中立的な立場で議論を整理・促進する進行役です。
+
+【議題】
+{topic}
+
+【これまでの議論】
+{history_text}
+
+【指示】
+{instruction}
+
+300字以内で簡潔にまとめてください。
+"""
+        return prompt
