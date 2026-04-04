@@ -251,6 +251,74 @@ def stream_auto(session_id):
     return Response(generate(), mimetype="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
+@app.route("/api/learn/fetch-url", methods=["POST"])
+def fetch_learn_url():
+    """WebページのテキストをAI学習データとして取得"""
+    data = request.json
+    url = data.get("url", "").strip()
+    if not url:
+        return jsonify({"error": "URLを入力してください"}), 400
+    try:
+        import requests as req
+        from bs4 import BeautifulSoup
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        res = req.get(url, headers=headers, timeout=10)
+        res.raise_for_status()
+        soup = BeautifulSoup(res.text, 'html.parser')
+        for tag in soup(['script', 'style', 'nav', 'footer', 'header', 'aside']):
+            tag.decompose()
+        lines = [l.strip() for l in soup.get_text(separator='\n').split('\n') if l.strip()]
+        text = '\n'.join(lines)[:4000]
+        return jsonify({"text": text, "url": url})
+    except Exception as e:
+        return jsonify({"error": f"取得エラー: {str(e)}"}), 500
+
+@app.route("/api/learn/fetch-youtube", methods=["POST"])
+def fetch_learn_youtube():
+    """YouTube動画の字幕をAI学習データとして取得"""
+    data = request.json
+    url = data.get("url", "").strip()
+    if not url:
+        return jsonify({"error": "YouTube URLを入力してください"}), 400
+    try:
+        import re
+        from youtube_transcript_api import YouTubeTranscriptApi
+        match = re.search(r'(?:v=|youtu\.be/)([a-zA-Z0-9_-]{11})', url)
+        if not match:
+            return jsonify({"error": "YouTube URLが正しくありません"}), 400
+        video_id = match.group(1)
+        try:
+            transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=['ja'])
+        except Exception:
+            transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=['en'])
+        text = ' '.join([t['text'] for t in transcript])[:4000]
+        return jsonify({"text": text, "url": url})
+    except Exception as e:
+        return jsonify({"error": f"字幕取得エラー: {str(e)}"}), 500
+
+@app.route("/api/learn/transcribe-audio", methods=["POST"])
+def transcribe_audio():
+    """音声ファイルをテキストに変換（WAV形式対応）"""
+    audio_file = request.files.get("audio")
+    if not audio_file:
+        return jsonify({"error": "音声ファイルが見つかりません"}), 400
+    try:
+        import tempfile, os, speech_recognition as sr
+        suffix = os.path.splitext(audio_file.filename)[1].lower()
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
+            audio_file.save(f.name)
+            temp_path = f.name
+        r = sr.Recognizer()
+        with sr.AudioFile(temp_path) as source:
+            audio = r.record(source)
+        text = r.recognize_google(audio, language='ja-JP')
+        os.unlink(temp_path)
+        return jsonify({"text": text})
+    except sr.UnknownValueError:
+        return jsonify({"error": "音声を認識できませんでした（WAV形式・日本語のみ対応）"}), 400
+    except Exception as e:
+        return jsonify({"error": f"文字起こしエラー: {str(e)}"}), 500
+
 @app.route("/api/health")
 def health():
     api_key = os.getenv("ANTHROPIC_API_KEY")

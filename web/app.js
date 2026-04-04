@@ -290,8 +290,14 @@ async function init() {
   });
   $('learnTextFile').addEventListener('change', (e) => handleLearnFiles(e, 'add', 'text'));
   $('learnImageFile').addEventListener('change', (e) => handleLearnFiles(e, 'add', 'image'));
+  $('learnAudioFile').addEventListener('change', (e) => handleLearnAudio(e, 'add'));
   $('editLearnTextFile').addEventListener('change', (e) => handleLearnFiles(e, 'edit', 'text'));
   $('editLearnImageFile').addEventListener('change', (e) => handleLearnFiles(e, 'edit', 'image'));
+  $('editLearnAudioFile').addEventListener('change', (e) => handleLearnAudio(e, 'edit'));
+  $('addFetchWebBtn').addEventListener('click', () => fetchLearnUrl('add', 'web'));
+  $('addFetchYoutubeBtn').addEventListener('click', () => fetchLearnUrl('add', 'youtube'));
+  $('editFetchWebBtn').addEventListener('click', () => fetchLearnUrl('edit', 'web'));
+  $('editFetchYoutubeBtn').addEventListener('click', () => fetchLearnUrl('edit', 'youtube'));
 
   DOM.chatInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendUserMessage(); } });
   DOM.chatInput.addEventListener('input', () => {
@@ -800,6 +806,66 @@ function scrollToBottom() { DOM.chatMessages.scrollTop = DOM.chatMessages.scroll
 function showToast(msg, type = 'info') {
   const toast = document.createElement('div'); toast.className = `toast ${type}`; toast.textContent = msg;
   DOM.toastContainer.appendChild(toast); setTimeout(() => toast.remove(), 3500);
+}
+
+// ★ URL・SNS・YouTube から学習データを取得
+async function fetchLearnUrl(mode, type) {
+  const inputId = mode === 'add' ? 'learnUrlInput' : 'editLearnUrlInput';
+  const inputEl = $(inputId);
+  const statusEl = mode === 'add' ? DOM.learnStatus : DOM.editLearnStatus;
+  const url = inputEl.value.trim();
+  if (!url) { showToast('URLを入力してください', 'error'); return; }
+
+  const endpoint = type === 'youtube' ? '/api/learn/fetch-youtube' : '/api/learn/fetch-url';
+  statusEl.textContent = '取得中...';
+
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '取得失敗');
+
+    const listKey = mode === 'add' ? 'addLearnFiles' : 'editLearnFiles';
+    const icon = type === 'youtube' ? '▶' : '🌐';
+    const label = `${icon} ${url.length > 40 ? url.slice(0, 40) + '…' : url}`;
+    State[listKey].push({ name: label, type: 'text', content: data.text });
+    renderLearnDataList(mode);
+    statusEl.textContent = `✓ 取得完了（${data.text.length}文字）`;
+    inputEl.value = '';
+    setTimeout(() => { statusEl.textContent = ''; }, 3000);
+  } catch (e) {
+    statusEl.textContent = `エラー: ${e.message}`;
+    setTimeout(() => { statusEl.textContent = ''; }, 4000);
+  }
+}
+
+// ★ 音声ファイルを文字起こして学習データに追加
+async function handleLearnAudio(e, mode) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const statusEl = mode === 'add' ? DOM.learnStatus : DOM.editLearnStatus;
+  statusEl.textContent = `${file.name} を文字起こし中...`;
+
+  try {
+    const formData = new FormData();
+    formData.append('audio', file);
+    const res = await fetch('/api/learn/transcribe-audio', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '文字起こし失敗');
+
+    const listKey = mode === 'add' ? 'addLearnFiles' : 'editLearnFiles';
+    State[listKey].push({ name: `🎵 ${file.name}`, type: 'text', content: data.text });
+    renderLearnDataList(mode);
+    statusEl.textContent = `✓ 文字起こし完了（${data.text.length}文字）`;
+    setTimeout(() => { statusEl.textContent = ''; }, 3000);
+  } catch (e) {
+    statusEl.textContent = `エラー: ${e.message}`;
+    setTimeout(() => { statusEl.textContent = ''; }, 4000);
+  }
+  e.target.value = '';
 }
 
 function escapeHtml(text) { const d = document.createElement('div'); d.textContent = text; return d.innerHTML; }

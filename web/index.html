@@ -368,10 +368,16 @@
     <div class="form-group"><label>話し方の特徴 *</label><textarea id="pSpeakingStyle" placeholder="「リスクを考えると〜」という表現が多い。"></textarea></div>
     <div class="form-group"><label>バックグラウンド</label><textarea id="pBackground" placeholder="大手商社に30年勤務後、独立。60代。"></textarea></div>
     <div class="form-group">
-      <label>学習データ（テキスト/PDF・画像）</label>
+      <label>学習データ（テキスト/PDF・画像・音声・URL）</label>
       <div class="learn-upload-row">
         <label class="avatar-file-btn">📄 テキスト/PDF<input type="file" id="learnTextFile" accept=".txt,.md,.pdf" multiple style="display:none" /></label>
         <label class="avatar-file-btn">🖼️ 画像<input type="file" id="learnImageFile" accept="image/*" multiple style="display:none" /></label>
+        <label class="avatar-file-btn">🎵 音声<input type="file" id="learnAudioFile" accept="audio/*" style="display:none" /></label>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center;">
+        <input type="text" id="learnUrlInput" placeholder="🔗 URL（SNS・Webページ・YouTube）" style="flex:1;min-width:180px;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;color:var(--text-primary);font-size:12px;font-family:'Noto Sans JP',sans-serif;outline:none;" />
+        <button class="avatar-file-btn" id="addFetchWebBtn">🌐 Web取得</button>
+        <button class="avatar-file-btn" id="addFetchYoutubeBtn">▶ YouTube</button>
       </div>
       <div id="learnDataList"></div>
       <div class="learn-status" id="learnStatus"></div>
@@ -411,6 +417,12 @@
       <div class="learn-upload-row">
         <label class="avatar-file-btn">📄 テキスト/PDF<input type="file" id="editLearnTextFile" accept=".txt,.md,.pdf" multiple style="display:none" /></label>
         <label class="avatar-file-btn">🖼️ 画像<input type="file" id="editLearnImageFile" accept="image/*" multiple style="display:none" /></label>
+        <label class="avatar-file-btn">🎵 音声<input type="file" id="editLearnAudioFile" accept="audio/*" style="display:none" /></label>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center;">
+        <input type="text" id="editLearnUrlInput" placeholder="🔗 URL（SNS・Webページ・YouTube）" style="flex:1;min-width:180px;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;color:var(--text-primary);font-size:12px;font-family:'Noto Sans JP',sans-serif;outline:none;" />
+        <button class="avatar-file-btn" id="editFetchWebBtn">🌐 Web取得</button>
+        <button class="avatar-file-btn" id="editFetchYoutubeBtn">▶ YouTube</button>
       </div>
       <div id="editLearnDataList"></div>
       <div class="learn-status" id="editLearnStatus"></div>
