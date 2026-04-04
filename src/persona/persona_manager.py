@@ -12,6 +12,12 @@ from src.database import (
 COLUMNS = ['id','name','avatar','description','personality',
            'speaking_style','background','color','role','created_at']
 
+def serialize_persona(d):
+    """datetimeをstrに変換してJSONシリアライズ可能にする"""
+    if d and 'created_at' in d and d['created_at'] is not None:
+        d['created_at'] = str(d['created_at'])
+    return d
+
 class PersonaManager:
 
     # ===== ペルソナCRUD =====
@@ -20,8 +26,7 @@ class PersonaManager:
         conn = get_connection()
         rows = conn.run("SELECT * FROM personas WHERE role='member' ORDER BY created_at ASC")
         conn.close()
-        result = rows_to_dicts(COLUMNS, rows)
-        # 各ペルソナの学習データ件数を追加
+        result = [serialize_persona(row_to_dict(COLUMNS, r)) for r in rows]
         for p in result:
             p['learn_count'] = get_learn_data_count(p['id'])
         return result
@@ -30,19 +35,19 @@ class PersonaManager:
         conn = get_connection()
         rows = conn.run("SELECT * FROM personas WHERE role='facilitator' ORDER BY created_at ASC LIMIT 1")
         conn.close()
-        return row_to_dict(COLUMNS, rows[0]) if rows else None
+        return serialize_persona(row_to_dict(COLUMNS, rows[0])) if rows else None
 
     def get_all_personas(self):
         conn = get_connection()
         rows = conn.run("SELECT * FROM personas ORDER BY role DESC, created_at ASC")
         conn.close()
-        return rows_to_dicts(COLUMNS, rows)
+        return [serialize_persona(row_to_dict(COLUMNS, r)) for r in rows]
 
     def get_persona_by_id(self, persona_id):
         conn = get_connection()
         rows = conn.run("SELECT * FROM personas WHERE id=:id", id=persona_id)
         conn.close()
-        return row_to_dict(COLUMNS, rows[0]) if rows else None
+        return serialize_persona(row_to_dict(COLUMNS, rows[0])) if rows else None
 
     def get_personas_by_ids(self, ids):
         if not ids:
@@ -79,7 +84,7 @@ class PersonaManager:
         role=data.get('role','member'))
         rows = conn.run("SELECT * FROM personas WHERE id=:id", id=persona_id)
         conn.close()
-        return row_to_dict(COLUMNS, rows[0]) if rows else None
+        return serialize_persona(row_to_dict(COLUMNS, rows[0])) if rows else None
 
     def update_persona(self, persona_id, data):
         conn = get_connection()
@@ -100,7 +105,7 @@ class PersonaManager:
         color=data.get('color','#8B5CF6'))
         rows = conn.run("SELECT * FROM personas WHERE id=:id", id=persona_id)
         conn.close()
-        return row_to_dict(COLUMNS, rows[0]) if rows else None
+        return serialize_persona(row_to_dict(COLUMNS, rows[0])) if rows else None
 
     def delete_persona(self, persona_id):
         protected = {'koumei', 'hideyoshi', 'professor', 'facilitator'}
