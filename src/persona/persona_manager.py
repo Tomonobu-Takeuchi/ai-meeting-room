@@ -1,163 +1,112 @@
 """
-persona_manager.py - ペルソナ管理（PostgreSQL永続化版）
+persona_manager.py - ペルソナ管理（PostgreSQL pg8000版）
 """
 import uuid
-from src.database import get_connection
+from src.database import get_connection, rows_to_dicts, row_to_dict
 
+COLUMNS = ['id','name','avatar','description','personality',
+           'speaking_style','background','color','role','created_at']
 
 class PersonaManager:
-    """ペルソナのCRUD操作をPostgreSQLで管理"""
-
-    # ===== 取得系 =====
-
-    def get_all_members(self):
-        """全ペルソナを取得（facilitator含む）"""
-        conn = get_connection()
-        cur = conn.cursor()
-        cur.execute("SELECT * FROM personas ORDER BY role DESC, created_at ASC")
-        rows = cur.fetchall()
-        cur.close()
-        conn.close()
-        return [dict(r) for r in rows]
 
     def get_members_only(self):
-        """memberロールのペルソナのみ取得"""
         conn = get_connection()
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT * FROM personas WHERE role = 'member' ORDER BY created_at ASC"
-        )
-        rows = cur.fetchall()
-        cur.close()
+        rows = conn.run("SELECT * FROM personas WHERE role='member' ORDER BY created_at ASC")
         conn.close()
-        return [dict(r) for r in rows]
+        return rows_to_dicts(COLUMNS, rows)
 
     def get_facilitator(self):
-        """ファシリテータを取得"""
         conn = get_connection()
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT * FROM personas WHERE role = 'facilitator' ORDER BY created_at ASC LIMIT 1"
-        )
-        row = cur.fetchone()
-        cur.close()
+        rows = conn.run("SELECT * FROM personas WHERE role='facilitator' ORDER BY created_at ASC LIMIT 1")
         conn.close()
-        return dict(row) if row else None
+        return row_to_dict(COLUMNS, rows[0]) if rows else None
+
+    def get_all_personas(self):
+        conn = get_connection()
+        rows = conn.run("SELECT * FROM personas ORDER BY role DESC, created_at ASC")
+        conn.close()
+        return rows_to_dicts(COLUMNS, rows)
 
     def get_persona_by_id(self, persona_id):
-        """IDでペルソナを取得"""
         conn = get_connection()
-        cur = conn.cursor()
-        cur.execute("SELECT * FROM personas WHERE id = %s", (persona_id,))
-        row = cur.fetchone()
-        cur.close()
+        rows = conn.run("SELECT * FROM personas WHERE id=:id", id=persona_id)
         conn.close()
-        return dict(row) if row else None
+        return row_to_dict(COLUMNS, rows[0]) if rows else None
 
     def get_personas_by_ids(self, ids):
-        """複数IDでペルソナを取得"""
         if not ids:
             return []
-        conn = get_connection()
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT * FROM personas WHERE id = ANY(%s) ORDER BY created_at ASC",
-            (ids,)
-        )
-        rows = cur.fetchall()
-        cur.close()
-        conn.close()
-        # ids の順番に並べ替え
-        id_order = {pid: i for i, pid in enumerate(ids)}
-        return sorted([dict(r) for r in rows], key=lambda p: id_order.get(p['id'], 999))
-
-    # ===== 追加・更新・削除 =====
+        result = []
+        for pid in ids:
+            p = self.get_persona_by_id(pid)
+            if p:
+                result.append(p)
+        return result
 
     def add_persona(self, data):
-        """新規ペルソナを追加"""
         persona_id = data.get('id') or str(uuid.uuid4())[:8]
-        persona = {
-            'id':            persona_id,
-            'name':          data.get('name', '').strip(),
-            'avatar':        data.get('avatar', '👤').strip() or '👤',
-            'description':   data.get('description', '').strip(),
-            'personality':   data.get('personality', '').strip(),
-            'speaking_style': data.get('speaking_style', '').strip(),
-            'background':    data.get('background', '').strip(),
-            'color':         data.get('color', '#8B5CF6'),
-            'role':          data.get('role', 'member'),
-        }
         conn = get_connection()
-        cur = conn.cursor()
-        cur.execute("""
+        conn.run("""
             INSERT INTO personas (id, name, avatar, description, personality,
                 speaking_style, background, color, role)
-            VALUES (%(id)s, %(name)s, %(avatar)s, %(description)s, %(personality)s,
-                %(speaking_style)s, %(background)s, %(color)s, %(role)s)
+            VALUES (:id, :name, :avatar, :description, :personality,
+                :speaking_style, :background, :color, :role)
             ON CONFLICT (id) DO UPDATE SET
                 name=EXCLUDED.name, avatar=EXCLUDED.avatar,
                 description=EXCLUDED.description, personality=EXCLUDED.personality,
                 speaking_style=EXCLUDED.speaking_style, background=EXCLUDED.background,
                 color=EXCLUDED.color, role=EXCLUDED.role
-            RETURNING *
-        """, persona)
-        row = cur.fetchone()
-        conn.commit()
-        cur.close()
+        """,
+        id=persona_id,
+        name=data.get('name','').strip(),
+        avatar=data.get('avatar','👤').strip() or '👤',
+        description=data.get('description','').strip(),
+        personality=data.get('personality','').strip(),
+        speaking_style=data.get('speaking_style','').strip(),
+        background=data.get('background','').strip(),
+        color=data.get('color','#8B5CF6'),
+        role=data.get('role','member'))
+        rows = conn.run("SELECT * FROM personas WHERE id=:id", id=persona_id)
         conn.close()
-        return dict(row)
+        return row_to_dict(COLUMNS, rows[0]) if rows else None
 
     def update_persona(self, persona_id, data):
-        """ペルソナ情報を更新"""
         conn = get_connection()
-        cur = conn.cursor()
-        cur.execute("""
+        conn.run("""
             UPDATE personas SET
-                name           = %(name)s,
-                avatar         = %(avatar)s,
-                description    = %(description)s,
-                personality    = %(personality)s,
-                speaking_style = %(speaking_style)s,
-                background     = %(background)s,
-                color          = %(color)s
-            WHERE id = %(id)s
-            RETURNING *
-        """, {
-            'id':            persona_id,
-            'name':          data.get('name', '').strip(),
-            'avatar':        data.get('avatar', '👤').strip() or '👤',
-            'description':   data.get('description', '').strip(),
-            'personality':   data.get('personality', '').strip(),
-            'speaking_style': data.get('speaking_style', '').strip(),
-            'background':    data.get('background', '').strip(),
-            'color':         data.get('color', '#8B5CF6'),
-        })
-        row = cur.fetchone()
-        conn.commit()
-        cur.close()
+                name=:name, avatar=:avatar, description=:description,
+                personality=:personality, speaking_style=:speaking_style,
+                background=:background, color=:color
+            WHERE id=:id
+        """,
+        id=persona_id,
+        name=data.get('name','').strip(),
+        avatar=data.get('avatar','👤').strip() or '👤',
+        description=data.get('description','').strip(),
+        personality=data.get('personality','').strip(),
+        speaking_style=data.get('speaking_style','').strip(),
+        background=data.get('background','').strip(),
+        color=data.get('color','#8B5CF6'))
+        rows = conn.run("SELECT * FROM personas WHERE id=:id", id=persona_id)
         conn.close()
-        return dict(row) if row else None
+        return row_to_dict(COLUMNS, rows[0]) if rows else None
 
     def delete_persona(self, persona_id):
-        """ペルソナを削除（デフォルトペルソナは削除不可）"""
         protected = {'koumei', 'hideyoshi', 'professor', 'facilitator'}
         if persona_id in protected:
             return False, 'デフォルトペルソナは削除できません'
         conn = get_connection()
-        cur = conn.cursor()
-        cur.execute("DELETE FROM personas WHERE id = %s RETURNING id", (persona_id,))
-        row = cur.fetchone()
-        conn.commit()
-        cur.close()
+        conn.run("DELETE FROM personas WHERE id=:id", id=persona_id)
         conn.close()
-        if row:
-            return True, '削除しました'
-        return False, 'ペルソナが見つかりません'
+        return True, '削除しました'
 
-    # ===== プロンプト生成 =====
+    def to_dict_list(self):
+        return self.get_all_personas()
+
+    def add_custom_persona(self, data):
+        return self.add_persona(data)
 
     def build_system_prompt(self, persona, topic, history_text='', learn_data=''):
-        """ペルソナのシステムプロンプトを生成"""
         prompt = f"""あなたは「{persona['name']}」です。
 
 【キャラクター設定】
@@ -185,17 +134,15 @@ class PersonaManager:
 """
         if history_text:
             prompt += f"\n【これまでの会話】\n{history_text}"
-
         return prompt
 
     def build_facilitator_prompt(self, facilitator, topic, history_text, mode='guide'):
-        """ファシリテータのプロンプトを生成"""
         if mode == 'summarize':
             instruction = "議論全体を振り返り、各メンバーの主な意見・共通点・相違点・結論を整理してください。"
         else:
             instruction = "議論の進行を促し、次の論点や深掘りすべき点を提示してください。"
 
-        prompt = f"""あなたは会議のファシリテータ「{facilitator['name']}」です。
+        return f"""あなたは会議のファシリテータ「{facilitator['name']}」です。
 
 【役割】
 中立的な立場で議論を整理・促進する進行役です。
@@ -211,4 +158,3 @@ class PersonaManager:
 
 300字以内で簡潔にまとめてください。
 """
-        return prompt
