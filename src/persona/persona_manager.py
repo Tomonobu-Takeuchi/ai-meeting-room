@@ -214,7 +214,13 @@ class PersonaManager:
         else:
             instruction = "議論の進行を促し、次の論点や深掘りすべき点を提示してください。"
 
-        return f"""あなたは会議のファシリテータ「{facilitator['name']}」です。
+        # facilitatorがdictの場合とstrの場合に対応
+        if isinstance(facilitator, dict):
+            facilitator_name = facilitator.get('name', 'ファシリテータ')
+        else:
+            facilitator_name = str(facilitator)
+
+        return f"""あなたは会議のファシリテータ「{facilitator_name}」です。
 
 【役割】
 中立的な立場で議論を整理・促進する進行役です。
