@@ -49,6 +49,10 @@ class PersonaManager:
         conn.close()
         return serialize_persona(row_to_dict(COLUMNS, rows[0])) if rows else None
 
+    # meeting_room.py との互換性のためエイリアスを追加
+    def get_persona(self, persona_id):
+        return self.get_persona_by_id(persona_id)
+
     def get_personas_by_ids(self, ids):
         if not ids:
             return []
