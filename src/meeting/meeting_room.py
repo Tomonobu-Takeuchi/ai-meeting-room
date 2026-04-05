@@ -21,7 +21,7 @@ class MeetingRoom:
         self.model = "claude-sonnet-4-20250514"
         self.sessions = {}
 
-    def create_session(self, topic, member_ids):
+    def create_session(self, topic, member_ids, user_id=None):
         session_id = str(uuid.uuid4())[:8]
         members = self.persona_manager.get_personas_by_ids(member_ids)
         facilitator = self.persona_manager.get_facilitator()
