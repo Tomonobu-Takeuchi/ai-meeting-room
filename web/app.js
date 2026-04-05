@@ -321,7 +321,7 @@ function showMemberSelectModal() {
     label.className = 'member-check-item';
     const avatarHtml = State.avatarImages[member.id]
       ? `<img src="${State.avatarImages[member.id]}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;" />`
-      : (member.avatar || '👤');
+      : (member.avatar && member.avatar.startsWith('data:') ? '<span>👤</span>' : (member.avatar || '👤'));
     label.innerHTML = `
       <input type="checkbox" value="${member.id}" ${isChecked ? 'checked' : ''} />
       <div class="member-check-avatar" style="background:${member.color}22">${avatarHtml}</div>
@@ -480,7 +480,10 @@ function renderMemberTriggers() {
   State.members.filter(m => State.selectedMemberIds.includes(m.id)).forEach(member => {
     const btn = document.createElement('button');
     btn.className = 'member-trigger-btn'; btn.dataset.id = member.id;
-    btn.innerHTML = `${member.avatar} ${member.name.split(' ')[0]}`;
+    const trigAvatar = State.avatarImages[member.id]
+      ? `<img src="${State.avatarImages[member.id]}" style="width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:4px;" />`
+      : (member.avatar && member.avatar.startsWith('data:') ? '' : (member.avatar || ''));
+    btn.innerHTML = `${trigAvatar}${member.name.split(' ')[0]}`;
     btn.addEventListener('click', () => triggerMemberResponse(member.id));
     DOM.memberTriggers.appendChild(btn);
   });
@@ -773,7 +776,10 @@ function addTypingIndicator(persona, isFacilitator = false) {
 
 function addStreamingBubble(persona) {
   const row = document.createElement('div'); row.className = 'message-row member';
-  const avatarContent = State.avatarImages[persona.id] ? `<img src="${State.avatarImages[persona.id]}" alt="${persona.name}" />` : persona.avatar;
+  const _av3 = State.avatarImages[persona.id];
+  const avatarContent = _av3
+    ? `<img src="${_av3}" alt="${persona.name}" />`
+    : (persona.avatar && !persona.avatar.startsWith('data:') ? persona.avatar : '👤');
   row.innerHTML = `
     <div class="msg-avatar" style="background:${persona.color}22;border:2px solid ${persona.color}44;">${avatarContent}</div>
     <div class="msg-body"><div class="msg-name">${persona.name}</div><div class="msg-bubble streaming"></div></div>`;
