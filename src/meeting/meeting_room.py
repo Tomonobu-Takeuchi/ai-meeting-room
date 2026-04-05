@@ -4,7 +4,18 @@
 import json
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, date
+
+
+def _json_serial(obj):
+    """datetime等をJSONシリアライズ可能にするカスタムエンコーダー"""
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    raise TypeError(f"Type {type(obj)} not serializable")
+
+
+def _dumps(data):
+    return json.dumps(data, default=_json_serial)
 
 import anthropic
 
@@ -76,11 +87,11 @@ class MeetingRoom:
             ) as stream:
                 for text in stream.text_stream:
                     full_response += text
-                    yield f"data: {json.dumps({'type': 'chunk', 'text': text, 'persona_id': persona_id})}\n\n"
+                    yield f"data: {_dumps({'type': 'chunk', 'text': text, 'persona_id': persona_id})}\n\n"
             msg = self.add_message(session_id, "member", persona_id, full_response)
-            yield f"data: {json.dumps({'type': 'done', 'persona_id': persona_id, 'message': msg})}\n\n"
+            yield f"data: {_dumps({'type': 'done', 'persona_id': persona_id, 'message': msg})}\n\n"
         except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            yield f"data: {_dumps({'type': 'error', 'message': str(e)})}\n\n"
 
     def generate_facilitator_response_stream(self, session_id):
         session = self.sessions.get(session_id)
@@ -100,11 +111,11 @@ class MeetingRoom:
             ) as stream:
                 for text in stream.text_stream:
                     full_response += text
-                    yield f"data: {json.dumps({'type': 'chunk', 'text': text, 'persona_id': 'facilitator'})}\n\n"
+                    yield f"data: {_dumps({'type': 'chunk', 'text': text, 'persona_id': 'facilitator'})}\n\n"
             msg = self.add_message(session_id, "facilitator", "facilitator", full_response)
-            yield f"data: {json.dumps({'type': 'done', 'persona_id': 'facilitator', 'message': msg})}\n\n"
+            yield f"data: {_dumps({'type': 'done', 'persona_id': 'facilitator', 'message': msg})}\n\n"
         except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            yield f"data: {_dumps({'type': 'error', 'message': str(e)})}\n\n"
 
     def generate_auto_discussion_stream(self, session_id, rounds=1):
         session = self.sessions.get(session_id)
@@ -112,7 +123,7 @@ class MeetingRoom:
             yield "data: [ERROR] セッションが見つかりません\n\n"
             return
         for member in session["members"]:
-            yield f"data: {json.dumps({'type': 'speaking_start', 'persona_id': member['id']})}\n\n"
+            yield f"data: {_dumps({'type': 'speaking_start', 'persona_id': member['id']})}\n\n"
             yield from self.generate_member_response_stream(session_id, member["id"])
 
     def _build_conversation_history(self, session, current_persona_id, trigger=None):
@@ -146,7 +157,7 @@ class MeetingRoom:
             return
         path = os.path.join(self.data_dir, f"{session_id}.json")
         with open(path, "w", encoding="utf-8") as f:
-            json.dump(session, f, ensure_ascii=False, indent=2)
+            json.dump(session, f, ensure_ascii=False, indent=2, default=_json_serial)
 
     def get_session_summary(self, session_id):
         session = self.sessions.get(session_id)
