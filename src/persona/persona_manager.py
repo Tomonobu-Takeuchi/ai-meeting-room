@@ -1,5 +1,5 @@
 """
-persona_manager.py - ペルソナ管理（pg8000 + RAG対応版）
+persona_manager.py - ペルソナ管理（ユーザー認証 + RAG対応版）
 """
 import uuid
 import os
@@ -9,75 +9,111 @@ from src.database import (
     get_learn_data_count, get_all_learn_data, delete_learn_data
 )
 
-COLUMNS = ['id','name','avatar','description','personality',
-           'speaking_style','background','color','role','created_at']
+COLUMNS = ['id','user_id','name','avatar','description','personality',
+           'speaking_style','background','color','role','is_default','created_at']
 
 def serialize_persona(d):
-    """datetimeをstrに変換してJSONシリアライズ可能にする"""
-    if d and 'created_at' in d and d['created_at'] is not None:
+    """datetimeをstrに変換・不要フィールドを整理"""
+    if not d:
+        return d
+    if 'created_at' in d and d['created_at'] is not None:
         d['created_at'] = str(d['created_at'])
     return d
 
+
 class PersonaManager:
 
-    # ===== ペルソナCRUD =====
+    # ===== ペルソナ取得（user_id対応） =====
 
-    def get_members_only(self):
+    def get_members_only(self, user_id=None):
+        """memberロールのペルソナ取得（デフォルト＋ユーザー固有）"""
         conn = get_connection()
-        rows = conn.run("SELECT * FROM personas WHERE role='member' ORDER BY created_at ASC")
+        if user_id:
+            rows = conn.run("""
+                SELECT * FROM personas
+                WHERE role='member'
+                  AND (user_id=:user_id OR user_id IS NULL)
+                ORDER BY is_default DESC, created_at ASC
+            """, user_id=user_id)
+        else:
+            rows = conn.run("""
+                SELECT * FROM personas
+                WHERE role='member' AND user_id IS NULL
+                ORDER BY created_at ASC
+            """)
         conn.close()
         result = [serialize_persona(row_to_dict(COLUMNS, r)) for r in rows]
         for p in result:
-            p['learn_count'] = get_learn_data_count(p['id'])
+            p['learn_count'] = get_learn_data_count(p['id'], user_id)
         return result
 
-    def get_facilitator(self):
+    def get_facilitator(self, user_id=None):
+        """ファシリテータ取得"""
         conn = get_connection()
-        rows = conn.run("SELECT * FROM personas WHERE role='facilitator' ORDER BY created_at ASC LIMIT 1")
+        if user_id:
+            rows = conn.run("""
+                SELECT * FROM personas
+                WHERE role='facilitator'
+                  AND (user_id=:user_id OR user_id IS NULL)
+                ORDER BY is_default DESC, created_at ASC LIMIT 1
+            """, user_id=user_id)
+        else:
+            rows = conn.run("""
+                SELECT * FROM personas
+                WHERE role='facilitator' AND user_id IS NULL
+                ORDER BY created_at ASC LIMIT 1
+            """)
         conn.close()
         return serialize_persona(row_to_dict(COLUMNS, rows[0])) if rows else None
 
-    def get_all_personas(self):
+    def get_all_personas(self, user_id=None):
         conn = get_connection()
-        rows = conn.run("SELECT * FROM personas ORDER BY role DESC, created_at ASC")
+        if user_id:
+            rows = conn.run("""
+                SELECT * FROM personas
+                WHERE user_id=:user_id OR user_id IS NULL
+                ORDER BY role DESC, is_default DESC, created_at ASC
+            """, user_id=user_id)
+        else:
+            rows = conn.run("""
+                SELECT * FROM personas WHERE user_id IS NULL
+                ORDER BY role DESC, created_at ASC
+            """)
         conn.close()
         return [serialize_persona(row_to_dict(COLUMNS, r)) for r in rows]
 
-    def get_persona_by_id(self, persona_id):
+    def get_persona_by_id(self, persona_id, user_id=None):
         conn = get_connection()
-        rows = conn.run("SELECT * FROM personas WHERE id=:id", id=persona_id)
+        if user_id:
+            rows = conn.run("""
+                SELECT * FROM personas
+                WHERE id=:id AND (user_id=:user_id OR user_id IS NULL)
+            """, id=persona_id, user_id=user_id)
+        else:
+            rows = conn.run("SELECT * FROM personas WHERE id=:id", id=persona_id)
         conn.close()
         return serialize_persona(row_to_dict(COLUMNS, rows[0])) if rows else None
 
-    # meeting_room.py との互換性のためエイリアスを追加
-    def get_persona(self, persona_id):
-        return self.get_persona_by_id(persona_id)
+    # meeting_room.py との互換性
+    def get_persona(self, persona_id, user_id=None):
+        return self.get_persona_by_id(persona_id, user_id)
 
-    def get_personas_by_ids(self, ids):
-        if not ids:
-            return []
-        result = []
-        for pid in ids:
-            p = self.get_persona_by_id(pid)
-            if p:
-                result.append(p)
-        return result
+    def get_personas_by_ids(self, ids, user_id=None):
+        return [p for p in [self.get_persona_by_id(pid, user_id) for pid in ids] if p]
 
-    def add_persona(self, data):
+    # ===== ペルソナ追加・更新・削除 =====
+
+    def add_persona(self, data, user_id=None):
         persona_id = data.get('id') or str(uuid.uuid4())[:8]
         conn = get_connection()
         conn.run("""
-            INSERT INTO personas (id, name, avatar, description, personality,
-                speaking_style, background, color, role)
-            VALUES (:id, :name, :avatar, :description, :personality,
-                :speaking_style, :background, :color, :role)
-            ON CONFLICT (id) DO UPDATE SET
-                name=EXCLUDED.name, avatar=EXCLUDED.avatar,
-                description=EXCLUDED.description, personality=EXCLUDED.personality,
-                speaking_style=EXCLUDED.speaking_style, background=EXCLUDED.background,
-                color=EXCLUDED.color, role=EXCLUDED.role
+            INSERT INTO personas (id, user_id, name, avatar, description, personality,
+                speaking_style, background, color, role, is_default)
+            VALUES (:id, :user_id, :name, :avatar, :description, :personality,
+                :speaking_style, :background, :color, :role, FALSE)
+            ON CONFLICT DO NOTHING
         """,
-        id=persona_id,
+        id=persona_id, user_id=user_id,
         name=data.get('name','').strip(),
         avatar=data.get('avatar','👤').strip() or '👤',
         description=data.get('description','').strip(),
@@ -86,51 +122,75 @@ class PersonaManager:
         background=data.get('background','').strip(),
         color=data.get('color','#8B5CF6'),
         role=data.get('role','member'))
-        rows = conn.run("SELECT * FROM personas WHERE id=:id", id=persona_id)
+        rows = conn.run("""
+            SELECT * FROM personas WHERE id=:id AND (user_id=:user_id OR user_id IS NULL)
+        """, id=persona_id, user_id=user_id)
         conn.close()
         return serialize_persona(row_to_dict(COLUMNS, rows[0])) if rows else None
 
-    def update_persona(self, persona_id, data):
+    def update_persona(self, persona_id, data, user_id=None):
         conn = get_connection()
-        conn.run("""
-            UPDATE personas SET
-                name=:name, avatar=:avatar, description=:description,
-                personality=:personality, speaking_style=:speaking_style,
-                background=:background, color=:color
-            WHERE id=:id
-        """,
-        id=persona_id,
-        name=data.get('name','').strip(),
-        avatar=data.get('avatar','👤').strip() or '👤',
-        description=data.get('description','').strip(),
-        personality=data.get('personality','').strip(),
-        speaking_style=data.get('speaking_style','').strip(),
-        background=data.get('background','').strip(),
-        color=data.get('color','#8B5CF6'))
-        rows = conn.run("SELECT * FROM personas WHERE id=:id", id=persona_id)
+        if user_id:
+            conn.run("""
+                UPDATE personas SET
+                    name=:name, avatar=:avatar, description=:description,
+                    personality=:personality, speaking_style=:speaking_style,
+                    background=:background, color=:color
+                WHERE id=:id AND (user_id=:user_id OR user_id IS NULL)
+            """,
+            id=persona_id, user_id=user_id,
+            name=data.get('name','').strip(),
+            avatar=data.get('avatar','👤').strip() or '👤',
+            description=data.get('description','').strip(),
+            personality=data.get('personality','').strip(),
+            speaking_style=data.get('speaking_style','').strip(),
+            background=data.get('background','').strip(),
+            color=data.get('color','#8B5CF6'))
+            rows = conn.run("""
+                SELECT * FROM personas WHERE id=:id AND (user_id=:user_id OR user_id IS NULL)
+            """, id=persona_id, user_id=user_id)
+        else:
+            conn.run("""
+                UPDATE personas SET
+                    name=:name, avatar=:avatar, description=:description,
+                    personality=:personality, speaking_style=:speaking_style,
+                    background=:background, color=:color
+                WHERE id=:id
+            """,
+            id=persona_id,
+            name=data.get('name','').strip(),
+            avatar=data.get('avatar','👤').strip() or '👤',
+            description=data.get('description','').strip(),
+            personality=data.get('personality','').strip(),
+            speaking_style=data.get('speaking_style','').strip(),
+            background=data.get('background','').strip(),
+            color=data.get('color','#8B5CF6'))
+            rows = conn.run("SELECT * FROM personas WHERE id=:id", id=persona_id)
         conn.close()
         return serialize_persona(row_to_dict(COLUMNS, rows[0])) if rows else None
 
-    def delete_persona(self, persona_id):
+    def delete_persona(self, persona_id, user_id=None):
         protected = {'koumei', 'hideyoshi', 'professor', 'facilitator'}
         if persona_id in protected:
             return False, 'デフォルトペルソナは削除できません'
         conn = get_connection()
-        conn.run("DELETE FROM personas WHERE id=:id", id=persona_id)
+        if user_id:
+            conn.run("DELETE FROM personas WHERE id=:id AND user_id=:user_id",
+                     id=persona_id, user_id=user_id)
+        else:
+            conn.run("DELETE FROM personas WHERE id=:id", id=persona_id)
         conn.close()
         return True, '削除しました'
 
-    def to_dict_list(self):
-        return self.get_all_personas()
+    def to_dict_list(self, user_id=None):
+        return self.get_all_personas(user_id)
 
-    def add_custom_persona(self, data):
-        return self.add_persona(data)
+    def add_custom_persona(self, data, user_id=None):
+        return self.add_persona(data, user_id)
 
-    # ===== RAG学習データ管理 =====
+    # ===== RAG学習データ =====
 
-    def add_learn_data(self, persona_id, content, source=''):
-        """学習データを保存（ベクトル化はフォールバック）"""
-        # OpenAI APIキーがあればベクトル化、なければテキストのみ保存
+    def add_learn_data(self, persona_id, content, source='', user_id=None):
         embedding = None
         openai_key = os.environ.get('OPENAI_API_KEY', '')
         if openai_key:
@@ -143,14 +203,13 @@ class PersonaManager:
                 )
                 embedding = res.data[0].embedding
             except Exception as e:
-                print(f"Embedding失敗（テキストのみ保存）: {e}")
-        save_learn_data(persona_id, content, source, embedding)
-        return get_learn_data_count(persona_id)
+                print(f"Embedding失敗: {e}")
+        save_learn_data(persona_id, user_id, content, source, embedding)
+        return get_learn_data_count(persona_id, user_id)
 
-    def get_relevant_learn_data(self, persona_id, topic):
-        """議題に関連する学習データを取得（RAG）"""
+    def get_relevant_learn_data(self, persona_id, topic, user_id=None):
         openai_key = os.environ.get('OPENAI_API_KEY', '')
-        if openai_key:
+        if openai_key and user_id:
             try:
                 import openai
                 client = openai.OpenAI(api_key=openai_key)
@@ -158,29 +217,24 @@ class PersonaManager:
                     model="text-embedding-3-small",
                     input=topic
                 )
-                query_embedding = res.data[0].embedding
-                results = search_learn_data(persona_id, query_embedding, limit=3)
+                results = search_learn_data(persona_id, user_id, res.data[0].embedding, limit=3)
                 if results:
                     return '\n\n'.join([r['content'] for r in results])
             except Exception as e:
-                print(f"RAG検索失敗（フォールバック）: {e}")
-
-        # フォールバック：最新の学習データを返す
-        results = get_learn_data_simple(persona_id, limit=3)
+                print(f"RAG検索失敗: {e}")
+        results = get_learn_data_simple(persona_id, user_id or 0, limit=3)
         return '\n\n'.join([r['content'] for r in results]) if results else ''
 
-    def get_all_learn_data(self, persona_id):
-        return get_all_learn_data(persona_id)
+    def get_all_learn_data(self, persona_id, user_id=None):
+        return get_all_learn_data(persona_id, user_id or 0)
 
-    def delete_learn_data(self, persona_id, learn_id):
-        delete_learn_data(persona_id, learn_id)
+    def delete_learn_data(self, persona_id, learn_id, user_id=None):
+        delete_learn_data(persona_id, user_id or 0, learn_id)
 
     # ===== プロンプト生成 =====
 
-    def build_system_prompt(self, persona, topic, history_text='', learn_data=''):
-        """RAG学習データを含むシステムプロンプトを生成"""
-        # RAGから関連データを取得
-        rag_data = self.get_relevant_learn_data(persona['id'], topic)
+    def build_system_prompt(self, persona, topic, history_text='', learn_data='', user_id=None):
+        rag_data = self.get_relevant_learn_data(persona['id'], topic, user_id)
         combined_learn = ''
         if rag_data:
             combined_learn += rag_data
@@ -223,7 +277,6 @@ class PersonaManager:
         else:
             instruction = "議論の進行を促し、次の論点や深掘りすべき点を提示してください。"
 
-        # facilitatorがdictの場合とstrの場合に対応
         if isinstance(facilitator, dict):
             facilitator_name = facilitator.get('name', 'ファシリテータ')
         else:

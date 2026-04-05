@@ -1,8 +1,7 @@
 """
-database.py - PostgreSQL接続・テーブル初期化（pg8000 + pgvector RAG対応版）
+database.py - PostgreSQL接続・テーブル初期化（ユーザー認証 + pgvector RAG対応版）
 """
 import os
-import json
 import pg8000.native
 from urllib.parse import urlparse
 
@@ -29,19 +28,32 @@ def rows_to_dicts(columns, rows):
     return [row_to_dict(columns, r) for r in rows]
 
 def init_db():
-    """テーブル初期化・デフォルトペルソナ投入"""
+    """テーブル初期化"""
     conn = get_connection()
 
-    # pgvector拡張を有効化（既にある場合はスキップ）
+    # pgvector拡張
     try:
         conn.run("CREATE EXTENSION IF NOT EXISTS vector")
     except Exception:
         pass
 
-    # personasテーブル
+    # ===== usersテーブル =====
+    conn.run("""
+        CREATE TABLE IF NOT EXISTS users (
+            id          SERIAL PRIMARY KEY,
+            email       TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            name        TEXT DEFAULT '',
+            plan        TEXT DEFAULT 'free',
+            created_at  TIMESTAMP DEFAULT NOW()
+        )
+    """)
+
+    # ===== personasテーブル（user_id追加） =====
     conn.run("""
         CREATE TABLE IF NOT EXISTS personas (
-            id             TEXT PRIMARY KEY,
+            id             TEXT NOT NULL,
+            user_id        INTEGER REFERENCES users(id) ON DELETE CASCADE,
             name           TEXT NOT NULL,
             avatar         TEXT DEFAULT '👤',
             description    TEXT DEFAULT '',
@@ -50,15 +62,28 @@ def init_db():
             background     TEXT DEFAULT '',
             color          TEXT DEFAULT '#8B5CF6',
             role           TEXT DEFAULT 'member',
-            created_at     TIMESTAMP DEFAULT NOW()
+            is_default     BOOLEAN DEFAULT FALSE,
+            created_at     TIMESTAMP DEFAULT NOW(),
+            PRIMARY KEY (id, COALESCE(user_id, 0))
         )
     """)
 
-    # persona_learnテーブル（RAG用学習データ）
+    # user_idカラムがない場合は追加（既存テーブルへの対応）
+    try:
+        conn.run("ALTER TABLE personas ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE")
+    except Exception:
+        pass
+    try:
+        conn.run("ALTER TABLE personas ADD COLUMN IF NOT EXISTS is_default BOOLEAN DEFAULT FALSE")
+    except Exception:
+        pass
+
+    # ===== persona_learnテーブル（user_id追加） =====
     conn.run("""
         CREATE TABLE IF NOT EXISTS persona_learn (
             id          SERIAL PRIMARY KEY,
-            persona_id  TEXT NOT NULL REFERENCES personas(id) ON DELETE CASCADE,
+            persona_id  TEXT NOT NULL,
+            user_id     INTEGER REFERENCES users(id) ON DELETE CASCADE,
             content     TEXT NOT NULL,
             source      TEXT DEFAULT '',
             embedding   vector(1536),
@@ -66,7 +91,12 @@ def init_db():
         )
     """)
 
-    # ベクトル検索用インデックス
+    try:
+        conn.run("ALTER TABLE persona_learn ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE")
+    except Exception:
+        pass
+
+    # ベクトル検索インデックス
     try:
         conn.run("""
             CREATE INDEX IF NOT EXISTS persona_learn_embedding_idx
@@ -76,7 +106,7 @@ def init_db():
     except Exception:
         pass
 
-    # デフォルトペルソナ投入
+    # デフォルトペルソナ（user_id=NULL = 全ユーザー共通）
     default_personas = [
         {
             'id': 'koumei', 'name': '諸葛亮孔明', 'avatar': '🪶',
@@ -91,7 +121,7 @@ def init_db():
             'description': '戦国時代の天下人。農民から天下統一を成し遂げた実行力の持ち主。',
             'personality': '楽観的でエネルギッシュ。スピードと実行力を重視。人たらしで交渉上手。',
             'speaking_style': '「ほほほ、それは面白い！」など軽快で親しみやすい口調。',
-            'background': '織田信長に仕え、本能寺の変後に天下統一。太閤検地・刀狩りなど革新的な政策を実施。',
+            'background': '織田信長に仕え、本能寺の変後に天下統一。',
             'color': '#D97706', 'role': 'member',
         },
         {
@@ -113,55 +143,77 @@ def init_db():
     ]
 
     for p in default_personas:
-        conn.run("""
-            INSERT INTO personas (id, name, avatar, description, personality,
-                speaking_style, background, color, role)
-            VALUES (:id, :name, :avatar, :description, :personality,
-                :speaking_style, :background, :color, :role)
-            ON CONFLICT (id) DO NOTHING
-        """,
-        id=p['id'], name=p['name'], avatar=p['avatar'],
-        description=p['description'], personality=p['personality'],
-        speaking_style=p['speaking_style'], background=p['background'],
-        color=p['color'], role=p['role'])
+        try:
+            conn.run("""
+                INSERT INTO personas (id, user_id, name, avatar, description, personality,
+                    speaking_style, background, color, role, is_default)
+                VALUES (:id, NULL, :name, :avatar, :description, :personality,
+                    :speaking_style, :background, :color, :role, TRUE)
+                ON CONFLICT DO NOTHING
+            """,
+            id=p['id'], name=p['name'], avatar=p['avatar'],
+            description=p['description'], personality=p['personality'],
+            speaking_style=p['speaking_style'], background=p['background'],
+            color=p['color'], role=p['role'])
+        except Exception:
+            pass
 
     conn.close()
-    print("✅ DB初期化完了（pgvector対応）")
+    print("✅ DB初期化完了（ユーザー認証対応）")
 
 
-# ===== RAG関連関数 =====
+# ===== ユーザー認証関連 =====
 
-def get_embedding(text, client):
-    """テキストをベクトル化（OpenAI Embedding API使用）"""
-    import anthropic
-    # AnthropicはEmbeddingを提供していないためOpenAI互換APIを使用
-    # ここでは簡易的にAnthropicのAPIでベクトル化の代替として
-    # テキストの特徴をJSONで返すアプローチを使用
-    # 本格実装はOpenAI text-embedding-3-smallを推奨
-    raise NotImplementedError("Embedding requires OpenAI API key")
+def create_user(email, password_hash, name=''):
+    conn = get_connection()
+    try:
+        conn.run("""
+            INSERT INTO users (email, password_hash, name)
+            VALUES (:email, :password_hash, :name)
+        """, email=email, password_hash=password_hash, name=name)
+        rows = conn.run("SELECT id, email, name, plan FROM users WHERE email=:email", email=email)
+        conn.close()
+        return row_to_dict(['id','email','name','plan'], rows[0]) if rows else None
+    except Exception as e:
+        conn.close()
+        raise e
+
+def get_user_by_email(email):
+    conn = get_connection()
+    rows = conn.run("""
+        SELECT id, email, name, plan, password_hash FROM users WHERE email=:email
+    """, email=email)
+    conn.close()
+    return row_to_dict(['id','email','name','plan','password_hash'], rows[0]) if rows else None
+
+def get_user_by_id(user_id):
+    conn = get_connection()
+    rows = conn.run("""
+        SELECT id, email, name, plan FROM users WHERE id=:id
+    """, id=user_id)
+    conn.close()
+    return row_to_dict(['id','email','name','plan'], rows[0]) if rows else None
 
 
-def save_learn_data(persona_id, content, source, embedding_vector=None):
-    """学習データをDBに保存（ベクトル付き）"""
+# ===== RAG関連 =====
+
+def save_learn_data(persona_id, user_id, content, source, embedding_vector=None):
     conn = get_connection()
     if embedding_vector:
-        # ベクトルをpg8000用にJSON配列文字列として渡す
         vec_str = '[' + ','.join(str(v) for v in embedding_vector) + ']'
         conn.run("""
-            INSERT INTO persona_learn (persona_id, content, source, embedding)
-            VALUES (:persona_id, :content, :source, :embedding::vector)
-        """, persona_id=persona_id, content=content,
+            INSERT INTO persona_learn (persona_id, user_id, content, source, embedding)
+            VALUES (:persona_id, :user_id, :content, :source, :embedding::vector)
+        """, persona_id=persona_id, user_id=user_id, content=content,
             source=source, embedding=vec_str)
     else:
         conn.run("""
-            INSERT INTO persona_learn (persona_id, content, source)
-            VALUES (:persona_id, :content, :source)
-        """, persona_id=persona_id, content=content, source=source)
+            INSERT INTO persona_learn (persona_id, user_id, content, source)
+            VALUES (:persona_id, :user_id, :content, :source)
+        """, persona_id=persona_id, user_id=user_id, content=content, source=source)
     conn.close()
 
-
-def search_learn_data(persona_id, query_embedding, limit=3):
-    """議題に関連する学習データをベクトル検索で取得"""
+def search_learn_data(persona_id, user_id, query_embedding, limit=3):
     conn = get_connection()
     vec_str = '[' + ','.join(str(v) for v in query_embedding) + ']'
     rows = conn.run("""
@@ -169,54 +221,55 @@ def search_learn_data(persona_id, query_embedding, limit=3):
                1 - (embedding <=> :query_vec::vector) AS similarity
         FROM persona_learn
         WHERE persona_id = :persona_id
+          AND (user_id = :user_id OR user_id IS NULL)
           AND embedding IS NOT NULL
         ORDER BY embedding <=> :query_vec::vector
         LIMIT :limit
-    """, persona_id=persona_id, query_vec=vec_str, limit=limit)
+    """, persona_id=persona_id, user_id=user_id, query_vec=vec_str, limit=limit)
     conn.close()
     return [{'content': r[0], 'source': r[1], 'similarity': float(r[2])} for r in rows]
 
-
-def get_learn_data_simple(persona_id, limit=5):
-    """ベクトルなしで最新の学習データを取得（フォールバック用）"""
+def get_learn_data_simple(persona_id, user_id, limit=5):
     conn = get_connection()
     rows = conn.run("""
         SELECT content, source FROM persona_learn
         WHERE persona_id = :persona_id
-        ORDER BY created_at DESC
-        LIMIT :limit
-    """, persona_id=persona_id, limit=limit)
+          AND (user_id = :user_id OR user_id IS NULL)
+        ORDER BY created_at DESC LIMIT :limit
+    """, persona_id=persona_id, user_id=user_id, limit=limit)
     conn.close()
     return [{'content': r[0], 'source': r[1]} for r in rows]
 
-
-def get_learn_data_count(persona_id):
-    """ペルソナの学習データ件数を取得"""
+def get_learn_data_count(persona_id, user_id=None):
     conn = get_connection()
-    rows = conn.run("""
-        SELECT COUNT(*) FROM persona_learn WHERE persona_id = :persona_id
-    """, persona_id=persona_id)
+    if user_id:
+        rows = conn.run("""
+            SELECT COUNT(*) FROM persona_learn
+            WHERE persona_id=:persona_id AND (user_id=:user_id OR user_id IS NULL)
+        """, persona_id=persona_id, user_id=user_id)
+    else:
+        rows = conn.run("""
+            SELECT COUNT(*) FROM persona_learn WHERE persona_id=:persona_id
+        """, persona_id=persona_id)
     conn.close()
     return rows[0][0] if rows else 0
 
-
-def delete_learn_data(persona_id, learn_id):
-    """学習データを削除"""
-    conn = get_connection()
-    conn.run("""
-        DELETE FROM persona_learn WHERE id = :id AND persona_id = :persona_id
-    """, id=learn_id, persona_id=persona_id)
-    conn.close()
-
-
-def get_all_learn_data(persona_id):
-    """ペルソナの全学習データを取得"""
+def get_all_learn_data(persona_id, user_id):
     conn = get_connection()
     rows = conn.run("""
         SELECT id, content, source, created_at FROM persona_learn
-        WHERE persona_id = :persona_id
+        WHERE persona_id=:persona_id AND (user_id=:user_id OR user_id IS NULL)
         ORDER BY created_at DESC
-    """, persona_id=persona_id)
+    """, persona_id=persona_id, user_id=user_id)
     conn.close()
-    return [{'id': r[0], 'content': r[1][:100]+'...' if len(r[1])>100 else r[1],
+    return [{'id': r[0],
+             'content': r[1][:100]+'...' if len(r[1])>100 else r[1],
              'source': r[2], 'created_at': str(r[3])} for r in rows]
+
+def delete_learn_data(persona_id, user_id, learn_id):
+    conn = get_connection()
+    conn.run("""
+        DELETE FROM persona_learn
+        WHERE id=:id AND persona_id=:persona_id AND user_id=:user_id
+    """, id=learn_id, persona_id=persona_id, user_id=user_id)
+    conn.close()
