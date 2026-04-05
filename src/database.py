@@ -160,23 +160,20 @@ def init_db():
 
     for p in default_personas:
         try:
-            # すでに存在するか確認
-            existing = conn.run("""
-                SELECT id FROM personas WHERE id=:id AND user_id IS NULL
-            """, id=p['id'])
-            if not existing:
-                conn.run("""
-                    INSERT INTO personas (id, user_id, name, avatar, description, personality,
-                        speaking_style, background, color, role, is_default)
-                    VALUES (:id, NULL, :name, :avatar, :description, :personality,
-                        :speaking_style, :background, :color, :role, TRUE)
-                """,
-                id=p['id'], name=p['name'], avatar=p['avatar'],
-                description=p['description'], personality=p['personality'],
-                speaking_style=p['speaking_style'], background=p['background'],
-                color=p['color'], role=p['role'])
+            # 既存のデフォルトペルソナを削除してから再挿入（定義を常に最新に保つ）
+            conn.run("DELETE FROM personas WHERE id=:id AND user_id IS NULL", id=p['id'])
+            conn.run("""
+                INSERT INTO personas (id, user_id, name, avatar, description, personality,
+                    speaking_style, background, color, role, is_default)
+                VALUES (:id, NULL, :name, :avatar, :description, :personality,
+                    :speaking_style, :background, :color, :role, TRUE)
+            """,
+            id=p['id'], name=p['name'], avatar=p['avatar'],
+            description=p['description'], personality=p['personality'],
+            speaking_style=p['speaking_style'], background=p['background'],
+            color=p['color'], role=p['role'])
         except Exception as e:
-            print(f"ペルソナ挿入スキップ: {e}")
+            print(f"ペルソナ挿入エラー: {e}")
 
     conn.close()
     print("✅ DB初期化完了（ユーザー認証対応）")
