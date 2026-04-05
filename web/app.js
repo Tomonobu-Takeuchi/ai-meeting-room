@@ -242,7 +242,12 @@ async function init() {
     State.members = data.members;
     // ★ デフォルトアバター画像をセット
     State.members.forEach(m => {
-      if (DEFAULT_AVATARS[m.id]) State.avatarImages[m.id] = DEFAULT_AVATARS[m.id];
+      // DB画像(data URL)を優先、なければDEFAULT_AVATARSにフォールバック
+      if (m.avatar && m.avatar.startsWith('data:')) {
+        State.avatarImages[m.id] = m.avatar;
+      } else if (DEFAULT_AVATARS[m.id]) {
+        State.avatarImages[m.id] = DEFAULT_AVATARS[m.id];
+      }
     });
     renderMemberList();
   } catch (e) { showToast('ペルソナ読み込み失敗: ' + e.message, 'error'); }
@@ -552,8 +557,18 @@ async function startMeeting() {
     State.members = data.members; State.facilitator = data.facilitator;
     // ★ 会議開始後もアバターを再セット
     State.members.forEach(m => {
-      if (!State.avatarImages[m.id] && DEFAULT_AVATARS[m.id]) State.avatarImages[m.id] = DEFAULT_AVATARS[m.id];
+      if (m.avatar && m.avatar.startsWith('data:')) {
+        State.avatarImages[m.id] = m.avatar;
+      } else if (!State.avatarImages[m.id] && DEFAULT_AVATARS[m.id]) {
+        State.avatarImages[m.id] = DEFAULT_AVATARS[m.id];
+      }
     });
+    // ファシリテータのアバターをDBから読み込む
+    if (State.facilitator?.avatar?.startsWith('data:')) {
+      State.avatarImages['facilitator'] = State.facilitator.avatar;
+    } else if (!State.avatarImages['facilitator'] && DEFAULT_AVATARS['facilitator']) {
+      State.avatarImages['facilitator'] = DEFAULT_AVATARS['facilitator'];
+    }
     DOM.welcomeScreen.classList.add('hidden');
     DOM.chatMessages.classList.remove('hidden'); DOM.chatInputArea.classList.remove('hidden');
     DOM.sessionBar.classList.remove('hidden');
@@ -718,7 +733,9 @@ function addMessage(msg) {
   const row = document.createElement('div');
   row.className = `message-row ${msg.role}`; row.dataset.msgId = msg.id;
   if (msg.role === 'facilitator') {
-    row.innerHTML = `<div class="facilitator-banner"><div class="facilitator-label">🎯 ファシリテーター</div><div class="facilitator-text">${escapeHtml(msg.content)}</div></div>`;
+    const _fAv3 = State.avatarImages['facilitator'];
+    const _fAvHtml3 = _fAv3 ? `<img src="${_fAv3}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:4px;" />` : '🎯';
+    row.innerHTML = `<div class="facilitator-banner"><div class="facilitator-label">${_fAvHtml3} ファシリテーター</div><div class="facilitator-text">${escapeHtml(msg.content)}</div></div>`;
   } else {
     // ★ ユーザーアバターもDEFAULT_AVATARSから取得
     const avatarContent = msg.persona_id === 'user'
@@ -741,7 +758,9 @@ function addTypingIndicator(persona, isFacilitator = false) {
   row.className = `message-row ${isFacilitator ? 'facilitator' : 'member'} typing-row`;
   const dots = `<div class="typing-bubble"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>`;
   if (isFacilitator) {
-    row.innerHTML = `<div class="facilitator-banner"><div class="facilitator-label">🎯 ファシリテーター</div>${dots}</div>`;
+    const _fAv = State.avatarImages['facilitator'];
+    const _fAvHtml = _fAv ? `<img src="${_fAv}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:4px;" />` : '🎯';
+    row.innerHTML = `<div class="facilitator-banner"><div class="facilitator-label">${_fAvHtml} ファシリテーター</div>${dots}</div>`;
   } else {
     const avatarContent = (persona && State.avatarImages[persona.id])
       ? `<img src="${State.avatarImages[persona.id]}" alt="${persona?.name}" />` : (persona?.avatar || '👤');
@@ -768,7 +787,9 @@ function appendToStreamingBubble(row, text) {
 
 function addFacilitatorBanner() {
   const row = document.createElement('div'); row.className = 'message-row facilitator';
-  row.innerHTML = `<div class="facilitator-banner"><div class="facilitator-label">🎯 ファシリテーター</div><div class="facilitator-text"></div></div>`;
+  const _fAv2 = State.avatarImages['facilitator'];
+  const _fAvHtml2 = _fAv2 ? `<img src="${_fAv2}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:4px;" />` : '🎯';
+  row.innerHTML = `<div class="facilitator-banner"><div class="facilitator-label">${_fAvHtml2} ファシリテーター</div><div class="facilitator-text"></div></div>`;
   DOM.chatMessages.appendChild(row); scrollToBottom(); return row;
 }
 
