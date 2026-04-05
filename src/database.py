@@ -63,10 +63,18 @@ def init_db():
             color          TEXT DEFAULT '#8B5CF6',
             role           TEXT DEFAULT 'member',
             is_default     BOOLEAN DEFAULT FALSE,
-            created_at     TIMESTAMP DEFAULT NOW(),
-            PRIMARY KEY (id, COALESCE(user_id, 0))
+            created_at     TIMESTAMP DEFAULT NOW()
         )
     """)
+
+    # ユニーク制約を追加（id + user_idの組み合わせ）
+    try:
+        conn.run("""
+            CREATE UNIQUE INDEX IF NOT EXISTS personas_id_user_idx
+            ON personas (id, COALESCE(user_id, -1))
+        """)
+    except Exception:
+        pass
 
     # user_idカラムがない場合は追加（既存テーブルへの対応）
     try:
@@ -144,19 +152,23 @@ def init_db():
 
     for p in default_personas:
         try:
-            conn.run("""
-                INSERT INTO personas (id, user_id, name, avatar, description, personality,
-                    speaking_style, background, color, role, is_default)
-                VALUES (:id, NULL, :name, :avatar, :description, :personality,
-                    :speaking_style, :background, :color, :role, TRUE)
-                ON CONFLICT DO NOTHING
-            """,
-            id=p['id'], name=p['name'], avatar=p['avatar'],
-            description=p['description'], personality=p['personality'],
-            speaking_style=p['speaking_style'], background=p['background'],
-            color=p['color'], role=p['role'])
-        except Exception:
-            pass
+            # すでに存在するか確認
+            existing = conn.run("""
+                SELECT id FROM personas WHERE id=:id AND user_id IS NULL
+            """, id=p['id'])
+            if not existing:
+                conn.run("""
+                    INSERT INTO personas (id, user_id, name, avatar, description, personality,
+                        speaking_style, background, color, role, is_default)
+                    VALUES (:id, NULL, :name, :avatar, :description, :personality,
+                        :speaking_style, :background, :color, :role, TRUE)
+                """,
+                id=p['id'], name=p['name'], avatar=p['avatar'],
+                description=p['description'], personality=p['personality'],
+                speaking_style=p['speaking_style'], background=p['background'],
+                color=p['color'], role=p['role'])
+        except Exception as e:
+            print(f"ペルソナ挿入スキップ: {e}")
 
     conn.close()
     print("✅ DB初期化完了（ユーザー認証対応）")
