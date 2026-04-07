@@ -1,5 +1,7 @@
 """
 会議シミュレーションロジック
+- Anthropic Prompt Caching対応（システムプロンプトを最大90%削減）
+- Gemini Flash切り替え対応（環境変数 USE_GEMINI=true で有効化）
 """
 import json
 import os
@@ -17,7 +19,20 @@ def _json_serial(obj):
 def _dumps(data):
     return json.dumps(data, default=_json_serial)
 
+
 import anthropic
+
+# Gemini使用フラグ（環境変数 USE_GEMINI=true で切り替え）
+USE_GEMINI = os.getenv("USE_GEMINI", "false").lower() == "true"
+
+if USE_GEMINI:
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+        print("[MeetingRoom] Gemini Flash モードで起動")
+    except ImportError:
+        print("[MeetingRoom] google-generativeai未インストール。Claudeにフォールバック")
+        USE_GEMINI = False
 
 
 class MeetingRoom:
@@ -28,8 +43,15 @@ class MeetingRoom:
             data_dir = os.path.join(base, "data", "meetings")
         self.data_dir = data_dir
         os.makedirs(data_dir, exist_ok=True)
+
+        # Anthropicクライアント（キャッシング有効化にはbetas指定が必要）
         self.client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-        self.model = "claude-sonnet-4-20250514"
+        self.claude_model = "claude-sonnet-4-20250514"
+
+        # Geminiモデル
+        if USE_GEMINI:
+            self.gemini_model = genai.GenerativeModel("gemini-2.5-flash-preview-05-20")
+
         self.sessions = {}
 
     def create_session(self, topic, member_ids, user_id=None):
@@ -66,6 +88,8 @@ class MeetingRoom:
         self._save_session(session_id)
         return msg
 
+    # ===== ペルソナ発言生成（キャッシング＋Gemini対応） =====
+
     def generate_member_response_stream(self, session_id, persona_id, trigger_message=None):
         session = self.sessions.get(session_id)
         if not session:
@@ -75,15 +99,36 @@ class MeetingRoom:
         if not persona:
             yield "data: [ERROR] ペルソナが見つかりません\n\n"
             return
+
         messages = self._build_conversation_history(session, persona_id, trigger_message)
         system_prompt = self.persona_manager.build_system_prompt(
             persona, session["topic"], session["members"]
         )
+
+        if USE_GEMINI:
+            yield from self._gemini_member_stream(session_id, persona_id, system_prompt, messages)
+        else:
+            yield from self._claude_member_stream(session_id, persona_id, system_prompt, messages)
+
+    def _claude_member_stream(self, session_id, persona_id, system_prompt, messages):
+        """
+        Anthropic Prompt Caching対応ストリーム
+        システムプロンプトにcache_controlを付与することで
+        2回目以降のリクエストのコストを最大90%削減
+        """
         try:
             full_response = ""
             with self.client.messages.stream(
-                model=self.model, max_tokens=512,
-                system=system_prompt, messages=messages
+                model=self.claude_model,
+                max_tokens=512,
+                system=[
+                    {
+                        "type": "text",
+                        "text": system_prompt,
+                        "cache_control": {"type": "ephemeral"}  # ← キャッシング有効化
+                    }
+                ],
+                messages=messages
             ) as stream:
                 for text in stream.text_stream:
                     full_response += text
@@ -92,6 +137,39 @@ class MeetingRoom:
             yield f"data: {_dumps({'type': 'done', 'persona_id': persona_id, 'message': msg})}\n\n"
         except Exception as e:
             yield f"data: {_dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    def _gemini_member_stream(self, session_id, persona_id, system_prompt, messages):
+        """
+        Gemini Flash対応ストリーム
+        Claude比で約3分の1のコスト
+        """
+        try:
+            # Gemini用にメッセージを変換
+            gemini_history = []
+            for msg in messages[:-1]:  # 最後のメッセージ以外をhistoryに
+                role = "model" if msg["role"] == "assistant" else "user"
+                gemini_history.append({"role": role, "parts": [msg["content"]]})
+
+            last_message = messages[-1]["content"] if messages else "意見を述べてください。"
+
+            # システムプロンプトを先頭メッセージとして注入
+            chat = self.gemini_model.start_chat(history=gemini_history)
+            full_prompt = f"{system_prompt}\n\n{last_message}"
+
+            full_response = ""
+            response = chat.send_message(full_prompt, stream=True)
+            for chunk in response:
+                text = chunk.text
+                if text:
+                    full_response += text
+                    yield f"data: {_dumps({'type': 'chunk', 'text': text, 'persona_id': persona_id})}\n\n"
+
+            msg = self.add_message(session_id, "member", persona_id, full_response)
+            yield f"data: {_dumps({'type': 'done', 'persona_id': persona_id, 'message': msg})}\n\n"
+        except Exception as e:
+            yield f"data: {_dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    # ===== ファシリテータ発言（キャッシング対応） =====
 
     def generate_facilitator_response_stream(self, session_id):
         session = self.sessions.get(session_id)
@@ -105,8 +183,15 @@ class MeetingRoom:
         try:
             full_response = ""
             with self.client.messages.stream(
-                model=self.model, max_tokens=400,
-                system=system_prompt,
+                model=self.claude_model,
+                max_tokens=400,
+                system=[
+                    {
+                        "type": "text",
+                        "text": system_prompt,
+                        "cache_control": {"type": "ephemeral"}  # ← キャッシング有効化
+                    }
+                ],
                 messages=[{"role": "user", "content": "議論を整理して、次のステップを示してください。"}]
             ) as stream:
                 for text in stream.text_stream:
@@ -117,6 +202,8 @@ class MeetingRoom:
         except Exception as e:
             yield f"data: {_dumps({'type': 'error', 'message': str(e)})}\n\n"
 
+    # ===== 自動議論 =====
+
     def generate_auto_discussion_stream(self, session_id, rounds=1):
         session = self.sessions.get(session_id)
         if not session:
@@ -125,6 +212,8 @@ class MeetingRoom:
         for member in session["members"]:
             yield f"data: {_dumps({'type': 'speaking_start', 'persona_id': member['id']})}\n\n"
             yield from self.generate_member_response_stream(session_id, member["id"])
+
+    # ===== 内部ユーティリティ =====
 
     def _build_conversation_history(self, session, current_persona_id, trigger=None):
         messages = []
