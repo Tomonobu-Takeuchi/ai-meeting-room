@@ -30,6 +30,7 @@ const State = {
   voiceMode: false, isSpeaking: false, isRecognizing: false,
   recognition: null, jaVoices: [],
   speakEndResolve: null,
+  currentUser: null,  // ログイン中ユーザー情報
 };
 
 const $ = id => document.getElementById(id);
@@ -242,6 +243,9 @@ async function init() {
     window.speechSynthesis.onvoiceschanged = loadVoices;
   }
 
+  // ログイン状態チェック
+  await checkAuthStatus();
+
   try {
     const data = await API.get('/api/personas/members');
     State.members = data.members;
@@ -276,6 +280,18 @@ async function init() {
   DOM.topicMicBtn.addEventListener('click', () => startVoiceInput(DOM.topicInput, DOM.topicMicBtn));
 
   DOM.addMemberBtn.addEventListener('click', openAddModal);
+
+  // 認証ボタンのイベント（動的生成されるため直接バインド）
+  document.addEventListener('click', (e) => {
+    if (e.target.id === 'loginBtnHeader') openAuthModal();
+    if (e.target.id === 'loginSubmitBtn') submitLogin();
+    if (e.target.id === 'registerSubmitBtn') submitRegister();
+  });
+  // Enterキーでサブミット
+  $('loginPassword')?.addEventListener('keydown', e => { if (e.key === 'Enter') submitLogin(); });
+  $('registerPassword')?.addEventListener('keydown', e => { if (e.key === 'Enter') submitRegister(); });
+  // モーダル外クリックで閉じる
+  $('authModalOverlay')?.addEventListener('click', e => { if (e.target === $('authModalOverlay')) closeAuthModal(); });
   DOM.cancelAddPersona.addEventListener('click', closeAddModal);
   DOM.confirmAddPersona.addEventListener('click', submitAddPersona);
   DOM.cancelEditPersona.addEventListener('click', closeEditModal);
@@ -941,5 +957,135 @@ async function handleLearnAudio(e, mode) {
 }
 
 function escapeHtml(text) { const d = document.createElement('div'); d.textContent = text; return d.innerHTML; }
+
+
+// ===== 認証機能 =====
+
+async function checkAuthStatus() {
+  try {
+    const data = await API.get('/api/auth/me');
+    if (data.user) {
+      State.currentUser = data.user;
+      renderAuthArea();
+    } else {
+      renderAuthArea();
+    }
+  } catch (e) {
+    renderAuthArea();
+  }
+}
+
+function renderAuthArea() {
+  const area = $('authArea');
+  if (!area) return;
+  if (State.currentUser) {
+    area.innerHTML = `
+      <div class="user-badge">
+        <span>👤</span>
+        <span class="user-name">${escapeHtml(State.currentUser.name || State.currentUser.email)}</span>
+      </div>
+      <button class="btn" id="logoutBtn" onclick="logout()">ログアウト</button>
+    `;
+  } else {
+    area.innerHTML = `<button class="btn" id="loginBtnHeader" onclick="openAuthModal()">🔑 ログイン</button>`;
+  }
+}
+
+function openAuthModal() {
+  $('authModalOverlay').classList.remove('hidden');
+  showLoginPanel();
+}
+
+function closeAuthModal() {
+  $('authModalOverlay').classList.add('hidden');
+  $('loginError').textContent = '';
+  $('registerError').textContent = '';
+}
+
+function showLoginPanel() {
+  $('loginPanel').classList.remove('hidden');
+  $('registerPanel').classList.add('hidden');
+}
+
+function showRegisterPanel() {
+  $('loginPanel').classList.add('hidden');
+  $('registerPanel').classList.remove('hidden');
+}
+
+async function submitLogin() {
+  const email = $('loginEmail').value.trim();
+  const password = $('loginPassword').value.trim();
+  const errEl = $('loginError');
+  if (!email || !password) { errEl.textContent = 'メールアドレスとパスワードを入力してください'; return; }
+  try {
+    const btn = $('loginSubmitBtn');
+    btn.textContent = 'ログイン中...'; btn.disabled = true;
+    const data = await API.post('/api/auth/login', { email, password });
+    State.currentUser = data.user;
+    renderAuthArea();
+    closeAuthModal();
+    showToast(`${data.user.name || data.user.email} でログインしました`, 'success');
+    // ペルソナを再読み込み（ユーザー固有のペルソナを反映）
+    await reloadPersonas();
+  } catch (e) {
+    $('loginError').textContent = e.message;
+  } finally {
+    const btn = $('loginSubmitBtn');
+    if (btn) { btn.textContent = 'ログイン'; btn.disabled = false; }
+  }
+}
+
+async function submitRegister() {
+  const name = $('registerName').value.trim();
+  const email = $('registerEmail').value.trim();
+  const password = $('registerPassword').value.trim();
+  const errEl = $('registerError');
+  if (!email || !password) { errEl.textContent = 'メールアドレスとパスワードを入力してください'; return; }
+  if (password.length < 6) { errEl.textContent = 'パスワードは6文字以上にしてください'; return; }
+  try {
+    const btn = $('registerSubmitBtn');
+    btn.textContent = '登録中...'; btn.disabled = true;
+    const data = await API.post('/api/auth/register', { email, password, name });
+    State.currentUser = data.user;
+    renderAuthArea();
+    closeAuthModal();
+    showToast(`登録完了！${data.user.name || data.user.email} でログインしました`, 'success');
+    await reloadPersonas();
+  } catch (e) {
+    $('registerError').textContent = e.message;
+  } finally {
+    const btn = $('registerSubmitBtn');
+    if (btn) { btn.textContent = '登録する'; btn.disabled = false; }
+  }
+}
+
+async function logout() {
+  try {
+    await API.post('/api/auth/logout', {});
+    State.currentUser = null;
+    renderAuthArea();
+    showToast('ログアウトしました', 'success');
+    await reloadPersonas();
+  } catch (e) { showToast('ログアウトエラー: ' + e.message, 'error'); }
+}
+
+async function reloadPersonas() {
+  try {
+    const data = await API.get('/api/personas/members');
+    State.members = data.members;
+    State.members.forEach(m => {
+      if (m.avatar && m.avatar.startsWith('data:')) {
+        State.avatarImages[m.id] = m.avatar;
+      } else if (DEFAULT_AVATARS[m.id]) {
+        State.avatarImages[m.id] = DEFAULT_AVATARS[m.id];
+      }
+    });
+    // ファシリテータのアバター更新
+    if (data.facilitator?.avatar?.startsWith('data:')) {
+      State.avatarImages['facilitator'] = data.facilitator.avatar;
+    }
+    renderMemberList();
+  } catch (e) { showToast('ペルソナ再読み込み失敗: ' + e.message, 'error'); }
+}
 
 document.addEventListener('DOMContentLoaded', init);

@@ -246,6 +246,27 @@
       /* トースト位置調整 */
       .toast-container{bottom:80px;right:10px;}
     }
+
+    /* ===== 認証モーダル ===== */
+    .auth-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:300;display:flex;align-items:center;justify-content:center;}
+    .auth-modal-overlay.hidden{display:none!important;}
+    .auth-modal{background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:32px;width:360px;max-width:90vw;}
+    .auth-modal h2{font-size:18px;font-weight:600;margin:0 0 6px;color:var(--text-primary);}
+    .auth-modal p{font-size:13px;color:var(--text-secondary);margin:0 0 24px;}
+    .auth-input{width:100%;box-sizing:border-box;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;color:var(--text-primary);font-size:14px;font-family:'Noto Sans JP',sans-serif;outline:none;margin-bottom:10px;}
+    .auth-input:focus{border-color:var(--accent-purple);}
+    .auth-btn{width:100%;padding:11px;background:var(--accent-purple);color:#fff;border:none;border-radius:var(--radius);font-size:14px;font-weight:600;cursor:pointer;margin-top:4px;}
+    .auth-btn:hover{opacity:0.9;}
+    .auth-switch{text-align:center;margin-top:16px;font-size:13px;color:var(--text-secondary);}
+    .auth-switch a{color:var(--accent-purple);cursor:pointer;text-decoration:underline;}
+    .auth-error{color:#FCA5A5;font-size:12px;margin-bottom:8px;min-height:16px;}
+    .auth-guest{text-align:center;margin-top:12px;font-size:12px;color:var(--text-muted);}
+    .auth-guest a{color:var(--text-muted);cursor:pointer;text-decoration:underline;}
+    /* ヘッダーのユーザー表示 */
+    .user-badge{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);padding:4px 10px;background:var(--bg-elevated);border-radius:20px;border:1px solid var(--border);}
+    .user-badge .user-name{max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    #logoutBtn{font-size:11px;padding:4px 8px;}
+    #loginBtnHeader{font-size:12px;padding:6px 12px;}
   </style>
 </head>
 <body>
@@ -258,6 +279,9 @@
     <div class="logo">AI<span>-</span>PERSONA<span> 会議室</span></div>
   </div>
   <div class="header-right">
+    <div id="authArea">
+      <button class="btn" id="loginBtnHeader">🔑 ログイン</button>
+    </div>
     <button class="btn btn-orange" id="summarizeBtn" disabled>🤔 議論のまとめ</button>
     <button class="btn btn-purple" id="facilitatorBtn" disabled>🎯 ファシリテータ介入</button>
   </div>
@@ -486,5 +510,34 @@
 </script>
 
 <script src="app.js"></script>
+
+<!-- ===== 認証モーダル ===== -->
+<div class="auth-modal-overlay hidden" id="authModalOverlay">
+  <div class="auth-modal">
+    <!-- ログイン画面 -->
+    <div id="loginPanel">
+      <h2>🔑 ログイン</h2>
+      <p>ログインすると学習データがアカウントに紐付けられます</p>
+      <div class="auth-error" id="loginError"></div>
+      <input class="auth-input" type="email" id="loginEmail" placeholder="メールアドレス" />
+      <input class="auth-input" type="password" id="loginPassword" placeholder="パスワード" />
+      <button class="auth-btn" id="loginSubmitBtn">ログイン</button>
+      <div class="auth-switch">アカウントをお持ちでない方は <a onclick="showRegisterPanel()">新規登録</a></div>
+      <div class="auth-guest"><a onclick="closeAuthModal()">ゲストとして続ける</a></div>
+    </div>
+    <!-- 登録画面 -->
+    <div id="registerPanel" class="hidden">
+      <h2>✨ 新規登録</h2>
+      <p>無料で始められます。登録するとデータが保存されます</p>
+      <div class="auth-error" id="registerError"></div>
+      <input class="auth-input" type="text" id="registerName" placeholder="お名前（任意）" />
+      <input class="auth-input" type="email" id="registerEmail" placeholder="メールアドレス" />
+      <input class="auth-input" type="password" id="registerPassword" placeholder="パスワード（6文字以上）" />
+      <button class="auth-btn" id="registerSubmitBtn">登録する</button>
+      <div class="auth-switch">すでにアカウントをお持ちの方は <a onclick="showLoginPanel()">ログイン</a></div>
+      <div class="auth-guest"><a onclick="closeAuthModal()">ゲストとして続ける</a></div>
+    </div>
+  </div>
+</div>
 </body>
 </html>
