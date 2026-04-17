@@ -260,25 +260,33 @@ def get_learn_data_simple(persona_id, user_id, limit=5):
 
 def get_learn_data_count(persona_id, user_id=None):
     conn = get_connection()
-    if user_id is not None:
+    if user_id:
         rows = conn.run("""
             SELECT COUNT(*) FROM persona_learn
             WHERE persona_id=:persona_id AND (user_id=:user_id OR user_id IS NULL)
         """, persona_id=persona_id, user_id=user_id)
     else:
         rows = conn.run("""
-            SELECT COUNT(*) FROM persona_learn WHERE persona_id=:persona_id
+            SELECT COUNT(*) FROM persona_learn
+            WHERE persona_id=:persona_id AND user_id IS NULL
         """, persona_id=persona_id)
     conn.close()
     return rows[0][0] if rows else 0
 
 def get_all_learn_data(persona_id, user_id):
     conn = get_connection()
-    rows = conn.run("""
-        SELECT id, content, source, created_at FROM persona_learn
-        WHERE persona_id=:persona_id AND (user_id=:user_id OR user_id IS NULL)
-        ORDER BY created_at DESC
-    """, persona_id=persona_id, user_id=user_id)
+    if user_id:
+        rows = conn.run("""
+            SELECT id, content, source, created_at FROM persona_learn
+            WHERE persona_id=:persona_id AND (user_id=:user_id OR user_id IS NULL)
+            ORDER BY created_at DESC
+        """, persona_id=persona_id, user_id=user_id)
+    else:
+        rows = conn.run("""
+            SELECT id, content, source, created_at FROM persona_learn
+            WHERE persona_id=:persona_id AND user_id IS NULL
+            ORDER BY created_at DESC
+        """, persona_id=persona_id)
     conn.close()
     return [{'id': r[0],
              'content': r[1][:100]+'...' if len(r[1])>100 else r[1],

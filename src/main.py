@@ -396,7 +396,7 @@ JSONのみ出力してください。"""
         filename = f'議事録_{topic_short}_{now.strftime("%Y%m%d")}.pdf'
 
         # ===== Phase 1-3: 会議ログ学習・パターン保存・カウント更新 =====
-        _uid = get_current_user_id() or 0  # ゲストはuser_id=0として保存
+        _uid = get_current_user_id()  # ゲストはNone（NULLとして保存）
         try:
             persona_manager.save_meeting_log(summary, _uid)
         except Exception as e:
