@@ -396,21 +396,20 @@ JSONのみ出力してください。"""
         filename = f'議事録_{topic_short}_{now.strftime("%Y%m%d")}.pdf'
 
         # ===== Phase 1-3: 会議ログ学習・パターン保存・カウント更新 =====
-        _uid = get_current_user_id()
-        if _uid:
-            try:
-                persona_manager.save_meeting_log(summary, _uid)
-            except Exception as e:
-                print(f"Phase1エラー（無視）: {e}")
-            try:
-                persona_manager.extract_and_save_patterns(summary, _uid)
-            except Exception as e:
-                print(f"Phase2エラー（無視）: {e}")
-            try:
-                for member in summary.get('members', []):
-                    persona_manager.increment_persona_meeting_count(member['id'], _uid)
-            except Exception as e:
-                print(f"Phase3エラー（無視）: {e}")
+        _uid = get_current_user_id() or 0  # ゲストはuser_id=0として保存
+        try:
+            persona_manager.save_meeting_log(summary, _uid)
+        except Exception as e:
+            print(f"Phase1エラー（無視）: {e}")
+        try:
+            persona_manager.extract_and_save_patterns(summary, _uid)
+        except Exception as e:
+            print(f"Phase2エラー（無視）: {e}")
+        try:
+            for member in summary.get('members', []):
+                persona_manager.increment_persona_meeting_count(member['id'], _uid)
+        except Exception as e:
+            print(f"Phase3エラー（無視）: {e}")
 
         return send_file(buf, as_attachment=True, download_name=filename, mimetype='application/pdf')
     except Exception as e:
