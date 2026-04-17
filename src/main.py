@@ -394,6 +394,24 @@ JSONのみ出力してください。"""
         buf.seek(0)
         topic_short = summary['topic'][:20].replace('/', '_').replace('\\', '_')
         filename = f'議事録_{topic_short}_{now.strftime("%Y%m%d")}.pdf'
+
+        # ===== Phase 1-3: 会議ログ学習・パターン保存・カウント更新 =====
+        _uid = get_current_user_id()
+        if _uid:
+            try:
+                persona_manager.save_meeting_log(summary, _uid)
+            except Exception as e:
+                print(f"Phase1エラー（無視）: {e}")
+            try:
+                persona_manager.extract_and_save_patterns(summary, _uid)
+            except Exception as e:
+                print(f"Phase2エラー（無視）: {e}")
+            try:
+                for member in summary.get('members', []):
+                    persona_manager.increment_persona_meeting_count(member['id'], _uid)
+            except Exception as e:
+                print(f"Phase3エラー（無視）: {e}")
+
         return send_file(buf, as_attachment=True, download_name=filename, mimetype='application/pdf')
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -425,6 +443,23 @@ def stream_auto(session_id):
 
 
 # ===== ヘルスチェック =====
+
+@app.route("/api/personas/<persona_id>/evolution", methods=["GET"])
+def get_persona_evolution(persona_id):
+    """Phase 3: ペルソナの成長状況を返す"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"level": 0, "meeting_count": 0})
+    level, count = persona_manager.get_evolution_level(persona_id, user_id)
+    level_names = {0: "初回", 1: "見習い", 2: "熟練", 3: "達人"}
+    return jsonify({
+        "persona_id": persona_id,
+        "level": level,
+        "level_name": level_names.get(level, "初回"),
+        "meeting_count": count,
+        "next_level_at": [4, 10, None][min(level, 2)]
+    })
+
 
 @app.route("/api/health")
 def health():

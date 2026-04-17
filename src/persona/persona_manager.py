@@ -6,7 +6,9 @@ import os
 from src.database import (
     get_connection, rows_to_dicts, row_to_dict,
     save_learn_data, search_learn_data, get_learn_data_simple,
-    get_learn_data_count, get_all_learn_data, delete_learn_data
+    get_learn_data_count, get_all_learn_data, delete_learn_data,
+    save_persona_pattern, get_persona_patterns,
+    increment_meeting_count, get_meeting_count
 )
 
 COLUMNS = ['id','user_id','name','avatar','description','personality',
@@ -188,6 +190,74 @@ class PersonaManager:
     def add_custom_persona(self, data, user_id=None):
         return self.add_persona(data, user_id)
 
+
+    # ===== Phase 1: 会話ログ自動学習 =====
+
+    def save_meeting_log(self, session_summary, user_id):
+        """Phase 1: 会議ログを各ペルソナの学習データとして保存"""
+        if not user_id:
+            return 0
+        topic = session_summary.get('topic', '')
+        messages = session_summary.get('messages', [])
+        saved_count = 0
+        MAX_LOGS_PER_PERSONA = 100
+        for msg in messages:
+            persona_id = msg.get('persona_id', '')
+            if persona_id in ['user', 'facilitator', '']:
+                continue
+            content_text = msg.get('content', '').strip()
+            if len(content_text) < 30:
+                continue
+            current_count = get_learn_data_count(persona_id, user_id)
+            if current_count >= MAX_LOGS_PER_PERSONA:
+                continue
+            log_content = "[議題]" + topic + "\n[発言]" + content_text + "\n[出典]会議ログ"
+            self.add_learn_data(
+                persona_id, log_content,
+                source="会議ログ_" + topic[:20],
+                user_id=user_id
+            )
+            saved_count += 1
+        print("Phase 1: " + str(saved_count) + "件の会議ログを保存")
+        return saved_count
+
+    # ===== Phase 2: 発言パターン抽出・保存 =====
+
+    def extract_and_save_patterns(self, session_summary, user_id):
+        """Phase 2: 発言パターンを抽出して保存"""
+        if not user_id:
+            return
+        topic = session_summary.get('topic', '')
+        messages = session_summary.get('messages', [])
+        business_kw = ['ビジネス', '事業', '経営', '戦略', '市場', '売上', '顧客']
+        social_kw = ['少子化', '人口', '社会', '政策', '環境', '教育']
+        topic_category = 'business' if any(k in topic for k in business_kw)                         else 'social' if any(k in topic for k in social_kw)                         else 'general'
+        for msg in messages:
+            persona_id = msg.get('persona_id', '')
+            if persona_id in ['user', 'facilitator', '']:
+                continue
+            text = msg.get('content', '')
+            if len(text) < 50:
+                continue
+            opening_kw = ['天下', '古より', '孫子', 'かつて', '余の', '研究によれば', '歴史的に']
+            objection_kw = ['しかし', 'されど', '一方', 'ただし', '懸念', 'リスク', '問題点']
+            conclusion_kw = ['ゆえに', '結論', 'まとめ', '愚考', '提案', '推奨', '総じて']
+            if any(k in text[:50] for k in opening_kw):
+                save_persona_pattern(persona_id, user_id, 'opening', text[:100], topic_category)
+            if any(k in text for k in objection_kw):
+                save_persona_pattern(persona_id, user_id, 'objection', text[:100], topic_category)
+            if any(k in text[-100:] for k in conclusion_kw):
+                save_persona_pattern(persona_id, user_id, 'conclusion', text[-100:], topic_category)
+        print("Phase 2: パターン保存完了（カテゴリ: " + topic_category + "）")
+
+    # ===== Phase 3: 会議カウント =====
+
+    def increment_persona_meeting_count(self, persona_id, user_id):
+        """Phase 3: 会議参加回数をインクリメント"""
+        if not user_id:
+            return 0
+        return increment_meeting_count(persona_id, user_id)
+
     # ===== RAG学習データ =====
 
     def add_learn_data(self, persona_id, content, source='', user_id=None):
@@ -258,6 +328,36 @@ class PersonaManager:
         if combined_learn:
             prompt += f"\n【この人物に関する学習データ・参考情報】\n{combined_learn[:3000]}\n"
             prompt += "\n※上記の学習データをもとに、この人物らしく発言してください。\n"
+
+        # Phase 2: 発言パターンをプロンプトに反映
+        if user_id:
+            patterns = get_persona_patterns(persona['id'], user_id, limit=6)
+            if patterns:
+                opening = [p['pattern_text'] for p in patterns if p['pattern_type'] == 'opening']
+                objection = [p['pattern_text'] for p in patterns if p['pattern_type'] == 'objection']
+                conclusion = [p['pattern_text'] for p in patterns if p['pattern_type'] == 'conclusion']
+                pattern_note = ''
+                if opening:
+                    pattern_note += '\n・発言冒頭の例：「' + opening[0][:60] + '…」'
+                if objection:
+                    pattern_note += '\n・反論時の例：「' + objection[0][:60] + '…」'
+                if conclusion:
+                    pattern_note += '\n・締めの例：「' + conclusion[0][:60] + '…」'
+                if pattern_note:
+                    prompt += '\n[あなたの発言スタイル（過去の会議から学習）]' + pattern_note + '\n'
+
+        # Phase 3: 会議経験に応じた発言深度
+        if user_id:
+            meeting_count = get_meeting_count(persona['id'], user_id)
+            if meeting_count == 0:
+                evolution_note = '初めての会議です。基本的な立場と考えを丁寧に説明してください。'
+            elif meeting_count < 3:
+                evolution_note = 'これまで' + str(meeting_count) + '回の会議を経験しています。自分の立場を明確にしながら、他のメンバーの意見にも反応してください。'
+            elif meeting_count < 10:
+                evolution_note = 'これまで' + str(meeting_count) + '回の会議を経験しています。具体的な根拠や事例を示しながら、より深みのある発言をしてください。'
+            else:
+                evolution_note = 'これまで' + str(meeting_count) + '回の会議を経験したベテランです。他のメンバーの思考パターンを熟知した上で、過去の議論の積み重ねを踏まえた深い洞察を示してください。'
+            prompt += '\n[あなたの経験値]\n' + evolution_note + '\n'
 
         prompt += f"""
 【会議のルール】

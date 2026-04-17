@@ -174,6 +174,8 @@ def init_db():
         except Exception as e:
             print(f"ペルソナ挿入エラー: {e}")
 
+    # Phase 1-3テーブル初期化
+    init_phase_tables(conn)
     conn.close()
     print("✅ DB初期化完了（ユーザー認証対応）")
 
@@ -289,3 +291,124 @@ def delete_learn_data(persona_id, user_id, learn_id):
         WHERE id=:id AND persona_id=:persona_id AND user_id=:user_id
     """, id=learn_id, persona_id=persona_id, user_id=user_id)
     conn.close()
+
+
+# ===== Phase 2: 発言パターンテーブル =====
+
+def init_phase_tables(conn):
+    """Phase 1-3用テーブル初期化"""
+
+    # Phase 2: 発言パターン蓄積テーブル
+    conn.run("""
+        CREATE TABLE IF NOT EXISTS persona_patterns (
+            id          SERIAL PRIMARY KEY,
+            persona_id  TEXT NOT NULL,
+            user_id     INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            pattern_type TEXT NOT NULL,
+            pattern_text TEXT NOT NULL,
+            topic_category TEXT DEFAULT 'general',
+            usage_count INTEGER DEFAULT 1,
+            created_at  TIMESTAMP DEFAULT NOW()
+        )
+    """)
+
+    # Phase 3: 会議統計テーブル
+    conn.run("""
+        CREATE TABLE IF NOT EXISTS persona_meeting_stats (
+            persona_id  TEXT NOT NULL,
+            user_id     INTEGER NOT NULL,
+            meeting_count INTEGER DEFAULT 0,
+            last_meeting_at TIMESTAMP DEFAULT NOW(),
+            PRIMARY KEY (persona_id, user_id)
+        )
+    """)
+    print("✅ Phase 1-3テーブル初期化完了")
+
+
+# ===== Phase 2: パターン保存・取得 =====
+
+def save_persona_pattern(persona_id, user_id, pattern_type, pattern_text, topic_category='general'):
+    conn = get_connection()
+    try:
+        # 同一パターンが既にあればusage_countを増やす
+        existing = conn.run("""
+            SELECT id FROM persona_patterns
+            WHERE persona_id=:persona_id AND user_id=:user_id
+              AND pattern_type=:pattern_type AND pattern_text=:pattern_text
+        """, persona_id=persona_id, user_id=user_id,
+            pattern_type=pattern_type, pattern_text=pattern_text)
+        if existing:
+            conn.run("""
+                UPDATE persona_patterns SET usage_count=usage_count+1
+                WHERE id=:id
+            """, id=existing[0][0])
+        else:
+            conn.run("""
+                INSERT INTO persona_patterns
+                    (persona_id, user_id, pattern_type, pattern_text, topic_category)
+                VALUES (:persona_id, :user_id, :pattern_type, :pattern_text, :topic_category)
+            """, persona_id=persona_id, user_id=user_id,
+                pattern_type=pattern_type, pattern_text=pattern_text,
+                topic_category=topic_category)
+    finally:
+        conn.close()
+
+def get_persona_patterns(persona_id, user_id, pattern_type=None, limit=5):
+    conn = get_connection()
+    try:
+        if pattern_type:
+            rows = conn.run("""
+                SELECT pattern_type, pattern_text, usage_count
+                FROM persona_patterns
+                WHERE persona_id=:persona_id AND user_id=:user_id
+                  AND pattern_type=:pattern_type
+                ORDER BY usage_count DESC LIMIT :limit
+            """, persona_id=persona_id, user_id=user_id,
+                pattern_type=pattern_type, limit=limit)
+        else:
+            rows = conn.run("""
+                SELECT pattern_type, pattern_text, usage_count
+                FROM persona_patterns
+                WHERE persona_id=:persona_id AND user_id=:user_id
+                ORDER BY usage_count DESC LIMIT :limit
+            """, persona_id=persona_id, user_id=user_id, limit=limit)
+        return [{'pattern_type': r[0], 'pattern_text': r[1], 'usage_count': r[2]} for r in rows]
+    finally:
+        conn.close()
+
+
+# ===== Phase 3: 会議統計 =====
+
+def increment_meeting_count(persona_id, user_id):
+    conn = get_connection()
+    try:
+        existing = conn.run("""
+            SELECT meeting_count FROM persona_meeting_stats
+            WHERE persona_id=:persona_id AND user_id=:user_id
+        """, persona_id=persona_id, user_id=user_id)
+        if existing:
+            conn.run("""
+                UPDATE persona_meeting_stats
+                SET meeting_count=meeting_count+1, last_meeting_at=NOW()
+                WHERE persona_id=:persona_id AND user_id=:user_id
+            """, persona_id=persona_id, user_id=user_id)
+            return existing[0][0] + 1
+        else:
+            conn.run("""
+                INSERT INTO persona_meeting_stats (persona_id, user_id, meeting_count)
+                VALUES (:persona_id, :user_id, 1)
+            """, persona_id=persona_id, user_id=user_id)
+            return 1
+    finally:
+        conn.close()
+
+def get_meeting_count(persona_id, user_id):
+    conn = get_connection()
+    try:
+        rows = conn.run("""
+            SELECT meeting_count FROM persona_meeting_stats
+            WHERE persona_id=:persona_id AND user_id=:user_id
+        """, persona_id=persona_id, user_id=user_id)
+        return rows[0][0] if rows else 0
+    finally:
+        conn.close()
