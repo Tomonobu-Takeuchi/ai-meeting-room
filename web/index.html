@@ -424,6 +424,13 @@
         <button class="avatar-file-btn" id="editFetchWebBtn">🌐 Web取得</button>
         <button class="avatar-file-btn" id="editFetchYoutubeBtn">▶ YouTube</button>
       </div>
+      <div id="savedLearnSection" style="margin-top:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <span style="font-size:12px;color:var(--text-secondary);">💾 保存済み学習データ <span id="savedLearnCount" style="color:var(--accent-purple);font-weight:600;"></span></span>
+          <button id="refreshLearnBtn" style="font-size:11px;padding:2px 8px;background:none;border:1px solid var(--border);border-radius:4px;color:var(--text-secondary);cursor:pointer;">↻ 更新</button>
+        </div>
+        <div id="savedLearnList" style="max-height:180px;overflow-y:auto;"></div>
+      </div>
       <div id="editLearnDataList"></div>
       <div class="learn-status" id="editLearnStatus"></div>
     </div>

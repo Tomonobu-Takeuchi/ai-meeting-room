@@ -89,6 +89,11 @@ const API = {
     if (!res.ok) { const e = await res.json().catch(() => ({ error: res.statusText })); throw new Error(e.error || res.statusText); }
     return res.json();
   },
+  async delete(path) {
+    const res = await fetch(path, { method: 'DELETE' });
+    if (!res.ok) { const e = await res.json().catch(() => ({ error: res.statusText })); throw new Error(e.error || res.statusText); }
+    return res.json();
+  },
 };
 
 function loadVoices() {
@@ -510,6 +515,46 @@ function openEditModal(memberId) {
   DOM.editLearnDataList.innerHTML = ''; DOM.editLearnStatus.textContent = '';
   DOM.editAvatarPreview.innerHTML = State.editAvatarDataUrl ? `<img src="${State.editAvatarDataUrl}" alt="avatar" />` : (member.avatar || '👤');
   DOM.editPersonaModal.classList.remove('hidden');
+  // 保存済み学習データを読み込む
+  loadSavedLearnData(memberId);
+  const refreshBtn = $('refreshLearnBtn');
+  if (refreshBtn) { refreshBtn.onclick = () => loadSavedLearnData(memberId); }
+}
+
+async function loadSavedLearnData(personaId) {
+  const listEl = $('savedLearnList');
+  const countEl = $('savedLearnCount');
+  if (!listEl) return;
+  listEl.innerHTML = '<span style="font-size:11px;color:var(--text-muted);">読み込み中...</span>';
+  try {
+    const data = await API.get(`/api/personas/${personaId}/learn`);
+    const items = data.learn_data || [];
+    countEl.textContent = `（${items.length}件）`;
+    if (items.length === 0) {
+      listEl.innerHTML = '<span style="font-size:11px;color:var(--text-muted);">保存済みデータなし</span>';
+      return;
+    }
+    listEl.innerHTML = items.map(item => `
+      <div class="learn-data-item" style="display:flex;align-items:flex-start;justify-content:space-between;padding:6px 10px;background:var(--bg-elevated);border-radius:6px;font-size:11px;color:var(--text-secondary);margin-top:4px;gap:8px;">
+        <div style="flex:1;overflow:hidden;">
+          <div style="color:var(--text-primary);margin-bottom:2px;">${escapeHtml(item.content.substring(0, 80))}${item.content.length > 80 ? '...' : ''}</div>
+          <div style="color:var(--text-muted);font-size:10px;">📌 ${escapeHtml(item.source || '手動入力')} | ${item.created_at ? item.created_at.substring(0,10) : ''}</div>
+        </div>
+        <button onclick="deleteSavedLearnData('${personaId}', ${item.id})" style="flex-shrink:0;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;padding:0 4px;" title="削除">🗑</button>
+      </div>
+    `).join('');
+  } catch (e) {
+    listEl.innerHTML = `<span style="font-size:11px;color:var(--accent-red);">読み込みエラー: ${e.message}</span>`;
+  }
+}
+
+async function deleteSavedLearnData(personaId, learnId) {
+  if (!confirm('この学習データを削除しますか？')) return;
+  try {
+    await API.delete(`/api/personas/${personaId}/learn/${learnId}`);
+    showToast('学習データを削除しました', 'success');
+    loadSavedLearnData(personaId);
+  } catch (e) { showToast('削除エラー: ' + e.message, 'error'); }
 }
 function closeEditModal() { DOM.editPersonaModal.classList.add('hidden'); State.editAvatarDataUrl = null; State.editLearnFiles = []; }
 
