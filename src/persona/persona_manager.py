@@ -247,6 +247,22 @@ class PersonaManager:
                 save_persona_pattern(persona_id, user_id, 'conclusion', text[-100:], topic_category)
         print("Phase 2: パターン保存完了（カテゴリ: " + topic_category + "）")
 
+    # ===== Phase 3: 成長レベル判定 =====
+
+    def get_evolution_level(self, persona_id, user_id):
+        """Phase 3: 会議回数に基づく成長レベルを返す (level, count)"""
+        if user_id is None:
+            return 0, 0
+        count = get_meeting_count(persona_id, user_id)
+        if count == 0:
+            return 0, count
+        elif count < 4:
+            return 1, count
+        elif count < 10:
+            return 2, count
+        else:
+            return 3, count
+
     # ===== Phase 3: 会議カウント =====
 
     def increment_persona_meeting_count(self, persona_id, user_id):
