@@ -195,8 +195,8 @@ class PersonaManager:
 
     def save_meeting_log(self, session_summary, user_id):
         """Phase 1: 会議ログを各ペルソナの学習データとして保存"""
-        if not user_id:
-            return 0
+        if user_id is None:
+            user_id = 0  # ゲストモードはuser_id=0として保存
         topic = session_summary.get('topic', '')
         messages = session_summary.get('messages', [])
         saved_count = 0
