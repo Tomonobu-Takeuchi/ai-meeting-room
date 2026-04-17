@@ -586,6 +586,10 @@ async function submitEditPersona() {
     const data = await API.put(`/api/personas/${memberId}`, { name, avatar, description, personality, speaking_style: speakingStyle, background, color });
     const idx = State.members.findIndex(m => m.id === memberId);
     if (idx >= 0) State.members[idx] = { ...State.members[idx], ...data.persona };
+
+    // ★ 学習データをDBに保存
+    await saveLearnFilesToDB(memberId, State.editLearnFiles);
+
     renderMemberList(); closeEditModal();
     showToast(`${name} の設定を保存しました`, 'success');
   } catch (e) { showToast('保存エラー: ' + e.message, 'error'); }
@@ -769,10 +773,31 @@ async function submitAddPersona() {
   try {
     const data = await API.post('/api/personas/add', { name, avatar, description, personality, speaking_style: speakingStyle, background, role: 'member', color });
     if (State.addAvatarDataUrl) State.avatarImages[data.persona.id] = State.addAvatarDataUrl;
+
+    // ★ 学習データをDBに保存
+    await saveLearnFilesToDB(data.persona.id, State.addLearnFiles);
+
     State.members.push(data.persona); State.selectedMemberIds.push(data.persona.id);
     renderMemberList(); closeAddModal();
     showToast(`${name} を追加しました`, 'success');
   } catch (e) { showToast('追加エラー: ' + e.message, 'error'); }
+}
+
+async function saveLearnFilesToDB(personaId, learnFiles) {
+  if (!learnFiles || learnFiles.length === 0) return;
+  let savedCount = 0;
+  for (const file of learnFiles) {
+    try {
+      const content = file.content || '';
+      if (!content || content.length < 5) continue;
+      const source = file.name || file.url || file.type || '手動入力';
+      await API.post(`/api/personas/${personaId}/learn`, { content, source });
+      savedCount++;
+    } catch (e) {
+      console.error('学習データ保存エラー:', e);
+    }
+  }
+  if (savedCount > 0) showToast(`学習データ ${savedCount}件 を保存しました`, 'success');
 }
 
 function handleFileAttach(e) {
