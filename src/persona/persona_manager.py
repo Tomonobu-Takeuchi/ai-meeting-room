@@ -225,8 +225,8 @@ class PersonaManager:
 
     def extract_and_save_patterns(self, session_summary, user_id):
         """Phase 2: 発言パターンを抽出して保存"""
-        if not user_id:
-            return
+        if user_id is None:
+            user_id = 0
         topic = session_summary.get('topic', '')
         messages = session_summary.get('messages', [])
         business_kw = ['ビジネス', '事業', '経営', '戦略', '市場', '売上', '顧客']
@@ -254,8 +254,8 @@ class PersonaManager:
 
     def increment_persona_meeting_count(self, persona_id, user_id):
         """Phase 3: 会議参加回数をインクリメント"""
-        if not user_id:
-            return 0
+        if user_id is None:
+            user_id = 0
         return increment_meeting_count(persona_id, user_id)
 
     # ===== RAG学習データ =====
@@ -279,7 +279,7 @@ class PersonaManager:
 
     def get_relevant_learn_data(self, persona_id, topic, user_id=None):
         openai_key = os.environ.get('OPENAI_API_KEY', '')
-        if openai_key and user_id:
+        if openai_key and user_id is not None:
             try:
                 import openai
                 client = openai.OpenAI(api_key=openai_key)

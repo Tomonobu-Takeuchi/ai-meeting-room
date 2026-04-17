@@ -260,7 +260,7 @@ def get_learn_data_simple(persona_id, user_id, limit=5):
 
 def get_learn_data_count(persona_id, user_id=None):
     conn = get_connection()
-    if user_id:
+    if user_id is not None:
         rows = conn.run("""
             SELECT COUNT(*) FROM persona_learn
             WHERE persona_id=:persona_id AND (user_id=:user_id OR user_id IS NULL)
