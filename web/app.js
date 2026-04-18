@@ -436,8 +436,10 @@ async function handleLearnFiles(e, mode, type) {
           statusEl.textContent = `✓ ${file.name}（${data.chars}文字）を抽出しました`;
           setTimeout(() => { statusEl.textContent = ''; }, 3000);
         } catch (err) {
-          statusEl.textContent = `エラー: ${err.message}`;
-          setTimeout(() => { statusEl.textContent = ''; }, 4000);
+          const friendlyPdfMsg = translateLearnError(err.message, 'PDF');
+          statusEl.textContent = friendlyPdfMsg;
+          statusEl.style.whiteSpace = 'pre-line';
+          setTimeout(() => { statusEl.textContent = ''; statusEl.style.whiteSpace = ''; }, 6000);
           continue;
         }
       } else { content = await readFileAsText(file); }
@@ -932,8 +934,10 @@ async function handleLearnVideo(e, mode) {
     statusEl.textContent = `✓ 文字起こし完了（${data.text.length}文字）`;
     setTimeout(() => { statusEl.textContent = ''; }, 3000);
   } catch (e) {
-    statusEl.textContent = `エラー: ${e.message}`;
-    setTimeout(() => { statusEl.textContent = ''; }, 4000);
+    const friendlyMsg = translateLearnError(e.message, '音声文字起こし');
+    statusEl.textContent = friendlyMsg;
+    statusEl.style.whiteSpace = 'pre-line';
+    setTimeout(() => { statusEl.textContent = ''; statusEl.style.whiteSpace = ''; }, 6000);
   }
   e.target.value = '';
 }
@@ -967,8 +971,10 @@ async function fetchLearnUrl(mode, type) {
     inputEl.value = '';
     setTimeout(() => { statusEl.textContent = ''; }, 3000);
   } catch (e) {
-    statusEl.textContent = `エラー: ${e.message}`;
-    setTimeout(() => { statusEl.textContent = ''; }, 4000);
+    const friendlyMsg = translateLearnError(e.message, type === 'youtube' ? 'YouTube' : 'Web');
+    statusEl.textContent = friendlyMsg;
+    statusEl.style.whiteSpace = 'pre-line';
+    setTimeout(() => { statusEl.textContent = ''; statusEl.style.whiteSpace = ''; }, 6000);
   }
 }
 
@@ -992,13 +998,48 @@ async function handleLearnAudio(e, mode) {
     statusEl.textContent = `✓ 文字起こし完了（${data.text.length}文字）`;
     setTimeout(() => { statusEl.textContent = ''; }, 3000);
   } catch (e) {
-    statusEl.textContent = `エラー: ${e.message}`;
-    setTimeout(() => { statusEl.textContent = ''; }, 4000);
+    const friendlyMsg = translateLearnError(e.message, '音声文字起こし');
+    statusEl.textContent = friendlyMsg;
+    statusEl.style.whiteSpace = 'pre-line';
+    setTimeout(() => { statusEl.textContent = ''; statusEl.style.whiteSpace = ''; }, 6000);
   }
   e.target.value = '';
 }
 
 function escapeHtml(text) { const d = document.createElement('div'); d.textContent = text; return d.innerHTML; }
+
+// ★ エラーメッセージをユーザー向けに翻訳
+function translateLearnError(errorMsg, type) {
+  if (!errorMsg) return '不明なエラーが発生しました';
+  const msg = errorMsg.toLowerCase();
+  // YouTube関連
+  if (msg.includes('subtitles are disabled') || msg.includes('no transcripts')) {
+    return '⚠️ この動画は字幕が無効のため取得できませんでした。\n代わりに「YouTube」ボタンで音声から文字起こしを試みます（自動実行中...）';
+  }
+  if (msg.includes('could not retrieve a transcript')) {
+    return '⚠️ 字幕データが見つかりませんでした。\n音声文字起こしを試みています...';
+  }
+  if (msg.includes('video unavailable') || msg.includes('private video')) {
+    return '❌ この動画は非公開または削除されています';
+  }
+  if (msg.includes('maximum content size') || msg.includes('413')) {
+    return '❌ 音声ファイルが大きすぎます（25MB超）\n動画を10分以内に分割してください';
+  }
+  if (msg.includes('ffmpeg') || msg.includes('no such file')) {
+    return '❌ 動画処理ツールが見つかりません\nYouTube URLを代わりにお試しください';
+  }
+  if (msg.includes('timeout')) {
+    return '⚠️ 処理がタイムアウトしました\n動画が長すぎる可能性があります（90分以内推奨）';
+  }
+  if (msg.includes('network') || msg.includes('connection')) {
+    return '❌ ネットワークエラーが発生しました\nしばらく待ってから再試行してください';
+  }
+  if (msg.includes('pdf') || msg.includes('スキャン')) {
+    return '❌ このPDFはスキャン画像のためテキスト抽出できません\n手動でテキストを入力してください';
+  }
+  // デフォルト
+  return `❌ ${type || ''}エラー: ${errorMsg.slice(0, 100)}`;
+}
 
 
 // ===== 認証機能 =====
