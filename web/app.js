@@ -259,7 +259,7 @@ async function init() {
       }
     });
     renderMemberList();
-  } catch (e) { showToast('ペルソナ読み込み失敗: ' + e.message, 'error'); }
+  } catch (e) { showToast(translateApiError(e.message, 'ペルソナの読み込み'), 'error'); }
 
   DOM.newMeetingBtn.addEventListener('click', resetMeeting);
   DOM.startMeetingBtn.addEventListener('click', showMemberSelectModal);
@@ -320,12 +320,61 @@ async function init() {
   $('editLearnTextFile').addEventListener('change', (e) => handleLearnFiles(e, 'edit', 'text'));
   $('editLearnImageFile').addEventListener('change', (e) => handleLearnFiles(e, 'edit', 'image'));
   $('editLearnAudioFile').addEventListener('change', (e) => handleLearnAudio(e, 'edit'));
+  // ★ 音声・動画ボタン押下時に事前案内を表示してからファイル選択を開く
+  ['learnAudioBtn', 'editLearnAudioBtn'].forEach((btnId, i) => {
+    const mode = i === 0 ? 'add' : 'edit';
+    const statusId = mode === 'add' ? 'learnStatus' : 'editLearnStatus';
+    const inputId = mode === 'add' ? 'learnAudioFile' : 'editLearnAudioFile';
+    $(btnId)?.addEventListener('click', () => {
+      const st = $(statusId);
+      if (st) {
+        st.textContent = '💡 対応形式：mp3・wav・m4a（200MB以下）。それ以上はYouTube URLをご利用ください。1時間超の音声は処理に数分かかります。';
+        st.style.color = 'var(--text-muted)'; st.style.whiteSpace = 'pre-line';
+      }
+      $(inputId)?.click();
+    });
+  });
+  ['learnVideoBtn', 'editLearnVideoBtn'].forEach((btnId, i) => {
+    const mode = i === 0 ? 'add' : 'edit';
+    const statusId = mode === 'add' ? 'learnStatus' : 'editLearnStatus';
+    const inputId = mode === 'add' ? 'learnVideoFile' : 'editLearnVideoFile';
+    $(btnId)?.addEventListener('click', () => {
+      const st = $(statusId);
+      if (st) {
+        st.textContent = '💡 対応形式：mp4・mov・avi（200MB以下）。それ以上はYouTube URLをご利用ください。音声抽出・圧縮処理のため数分かかります。';
+        st.style.color = 'var(--text-muted)'; st.style.whiteSpace = 'pre-line';
+      }
+      $(inputId)?.click();
+    });
+  });
   $('learnVideoFile')?.addEventListener('change', (e) => handleLearnVideo(e, 'add'));
   $('editLearnVideoFile')?.addEventListener('change', (e) => handleLearnVideo(e, 'edit'));
   $('addFetchWebBtn').addEventListener('click', () => fetchLearnUrl('add', 'web'));
   $('addFetchYoutubeBtn').addEventListener('click', () => fetchLearnUrl('add', 'youtube'));
   $('editFetchWebBtn').addEventListener('click', () => fetchLearnUrl('edit', 'web'));
   $('editFetchYoutubeBtn').addEventListener('click', () => fetchLearnUrl('edit', 'youtube'));
+
+  // ★ URL入力欄フォーカス時に事前案内を表示
+  const urlHints = [
+    { id: 'learnUrlInput', statusId: 'learnStatus' },
+    { id: 'editLearnUrlInput', statusId: 'editLearnStatus' }
+  ];
+  urlHints.forEach(({ id, statusId }) => {
+    const el = $(id); const st = $(statusId);
+    if (!el || !st) return;
+    el.addEventListener('focus', () => {
+      if (st.textContent === '') {
+        st.textContent = '💡 YouTube：字幕なし動画は音声変換のため数分かかります。Bot制限で取得できない場合はmp3/mp4ファイルを「音声」「動画」ボタンでアップロードしてください。';
+        st.style.color = 'var(--text-muted)';
+        st.style.whiteSpace = 'pre-line';
+      }
+    });
+    el.addEventListener('blur', () => {
+      if (st.style.color === 'var(--text-muted)') {
+        st.textContent = ''; st.style.color = ''; st.style.whiteSpace = '';
+      }
+    });
+  });
 
   DOM.chatInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendUserMessage(); } });
   DOM.chatInput.addEventListener('input', () => {
@@ -388,7 +437,7 @@ async function summarizeMeeting() {
       typingEl?.remove(); streamEl?.remove(); evtSource.close();
       State.isStreaming = false; setStreamingButtons(false);
       DOM.summarizeBtn.disabled = false;
-      showToast('まとめエラー: ' + data.message, 'error');
+      showToast(translateApiError(data.message, '会議のまとめ'), 'error');
     }
   };
   evtSource.onerror = () => { typingEl?.remove(); evtSource.close(); State.isStreaming = false; setStreamingButtons(false); DOM.summarizeBtn.disabled = false; };
@@ -410,7 +459,7 @@ async function downloadMinutes() {
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
     showToast('議事録をダウンロードしました', 'success');
-  } catch (e) { showToast('ダウンロードエラー: ' + e.message, 'error'); }
+  } catch (e) { showToast(translateApiError(e.message, '議事録のダウンロード'), 'error'); }
   finally { btn.disabled = false; btn.textContent = '📄 議事録をダウンロード（PDF）'; }
 }
 
@@ -536,7 +585,10 @@ function openAddModal() {
   $('pName').value = ''; $('pColor').value = '#8B5CF6';
   $('pDescription').value = ''; $('pPersonality').value = '';
   $('pSpeakingStyle').value = ''; $('pBackground').value = '';
-  DOM.learnDataList.innerHTML = ''; DOM.learnStatus.textContent = '';
+  DOM.learnDataList.innerHTML = '';
+  DOM.learnStatus.textContent = '💡 音声・動画：200MB以下のmp3/mp4に対応。それ以上はYouTube URLをご利用ください。\nYouTube：Bot制限で取得できない場合は動画ファイルを直接アップロードしてください。';
+  DOM.learnStatus.style.color = 'var(--text-muted)';
+  DOM.learnStatus.style.whiteSpace = 'pre-line';
   DOM.addPersonaModal.classList.remove('hidden');
 }
 function closeAddModal() { DOM.addPersonaModal.classList.add('hidden'); }
@@ -544,6 +596,11 @@ function closeAddModal() { DOM.addPersonaModal.classList.add('hidden'); }
 function openEditModal(memberId) {
   const member = State.members.find(m => m.id === memberId); if (!member) return;
   State.editAvatarDataUrl = State.avatarImages[memberId] || null; State.editLearnFiles = [];
+  if (DOM.editLearnStatus) {
+    DOM.editLearnStatus.textContent = '💡 音声・動画：200MB以下のmp3/mp4に対応。それ以上はYouTube URLをご利用ください。\nYouTube：Bot制限で取得できない場合は動画ファイルを直接アップロードしてください。';
+    DOM.editLearnStatus.style.color = 'var(--text-muted)';
+    DOM.editLearnStatus.style.whiteSpace = 'pre-line';
+  }
   $('editPersonaId').value = memberId; $('eAvatar').value = member.avatar || '👤';
   $('eName').value = member.name || ''; $('eColor').value = member.color || '#8B5CF6';
   $('eDescription').value = member.description || ''; $('ePersonality').value = member.personality || '';
@@ -590,7 +647,7 @@ async function deleteSavedLearnData(personaId, learnId) {
     await API.delete(`/api/personas/${personaId}/learn/${learnId}`);
     showToast('学習データを削除しました', 'success');
     loadSavedLearnData(personaId);
-  } catch (e) { showToast('削除エラー: ' + e.message, 'error'); }
+  } catch (e) { showToast(translateApiError(e.message, '学習データの削除'), 'error'); }
 }
 function closeEditModal() { DOM.editPersonaModal.classList.add('hidden'); State.editAvatarDataUrl = null; State.editLearnFiles = []; }
 
@@ -618,7 +675,7 @@ async function submitEditPersona() {
     renderMemberList(); closeEditModal();
     const learnCount = textFiles.length;
     showToast(`${name} の設定を保存しました${learnCount > 0 ? `（学習データ${learnCount}件追加）` : ''}`, 'success');
-  } catch (e) { showToast('保存エラー: ' + e.message, 'error'); }
+  } catch (e) { showToast(translateApiError(e.message, 'ペルソナの保存'), 'error'); }
 }
 
 function openDeleteConfirm(memberId) {
@@ -674,7 +731,7 @@ async function startMeeting() {
     addSystemMessage(`会議を開始しました。議題：${State.topic}`);
     showToast('会議を開始しました！', 'success');
     await invokeFacilitator();
-  } catch (e) { showToast('会議開始エラー: ' + e.message, 'error'); }
+  } catch (e) { showToast(translateApiError(e.message, '会議の開始'), 'error'); }
   finally { setLoading(false); }
 }
 
@@ -702,7 +759,7 @@ async function sendUserMessage() {
   DOM.chatInput.value = ''; DOM.chatInput.style.height = 'auto';
   addMessage({ role: 'user', persona_id: 'user', content, id: 'tmp_' + Date.now() });
   try { await API.post(`/api/meeting/${State.sessionId}/message`, { content }); }
-  catch (e) { showToast('送信エラー: ' + e.message, 'error'); }
+  catch (e) { showToast(translateApiError(e.message, 'メッセージの送信'), 'error'); }
 }
 
 async function triggerMemberResponse(personaId, trigger = null) {
@@ -735,13 +792,14 @@ async function triggerMemberResponse(personaId, trigger = null) {
       } else if (data.type === 'error') {
         typingEl?.remove(); streamEl?.remove(); evtSource.close();
         State.isStreaming = false; setStreamingButtons(false); setMemberSpeaking(personaId, false);
-        showToast('エラー: ' + data.message, 'error');
+        showToast(translateApiError(data.message, 'AIの応答'), 'error');
         resolve();
       }
     };
     evtSource.onerror = () => {
       typingEl?.remove(); evtSource.close();
       State.isStreaming = false; setStreamingButtons(false); setMemberSpeaking(personaId, false);
+      showToast('AIとの接続が切断されました。再試行してください。', 'error');
       resolve();
     };
   });
@@ -766,10 +824,10 @@ async function invokeFacilitator() {
     } else if (data.type === 'error') {
       typingEl?.remove(); streamEl?.remove(); evtSource.close();
       State.isStreaming = false; setStreamingButtons(false);
-      showToast('ファシリテーターエラー: ' + data.message, 'error');
+      showToast(translateApiError(data.message, 'ファシリテーターの応答'), 'error');
     }
   };
-  evtSource.onerror = () => { typingEl?.remove(); evtSource.close(); State.isStreaming = false; setStreamingButtons(false); };
+  evtSource.onerror = () => { typingEl?.remove(); evtSource.close(); State.isStreaming = false; setStreamingButtons(false); showToast('AIとの接続が切断されました。再試行してください。', 'error'); };
 }
 
 async function allRespond() {
@@ -812,7 +870,7 @@ async function submitAddPersona() {
     renderMemberList(); closeAddModal();
     const learnCount = textFiles.length;
     showToast(`${name} を追加しました${learnCount > 0 ? `（学習データ${learnCount}件保存）` : ''}`, 'success');
-  } catch (e) { showToast('追加エラー: ' + e.message, 'error'); }
+  } catch (e) { showToast(translateApiError(e.message, 'ペルソナの追加'), 'error'); }
 }
 
 function handleFileAttach(e) {
@@ -1057,45 +1115,119 @@ async function handleLearnAudio(e, mode) {
 
 function escapeHtml(text) { const d = document.createElement('div'); d.textContent = text; return d.innerHTML; }
 
-// ★ エラーメッセージをユーザー向けに翻訳
+// ★ 学習データ取得エラーをユーザー向けに翻訳
 function translateLearnError(errorMsg, type) {
-  if (!errorMsg) return '不明なエラーが発生しました';
+  if (!errorMsg) return '❌ 不明なエラーが発生しました\nページを再読み込みして再試行してください';
   const msg = errorMsg.toLowerCase();
-  // Bot検知・ログイン要求
-  if (msg.includes('sign in to confirm') || msg.includes('not a bot') || msg.includes('confirm you')) {
-    return '❌ YouTubeのBot検知によりブロックされました\n時間をおいて再試行するか、字幕付き動画をお試しください';
+
+  // ── 通信・接続 ──
+  if (msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('network request failed')) {
+    return '❌ サーバーに接続できませんでした\nインターネット接続を確認して再試行してください';
   }
-  // Whisper デコードエラー
-  if (msg.includes('could not be decoded') || msg.includes('error code: 400') || msg.includes('invalid file format')) {
-    return '❌ 音声ファイルの形式が認識できませんでした\n別の動画・音声ファイルをお試しください';
-  }
-  // YouTube関連
-  if (msg.includes('subtitles are disabled') || msg.includes('no transcripts')) {
-    return '⚠️ この動画は字幕が無効のため取得できませんでした。\n代わりに「YouTube」ボタンで音声から文字起こしを試みます（自動実行中...）';
-  }
-  if (msg.includes('could not retrieve a transcript')) {
-    return '⚠️ 字幕データが見つかりませんでした。\n音声文字起こしを試みています...';
-  }
-  if (msg.includes('video unavailable') || msg.includes('private video')) {
-    return '❌ この動画は非公開または削除されています';
+  if (msg.includes('timeout') || msg.includes('timed out')) {
+    return '⚠️ 処理がタイムアウトしました\n動画が長すぎる可能性があります（目安：90分以内）\nしばらく待ってから再試行してください';
   }
   if (msg.includes('maximum content size') || msg.includes('413') || msg.includes('request entity too large')) {
-    return '❌ ファイルが大きすぎてサーバーに届きませんでした\nYouTube URLを入力して「YouTube」ボタンをお試しください';
+    return '❌ ファイルが大きすぎてサーバーに届きませんでした\nYouTube URLを「YouTube」ボタンで入力するか\n動画をmp3に変換してからアップロードしてください';
   }
-  if (msg.includes('ffmpeg') || msg.includes('no such file')) {
-    return '❌ 動画処理ツールが見つかりません\nYouTube URLを代わりにお試しください';
+
+  // ── YouTube フォーマット・取得失敗 ──
+  if (msg.includes('requested format is not available') || msg.includes('use --list-formats') || msg.includes('no video formats found')) {
+    return '❌ この動画のフォーマットを取得できませんでした\n動画ファイルをローカルにダウンロードして「動画」ボタンでアップロードするか\n字幕付き動画をお試しください';
   }
-  if (msg.includes('timeout')) {
-    return '⚠️ 処理がタイムアウトしました\n動画が長すぎる可能性があります（90分以内推奨）';
+  if (msg.includes('unable to download') || msg.includes('download failed') || msg.includes('ダウンロードに失敗')) {
+    return '❌ 動画のダウンロードに失敗しました\n時間をおいて再試行するか、別の動画をお試しください';
   }
-  if (msg.includes('network') || msg.includes('connection')) {
-    return '❌ ネットワークエラーが発生しました\nしばらく待ってから再試行してください';
+
+  // ── YouTube アクセス制限 ──
+  if (msg.includes('sign in to confirm') || msg.includes('not a bot') || msg.includes('confirm you')) {
+    return '❌ YouTubeのBot検知によりブロックされました\n少し時間をおいてから再試行してください\n💡 字幕付き動画では「YouTube」ボタンで取得できることがあります';
   }
-  if (msg.includes('pdf') || msg.includes('スキャン')) {
+  if (msg.includes('age') && (msg.includes('restrict') || msg.includes('limit'))) {
+    return '❌ この動画は年齢制限のためダウンロードできません\n別の動画をお試しください';
+  }
+  if (msg.includes('members only') || msg.includes('member-only') || msg.includes('join this channel')) {
+    return '❌ この動画はチャンネルメンバー限定です\n公開動画をお試しください';
+  }
+  if (msg.includes('copyright') || msg.includes('unavailable in your country') || msg.includes('not available in your region')) {
+    return '❌ この動画は著作権または地域制限により取得できません\n別の動画をお試しください';
+  }
+  if (msg.includes('video unavailable') || msg.includes('private video') || msg.includes('has been removed')) {
+    return '❌ この動画は非公開・削除済み、または視聴できない状態です';
+  }
+  if (msg.includes('subtitles are disabled') || msg.includes('no transcripts')) {
+    return '⚠️ この動画は字幕が無効のため取得できませんでした\n「YouTube」ボタンで音声から文字起こしを試みます（自動実行中...）';
+  }
+  if (msg.includes('could not retrieve a transcript')) {
+    return '⚠️ 字幕データが見つかりませんでした\n音声文字起こしを試みています...';
+  }
+  if (msg.includes('url') && (msg.includes('invalid') || msg.includes('not valid') || msg.includes('正しくありません'))) {
+    return '❌ URLの形式が正しくありません\nYouTubeのURLを貼り付けてください（例：https://www.youtube.com/watch?v=...）';
+  }
+
+  // ── 音声変換・処理 ──
+  if (msg.includes('ffmpeg') || msg.includes('no such file or directory')) {
+    return '❌ 動画処理ツール（ffmpeg）が見つかりません\nサーバーの設定に問題がある可能性があります\nYouTube URLをお試しください';
+  }
+  if (msg.includes('変換に失敗') || msg.includes('conversion failed') || msg.includes('音声抽出失敗')) {
+    return '❌ 音声の変換に失敗しました\n動画に音声トラックがないか、対応していない形式の可能性があります\n別のファイルをお試しください';
+  }
+  if (msg.includes('could not be decoded') || msg.includes('invalid file format') || msg.includes('音声ファイルが空')) {
+    return '❌ 音声ファイルの形式を認識できませんでした\nmp3またはmp4形式のファイルをお試しください';
+  }
+  if (msg.includes('音声トラックがない') || msg.includes('no audio') || msg.includes('no stream')) {
+    return '❌ このファイルに音声が含まれていません\n音声付きの動画・音声ファイルをお試しください';
+  }
+
+  // ── OpenAI API ──
+  if (msg.includes('insufficient_quota') || msg.includes('you exceeded your current quota')) {
+    return '❌ AIサービスの利用上限に達しました\n管理者にお問い合わせください';
+  }
+  if (msg.includes('rate limit') || msg.includes('rate_limit') || msg.includes('too many requests') || msg.includes('429')) {
+    return '⚠️ AIサービスへのリクエストが集中しています\n1〜2分待ってから再試行してください';
+  }
+  if (msg.includes('error code: 400') || msg.includes('bad request')) {
+    return '❌ 音声データの送信に失敗しました\nファイルが破損している可能性があります\n別のファイルをお試しください';
+  }
+  if (msg.includes('error code: 500') || msg.includes('internal server error') || msg.includes('service unavailable')) {
+    return '⚠️ AIサービスが一時的に利用できません\nしばらく待ってから再試行してください';
+  }
+
+  // ── PDF ──
+  if (msg.includes('スキャン') || (msg.includes('pdf') && msg.includes('text'))) {
     return '❌ このPDFはスキャン画像のためテキスト抽出できません\n手動でテキストを入力してください';
   }
-  // デフォルト
-  return `❌ ${type || ''}エラー: ${errorMsg.slice(0, 100)}`;
+
+  // ── デフォルト ──
+  return `❌ ${type || ''}エラーが発生しました\n詳細: ${errorMsg.slice(0, 120)}`;
+}
+
+// ★ API全般エラーをユーザー向けに翻訳（会議・ペルソナ・認証など）
+function translateApiError(errorMsg, context) {
+  if (!errorMsg) return `${context || ''}でエラーが発生しました。再試行してください。`;
+  const msg = errorMsg.toLowerCase();
+  if (msg.includes('failed to fetch') || msg.includes('networkerror')) {
+    return 'サーバーに接続できませんでした。インターネット接続を確認してください。';
+  }
+  if (msg.includes('overloaded') || msg.includes('529') || msg.includes('503')) {
+    return 'AIサーバーが混雑しています。しばらく待ってから再試行してください。';
+  }
+  if (msg.includes('rate limit') || msg.includes('429') || msg.includes('too many')) {
+    return 'リクエストが集中しています。1〜2分待ってから再試行してください。';
+  }
+  if (msg.includes('insufficient_quota') || msg.includes('quota')) {
+    return 'AIサービスの利用上限に達しました。管理者にお問い合わせください。';
+  }
+  if (msg.includes('unauthorized') || msg.includes('401') || msg.includes('ログインが必要')) {
+    return 'ログインが必要です。右上の「ログイン」からログインしてください。';
+  }
+  if (msg.includes('not found') || msg.includes('404')) {
+    return 'データが見つかりませんでした。ページを再読み込みしてください。';
+  }
+  if (msg.includes('timeout')) {
+    return '処理がタイムアウトしました。しばらく待ってから再試行してください。';
+  }
+  return `${context || ''}でエラーが発生しました: ${errorMsg.slice(0, 100)}`;
 }
 
 
@@ -1168,7 +1300,7 @@ async function submitLogin() {
     // ペルソナを再読み込み（ユーザー固有のペルソナを反映）
     await reloadPersonas();
   } catch (e) {
-    $('loginError').textContent = e.message;
+    $('loginError').textContent = translateApiError(e.message, 'ログイン');
   } finally {
     const btn = $('loginSubmitBtn');
     if (btn) { btn.textContent = 'ログイン'; btn.disabled = false; }
@@ -1192,7 +1324,7 @@ async function submitRegister() {
     showToast(`登録完了！${data.user.name || data.user.email} でログインしました`, 'success');
     await reloadPersonas();
   } catch (e) {
-    $('registerError').textContent = e.message;
+    $('registerError').textContent = translateApiError(e.message, '登録');
   } finally {
     const btn = $('registerSubmitBtn');
     if (btn) { btn.textContent = '登録する'; btn.disabled = false; }
@@ -1206,7 +1338,7 @@ async function logout() {
     renderAuthArea();
     showToast('ログアウトしました', 'success');
     await reloadPersonas();
-  } catch (e) { showToast('ログアウトエラー: ' + e.message, 'error'); }
+  } catch (e) { showToast(translateApiError(e.message, 'ログアウト'), 'error'); }
 }
 
 async function reloadPersonas() {
@@ -1225,7 +1357,7 @@ async function reloadPersonas() {
       State.avatarImages['facilitator'] = data.facilitator.avatar;
     }
     renderMemberList();
-  } catch (e) { showToast('ペルソナ再読み込み失敗: ' + e.message, 'error'); }
+  } catch (e) { showToast(translateApiError(e.message, 'ペルソナの再読み込み'), 'error'); }
 }
 
 document.addEventListener('DOMContentLoaded', init);
