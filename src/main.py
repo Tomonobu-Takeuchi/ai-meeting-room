@@ -261,6 +261,10 @@ def fetch_learn_youtube():
                         'preferredquality': '32',
                     }],
                     'quiet': True,
+                    'ignoreerrors': False,
+                    'no_warnings': True,
+                    'extractor_retries': 3,
+                    'format_sort': ['abr', 'asr'],
                 }
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     ydl.download([url])

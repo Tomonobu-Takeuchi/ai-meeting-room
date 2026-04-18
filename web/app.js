@@ -438,8 +438,8 @@ async function handleLearnFiles(e, mode, type) {
         } catch (err) {
           const friendlyPdfMsg = translateLearnError(err.message, 'PDF');
           statusEl.textContent = friendlyPdfMsg;
+          statusEl.style.color = 'var(--accent-red)';
           statusEl.style.whiteSpace = 'pre-line';
-          setTimeout(() => { statusEl.textContent = ''; statusEl.style.whiteSpace = ''; }, 6000);
           continue;
         }
       } else { content = await readFileAsText(file); }
@@ -931,13 +931,13 @@ async function handleLearnVideo(e, mode) {
     const listKey = mode === 'add' ? 'addLearnFiles' : 'editLearnFiles';
     State[listKey].push({ name: `🎬 ${file.name}`, type: 'text', content: data.text });
     renderLearnDataList(mode);
-    statusEl.textContent = `✓ 文字起こし完了（${data.text.length}文字）`;
+    statusEl.style.color = ''; statusEl.textContent = `✓ 文字起こし完了（${data.text.length}文字）`;
     setTimeout(() => { statusEl.textContent = ''; }, 3000);
   } catch (e) {
     const friendlyMsg = translateLearnError(e.message, '音声文字起こし');
     statusEl.textContent = friendlyMsg;
+    statusEl.style.color = 'var(--accent-red)';
     statusEl.style.whiteSpace = 'pre-line';
-    setTimeout(() => { statusEl.textContent = ''; statusEl.style.whiteSpace = ''; }, 6000);
   }
   e.target.value = '';
 }
@@ -967,14 +967,14 @@ async function fetchLearnUrl(mode, type) {
     const label = `${icon} ${url.length > 40 ? url.slice(0, 40) + '…' : url}`;
     State[listKey].push({ name: label, type: 'text', content: data.text });
     renderLearnDataList(mode);
-    statusEl.textContent = `✓ 取得完了（${data.text.length}文字）`;
+    statusEl.style.color = ''; statusEl.textContent = `✓ 取得完了（${data.text.length}文字）`;
     inputEl.value = '';
     setTimeout(() => { statusEl.textContent = ''; }, 3000);
   } catch (e) {
     const friendlyMsg = translateLearnError(e.message, type === 'youtube' ? 'YouTube' : 'Web');
     statusEl.textContent = friendlyMsg;
+    statusEl.style.color = 'var(--accent-red)';
     statusEl.style.whiteSpace = 'pre-line';
-    setTimeout(() => { statusEl.textContent = ''; statusEl.style.whiteSpace = ''; }, 6000);
   }
 }
 
@@ -995,13 +995,13 @@ async function handleLearnAudio(e, mode) {
     const listKey = mode === 'add' ? 'addLearnFiles' : 'editLearnFiles';
     State[listKey].push({ name: `🎵 ${file.name}`, type: 'text', content: data.text });
     renderLearnDataList(mode);
-    statusEl.textContent = `✓ 文字起こし完了（${data.text.length}文字）`;
+    statusEl.style.color = ''; statusEl.textContent = `✓ 文字起こし完了（${data.text.length}文字）`;
     setTimeout(() => { statusEl.textContent = ''; }, 3000);
   } catch (e) {
     const friendlyMsg = translateLearnError(e.message, '音声文字起こし');
     statusEl.textContent = friendlyMsg;
+    statusEl.style.color = 'var(--accent-red)';
     statusEl.style.whiteSpace = 'pre-line';
-    setTimeout(() => { statusEl.textContent = ''; statusEl.style.whiteSpace = ''; }, 6000);
   }
   e.target.value = '';
 }
