@@ -1,9 +1,5 @@
 [phases.setup]
-nixPkgs = ["python312", "ffmpeg"]
-aptPkgs = ["libpq-dev"]
+aptPkgs = ["libpq-dev", "ffmpeg", "python3-dev"]
 
-[phases.install]
-cmds = ["python3.12 -m venv /app/.venv && /app/.venv/bin/pip install -r requirements.txt"]
-
-[start]
-cmd = "gunicorn src.main:app --bind 0.0.0.0:$PORT --timeout 120 --workers 1"
+[variables]
+NIXPACKS_PYTHON_VERSION = "3.12.0"
