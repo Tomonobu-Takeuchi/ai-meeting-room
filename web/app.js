@@ -922,6 +922,8 @@ async function handleLearnVideo(e, mode) {
   if (!file) return;
   const statusEl = mode === 'add' ? DOM.learnStatus : DOM.editLearnStatus;
   statusEl.textContent = `${file.name} を文字起こし中...（時間がかかります）`;
+  statusEl.style.color = '';
+  statusEl.style.whiteSpace = '';
   try {
     const formData = new FormData();
     formData.append('video', file);
@@ -951,7 +953,9 @@ async function fetchLearnUrl(mode, type) {
   if (!url) { showToast('URLを入力してください', 'error'); return; }
 
   const endpoint = type === 'youtube' ? '/api/learn/fetch-youtube' : '/api/learn/fetch-url';
-  statusEl.textContent = '取得中...';
+  statusEl.textContent = type === 'youtube' ? '取得中...（字幕検索→音声変換の順に試みます）' : '取得中...';
+  statusEl.style.color = '';
+  statusEl.style.whiteSpace = '';
 
   try {
     const res = await fetch(endpoint, {
@@ -984,7 +988,8 @@ async function handleLearnAudio(e, mode) {
   if (!file) return;
   const statusEl = mode === 'add' ? DOM.learnStatus : DOM.editLearnStatus;
   statusEl.textContent = `${file.name} を文字起こし中...`;
-
+  statusEl.style.color = '';
+  statusEl.style.whiteSpace = '';
   try {
     const formData = new FormData();
     formData.append('audio', file);

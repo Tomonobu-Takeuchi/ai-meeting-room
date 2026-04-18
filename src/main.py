@@ -249,11 +249,11 @@ def fetch_learn_youtube():
             pass
         # 字幕なし → yt-dlp + Whisper APIで音声から文字起こし（自動圧縮+チャンク対応）
         try:
-            import tempfile, yt_dlp, openai, math, subprocess
+            import tempfile, yt_dlp, openai, math, subprocess, glob
             client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
             with tempfile.TemporaryDirectory() as tmpdir:
                 ydl_opts = {
-                    'format': 'bestaudio/best',
+                    'format': 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best',
                     'outtmpl': f'{tmpdir}/audio.%(ext)s',
                     'postprocessors': [{
                         'key': 'FFmpegExtractAudio',
@@ -264,11 +264,29 @@ def fetch_learn_youtube():
                     'ignoreerrors': False,
                     'no_warnings': True,
                     'extractor_retries': 3,
-                    'format_sort': ['abr', 'asr'],
                 }
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     ydl.download([url])
-                audio_path = f'{tmpdir}/audio.mp3'
+
+                # mp3ファイルを探す（postprocessor成功時）
+                mp3_files = glob.glob(f'{tmpdir}/audio.mp3')
+                if mp3_files:
+                    audio_path = mp3_files[0]
+                else:
+                    # postprocessorが失敗した場合、元ファイルをffmpegで直接変換
+                    raw_files = [f for f in glob.glob(f'{tmpdir}/audio.*') if not f.endswith('.mp3')]
+                    if not raw_files:
+                        raise Exception("動画のダウンロードに失敗しました。非公開・地域制限の動画の可能性があります。")
+                    converted_path = f'{tmpdir}/audio_conv.mp3'
+                    conv = subprocess.run(
+                        ["ffmpeg", "-i", raw_files[0], "-vn", "-acodec", "mp3",
+                         "-b:a", "32k", "-ar", "16000", "-ac", "1", converted_path, "-y"],
+                        capture_output=True, timeout=180
+                    )
+                    if conv.returncode != 0 or not os.path.exists(converted_path):
+                        raise Exception("音声の変換に失敗しました。ffmpegが利用できない可能性があります。")
+                    audio_path = converted_path
+
                 file_size = os.path.getsize(audio_path)
                 MAX_SIZE = 24 * 1024 * 1024
 
