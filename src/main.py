@@ -254,7 +254,7 @@ def fetch_learn_youtube():
             with tempfile.TemporaryDirectory() as tmpdir:
                 ydl_opts = {
                     # iOSクライアントを優先するとBot検知を回避できる
-                    'format': 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best',
+                    'format': 'bestaudio/best',
                     'outtmpl': f'{tmpdir}/audio.%(ext)s',
                     'postprocessors': [{
                         'key': 'FFmpegExtractAudio',

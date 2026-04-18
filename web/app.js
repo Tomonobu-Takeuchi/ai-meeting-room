@@ -606,8 +606,18 @@ async function submitEditPersona() {
     const data = await API.put(`/api/personas/${memberId}`, { name, avatar, description, personality, speaking_style: speakingStyle, background, color });
     const idx = State.members.findIndex(m => m.id === memberId);
     if (idx >= 0) State.members[idx] = { ...State.members[idx], ...data.persona };
+
+    // ★ 学習データをpersona_learnテーブルにDB保存
+    const textFiles = State.editLearnFiles.filter(f => f.type === 'text' || f.type === 'pdf');
+    for (const f of textFiles) {
+      try {
+        await API.post(`/api/personas/${memberId}/learn`, { content: f.content, source: f.name });
+      } catch (le) { console.warn('学習データ保存スキップ:', le.message); }
+    }
+
     renderMemberList(); closeEditModal();
-    showToast(`${name} の設定を保存しました`, 'success');
+    const learnCount = textFiles.length;
+    showToast(`${name} の設定を保存しました${learnCount > 0 ? `（学習データ${learnCount}件追加）` : ''}`, 'success');
   } catch (e) { showToast('保存エラー: ' + e.message, 'error'); }
 }
 
@@ -789,9 +799,19 @@ async function submitAddPersona() {
   try {
     const data = await API.post('/api/personas/add', { name, avatar, description, personality, speaking_style: speakingStyle, background, role: 'member', color });
     if (State.addAvatarDataUrl) State.avatarImages[data.persona.id] = State.addAvatarDataUrl;
+
+    // ★ 学習データをpersona_learnテーブルにDB保存
+    const textFiles = State.addLearnFiles.filter(f => f.type === 'text' || f.type === 'pdf');
+    for (const f of textFiles) {
+      try {
+        await API.post(`/api/personas/${data.persona.id}/learn`, { content: f.content, source: f.name });
+      } catch (le) { console.warn('学習データ保存スキップ:', le.message); }
+    }
+
     State.members.push(data.persona); State.selectedMemberIds.push(data.persona.id);
     renderMemberList(); closeAddModal();
-    showToast(`${name} を追加しました`, 'success');
+    const learnCount = textFiles.length;
+    showToast(`${name} を追加しました${learnCount > 0 ? `（学習データ${learnCount}件保存）` : ''}`, 'success');
   } catch (e) { showToast('追加エラー: ' + e.message, 'error'); }
 }
 
