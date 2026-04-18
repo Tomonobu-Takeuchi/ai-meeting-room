@@ -217,15 +217,15 @@ def fetch_learn_youtube():
         return jsonify({"error": "YouTube URLを入力してください"}), 400
     try:
         import re
-        from youtube_transcript_api import YouTubeTranscriptApi, TranscriptList
+        from youtube_transcript_api import YouTubeTranscriptApi
         match = re.search(r'(?:v=|youtu\.be/)([a-zA-Z0-9_-]{11})', url)
         if not match:
             return jsonify({"error": "YouTube URLが正しくありません"}), 400
         video_id = match.group(1)
-        transcript = None
-        # 優先順位：日本語手動 → 日本語自動生成 → 英語手動 → 英語自動生成 → 何でも最初の1つ
+        # まず字幕APIを試みる
         try:
             transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+            transcript = None
             for lang in ['ja', 'en']:
                 try:
                     t = transcript_list.find_transcript([lang])
@@ -239,18 +239,74 @@ def fetch_learn_youtube():
                     except Exception:
                         continue
             if transcript is None:
-                # 全言語から最初の字幕を取得
                 for t in transcript_list:
                     transcript = t.fetch()
                     break
+            if transcript:
+                text = ' '.join([t['text'] for t in transcript])[:4000]
+                return jsonify({"text": text, "url": url})
         except Exception:
-            transcript = YouTubeTranscriptApi.get_transcript(video_id)
-        if not transcript:
-            return jsonify({"error": "字幕が見つかりませんでした"}), 400
-        text = ' '.join([t['text'] for t in transcript])[:4000]
-        return jsonify({"text": text, "url": url})
+            pass
+        # 字幕なし → yt-dlp + Whisper APIで音声から文字起こし（自動圧縮+チャンク対応）
+        try:
+            import tempfile, yt_dlp, openai, math, subprocess
+            client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            with tempfile.TemporaryDirectory() as tmpdir:
+                ydl_opts = {
+                    'format': 'bestaudio/best',
+                    'outtmpl': f'{tmpdir}/audio.%(ext)s',
+                    'postprocessors': [{
+                        'key': 'FFmpegExtractAudio',
+                        'preferredcodec': 'mp3',
+                        'preferredquality': '32',
+                    }],
+                    'quiet': True,
+                }
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([url])
+                audio_path = f'{tmpdir}/audio.mp3'
+                file_size = os.path.getsize(audio_path)
+                MAX_SIZE = 24 * 1024 * 1024
+
+                if file_size <= MAX_SIZE:
+                    with open(audio_path, 'rb') as af:
+                        transcription = client.audio.transcriptions.create(
+                            model="whisper-1", file=af, language="ja"
+                        )
+                    full_text = transcription.text
+                else:
+                    # チャンク分割
+                    probe = subprocess.run(["ffmpeg", "-i", audio_path],
+                        capture_output=True, text=True)
+                    duration = 0
+                    for line in probe.stderr.split("\n"):
+                        if "Duration" in line:
+                            parts = line.strip().split("Duration:")[1].split(",")[0].strip()
+                            h, m, s = parts.split(":")
+                            duration = int(h)*3600 + int(m)*60 + float(s)
+                            break
+                    chunk_duration = 600
+                    num_chunks = math.ceil(duration / chunk_duration)
+                    full_text = ""
+                    for i in range(num_chunks):
+                        start = i * chunk_duration
+                        chunk_path = f'{tmpdir}/chunk_{i}.mp3'
+                        subprocess.run(
+                            ["ffmpeg", "-i", audio_path, "-ss", str(start),
+                             "-t", str(chunk_duration), "-acodec", "copy",
+                             chunk_path, "-y"], capture_output=True, timeout=60
+                        )
+                        if os.path.exists(chunk_path):
+                            with open(chunk_path, 'rb') as af:
+                                result = client.audio.transcriptions.create(
+                                    model="whisper-1", file=af, language="ja"
+                                )
+                            full_text += result.text + " "
+            return jsonify({"text": full_text.strip()[:6000], "url": url})
+        except Exception as e2:
+            return jsonify({"error": f"音声文字起こしエラー: {str(e2)}"}), 500
     except Exception as e:
-        return jsonify({"error": f"字幕取得エラー: {str(e)}"}), 500
+        return jsonify({"error": f"取得エラー: {str(e)}"}), 500
 
 @app.route("/api/learn/transcribe-audio", methods=["POST"])
 def transcribe_audio():
@@ -280,27 +336,74 @@ def transcribe_video():
     if not video_file:
         return jsonify({"error": "動画ファイルが見つかりません"}), 400
     try:
-        import tempfile, subprocess, openai
+        import tempfile, subprocess, math, openai
         client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         suffix = os.path.splitext(video_file.filename)[1].lower() or ".mp4"
         with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
             video_file.save(f.name)
             video_path = f.name
+
+        # 音声抽出（32kbps モノラルで圧縮）
         audio_path = video_path.replace(suffix, ".mp3")
         proc = subprocess.run(
             ["ffmpeg", "-i", video_path, "-vn", "-acodec", "mp3",
-             "-ar", "16000", "-ac", "1", audio_path, "-y"],
-            capture_output=True, timeout=120
+             "-b:a", "32k", "-ar", "16000", "-ac", "1", audio_path, "-y"],
+            capture_output=True, timeout=300
         )
         os.unlink(video_path)
         if proc.returncode != 0:
-            raise Exception("音声抽出失敗（ffmpegエラー）")
-        with open(audio_path, "rb") as af:
-            transcription = client.audio.transcriptions.create(
-                model="whisper-1", file=af, language="ja"
+            raise Exception("音声抽出失敗（ffmpegが見つかりません）")
+
+        file_size = os.path.getsize(audio_path)
+        MAX_SIZE = 24 * 1024 * 1024  # 24MB（余裕を持って）
+
+        if file_size <= MAX_SIZE:
+            # 25MB以内：そのままWhisper APIへ
+            with open(audio_path, "rb") as af:
+                transcription = client.audio.transcriptions.create(
+                    model="whisper-1", file=af, language="ja"
+                )
+            os.unlink(audio_path)
+            return jsonify({"text": transcription.text})
+        else:
+            # 25MB超：チャンク分割して文字起こし
+            # 動画の長さを取得
+            probe = subprocess.run(
+                ["ffmpeg", "-i", audio_path],
+                capture_output=True, text=True
             )
-        os.unlink(audio_path)
-        return jsonify({"text": transcription.text})
+            duration = 0
+            for line in probe.stderr.split("\n"):
+                if "Duration" in line:
+                    parts = line.strip().split("Duration:")[1].split(",")[0].strip()
+                    h, m, s = parts.split(":")
+                    duration = int(h)*3600 + int(m)*60 + float(s)
+                    break
+
+            chunk_duration = 600  # 10分ごとに分割
+            num_chunks = math.ceil(duration / chunk_duration)
+            full_text = ""
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                for i in range(num_chunks):
+                    start = i * chunk_duration
+                    chunk_path = f"{tmpdir}/chunk_{i}.mp3"
+                    subprocess.run(
+                        ["ffmpeg", "-i", audio_path, "-ss", str(start),
+                         "-t", str(chunk_duration), "-acodec", "copy",
+                         chunk_path, "-y"],
+                        capture_output=True, timeout=60
+                    )
+                    if os.path.exists(chunk_path):
+                        with open(chunk_path, "rb") as af:
+                            result = client.audio.transcriptions.create(
+                                model="whisper-1", file=af, language="ja"
+                            )
+                        full_text += result.text + " "
+
+            os.unlink(audio_path)
+            return jsonify({"text": full_text.strip()[:8000]})
+
     except Exception as e:
         return jsonify({"error": f"動画文字起こしエラー: {str(e)}"}), 500
 
