@@ -253,6 +253,7 @@ def fetch_learn_youtube():
             client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
             with tempfile.TemporaryDirectory() as tmpdir:
                 ydl_opts = {
+                    # iOSクライアントを優先するとBot検知を回避できる
                     'format': 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best',
                     'outtmpl': f'{tmpdir}/audio.%(ext)s',
                     'postprocessors': [{
@@ -260,6 +261,7 @@ def fetch_learn_youtube():
                         'preferredcodec': 'mp3',
                         'preferredquality': '32',
                     }],
+                    'extractor_args': {'youtube': {'player_client': ['ios', 'web']}},
                     'quiet': True,
                     'ignoreerrors': False,
                     'no_warnings': True,
@@ -279,13 +281,25 @@ def fetch_learn_youtube():
                         raise Exception("動画のダウンロードに失敗しました。非公開・地域制限の動画の可能性があります。")
                     converted_path = f'{tmpdir}/audio_conv.mp3'
                     conv = subprocess.run(
-                        ["ffmpeg", "-i", raw_files[0], "-vn", "-acodec", "mp3",
+                        ["ffmpeg", "-i", raw_files[0], "-vn", "-acodec", "libmp3lame",
                          "-b:a", "32k", "-ar", "16000", "-ac", "1", converted_path, "-y"],
                         capture_output=True, timeout=180
                     )
                     if conv.returncode != 0 or not os.path.exists(converted_path):
                         raise Exception("音声の変換に失敗しました。ffmpegが利用できない可能性があります。")
                     audio_path = converted_path
+
+                # Whisper送信前：ファイルサイズ確認 + 安全な再エンコード
+                if os.path.getsize(audio_path) == 0:
+                    raise Exception("音声ファイルが空です。動画に音声トラックがない可能性があります。")
+                safe_path = f'{tmpdir}/audio_safe.mp3'
+                re_enc = subprocess.run(
+                    ["ffmpeg", "-i", audio_path, "-acodec", "libmp3lame",
+                     "-b:a", "32k", "-ar", "16000", "-ac", "1", safe_path, "-y"],
+                    capture_output=True, timeout=180
+                )
+                if re_enc.returncode == 0 and os.path.exists(safe_path) and os.path.getsize(safe_path) > 0:
+                    audio_path = safe_path
 
                 file_size = os.path.getsize(audio_path)
                 MAX_SIZE = 24 * 1024 * 1024
@@ -368,13 +382,13 @@ def transcribe_video():
         # 音声抽出（32kbps モノラルで圧縮）
         audio_path = video_path.replace(suffix, ".mp3")
         proc = subprocess.run(
-            ["ffmpeg", "-i", video_path, "-vn", "-acodec", "mp3",
+            ["ffmpeg", "-i", video_path, "-vn", "-acodec", "libmp3lame",
              "-b:a", "32k", "-ar", "16000", "-ac", "1", audio_path, "-y"],
             capture_output=True, timeout=300
         )
         os.unlink(video_path)
-        if proc.returncode != 0:
-            raise Exception("音声抽出失敗（ffmpegが見つかりません）")
+        if proc.returncode != 0 or not os.path.exists(audio_path) or os.path.getsize(audio_path) == 0:
+            raise Exception("音声抽出に失敗しました。動画に音声トラックがないか、対応していない形式の可能性があります。")
 
         file_size = os.path.getsize(audio_path)
         MAX_SIZE = 24 * 1024 * 1024  # 24MB（余裕を持って）

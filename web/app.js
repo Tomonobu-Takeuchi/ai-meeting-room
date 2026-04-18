@@ -1017,6 +1017,14 @@ function escapeHtml(text) { const d = document.createElement('div'); d.textConte
 function translateLearnError(errorMsg, type) {
   if (!errorMsg) return '不明なエラーが発生しました';
   const msg = errorMsg.toLowerCase();
+  // Bot検知・ログイン要求
+  if (msg.includes('sign in to confirm') || msg.includes('not a bot') || msg.includes('confirm you')) {
+    return '❌ YouTubeのBot検知によりブロックされました\n時間をおいて再試行するか、字幕付き動画をお試しください';
+  }
+  // Whisper デコードエラー
+  if (msg.includes('could not be decoded') || msg.includes('error code: 400') || msg.includes('invalid file format')) {
+    return '❌ 音声ファイルの形式が認識できませんでした\n別の動画・音声ファイルをお試しください';
+  }
   // YouTube関連
   if (msg.includes('subtitles are disabled') || msg.includes('no transcripts')) {
     return '⚠️ この動画は字幕が無効のため取得できませんでした。\n代わりに「YouTube」ボタンで音声から文字起こしを試みます（自動実行中...）';
