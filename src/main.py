@@ -350,18 +350,63 @@ def transcribe_audio():
     if not audio_file:
         return jsonify({"error": "音声ファイルが見つかりません"}), 400
     try:
-        import tempfile, openai
+        import tempfile, subprocess, math, openai
         client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         suffix = os.path.splitext(audio_file.filename)[1].lower() or '.mp3'
         with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
             audio_file.save(f.name)
-            temp_path = f.name
-        with open(temp_path, 'rb') as af:
-            result = client.audio.transcriptions.create(
-                model="whisper-1", file=af, language="ja"
+            raw_path = f.name
+
+        # 32kbpsモノラルに圧縮（1時間20分のmp3でも約19MBになる）
+        with tempfile.TemporaryDirectory() as tmpdir:
+            compressed_path = f'{tmpdir}/audio_compressed.mp3'
+            proc = subprocess.run(
+                ["ffmpeg", "-i", raw_path, "-vn", "-acodec", "libmp3lame",
+                 "-b:a", "32k", "-ar", "16000", "-ac", "1", compressed_path, "-y"],
+                capture_output=True, timeout=300
             )
-        os.unlink(temp_path)
-        return jsonify({"text": result.text})
+            os.unlink(raw_path)
+            if proc.returncode != 0 or not os.path.exists(compressed_path) or os.path.getsize(compressed_path) == 0:
+                raise Exception("音声ファイルの変換に失敗しました。対応していない形式の可能性があります。")
+
+            file_size = os.path.getsize(compressed_path)
+            MAX_SIZE = 24 * 1024 * 1024
+
+            if file_size <= MAX_SIZE:
+                with open(compressed_path, 'rb') as af:
+                    result = client.audio.transcriptions.create(
+                        model="whisper-1", file=af, language="ja"
+                    )
+                return jsonify({"text": result.text})
+            else:
+                # 25MB超（極端に長い音声）→ チャンク分割
+                probe = subprocess.run(["ffmpeg", "-i", compressed_path],
+                    capture_output=True, text=True)
+                duration = 0
+                for line in probe.stderr.split("\n"):
+                    if "Duration" in line:
+                        parts = line.strip().split("Duration:")[1].split(",")[0].strip()
+                        h, m, s = parts.split(":")
+                        duration = int(h)*3600 + int(m)*60 + float(s)
+                        break
+                chunk_duration = 600
+                num_chunks = math.ceil(duration / chunk_duration)
+                full_text = ""
+                for i in range(num_chunks):
+                    start = i * chunk_duration
+                    chunk_path = f'{tmpdir}/chunk_{i}.mp3'
+                    subprocess.run(
+                        ["ffmpeg", "-i", compressed_path, "-ss", str(start),
+                         "-t", str(chunk_duration), "-acodec", "copy",
+                         chunk_path, "-y"], capture_output=True, timeout=60
+                    )
+                    if os.path.exists(chunk_path):
+                        with open(chunk_path, 'rb') as af:
+                            result = client.audio.transcriptions.create(
+                                model="whisper-1", file=af, language="ja"
+                            )
+                        full_text += result.text + " "
+                return jsonify({"text": full_text.strip()[:8000]})
     except Exception as e:
         return jsonify({"error": f"文字起こしエラー: {str(e)}"}), 500
 

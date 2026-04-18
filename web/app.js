@@ -941,9 +941,21 @@ async function handleLearnVideo(e, mode) {
   const file = e.target.files[0];
   if (!file) return;
   const statusEl = mode === 'add' ? DOM.learnStatus : DOM.editLearnStatus;
-  statusEl.textContent = `${file.name} を文字起こし中...（時間がかかります）`;
   statusEl.style.color = '';
   statusEl.style.whiteSpace = '';
+
+  // ファイルサイズ事前チェック（200MB超はアップロード不可）
+  const MAX_VIDEO_MB = 200;
+  const fileMB = Math.round(file.size / 1024 / 1024);
+  if (file.size > MAX_VIDEO_MB * 1024 * 1024) {
+    statusEl.textContent = `❌ ファイルが大きすぎます（${fileMB}MB）\nサーバーへのアップロード上限は200MBです\n💡 YouTube URLを「YouTube」ボタンで入力するか、動画をmp3に変換してから「音声」ボタンをお試しください`;
+    statusEl.style.color = 'var(--accent-red)';
+    statusEl.style.whiteSpace = 'pre-line';
+    e.target.value = '';
+    return;
+  }
+
+  statusEl.textContent = `${file.name}（${fileMB}MB）を文字起こし中...（時間がかかります）`;
   try {
     const formData = new FormData();
     formData.append('video', file);
@@ -1007,9 +1019,21 @@ async function handleLearnAudio(e, mode) {
   const file = e.target.files[0];
   if (!file) return;
   const statusEl = mode === 'add' ? DOM.learnStatus : DOM.editLearnStatus;
-  statusEl.textContent = `${file.name} を文字起こし中...`;
   statusEl.style.color = '';
   statusEl.style.whiteSpace = '';
+
+  // ファイルサイズ事前チェック（200MB超はアップロード不可）
+  const MAX_AUDIO_MB = 200;
+  const fileMB = Math.round(file.size / 1024 / 1024);
+  if (file.size > MAX_AUDIO_MB * 1024 * 1024) {
+    statusEl.textContent = `❌ ファイルが大きすぎます（${fileMB}MB）\nサーバーへのアップロード上限は200MBです\n💡 YouTube URLを「YouTube」ボタンで入力するか、音声を短く分割してお試しください`;
+    statusEl.style.color = 'var(--accent-red)';
+    statusEl.style.whiteSpace = 'pre-line';
+    e.target.value = '';
+    return;
+  }
+
+  statusEl.textContent = `${file.name}（${fileMB}MB）を文字起こし中...（圧縮処理を含むため時間がかかります）`;
   try {
     const formData = new FormData();
     formData.append('audio', file);
@@ -1055,8 +1079,8 @@ function translateLearnError(errorMsg, type) {
   if (msg.includes('video unavailable') || msg.includes('private video')) {
     return '❌ この動画は非公開または削除されています';
   }
-  if (msg.includes('maximum content size') || msg.includes('413')) {
-    return '❌ 音声ファイルが大きすぎます（25MB超）\n動画を10分以内に分割してください';
+  if (msg.includes('maximum content size') || msg.includes('413') || msg.includes('request entity too large')) {
+    return '❌ ファイルが大きすぎてサーバーに届きませんでした\nYouTube URLを入力して「YouTube」ボタンをお試しください';
   }
   if (msg.includes('ffmpeg') || msg.includes('no such file')) {
     return '❌ 動画処理ツールが見つかりません\nYouTube URLを代わりにお試しください';
