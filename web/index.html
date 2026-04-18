@@ -175,6 +175,31 @@
     ::-webkit-scrollbar{width:6px;height:6px;}
     ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
 
+    /* ===== アクションバー（まとめ・ファシリ介入）PC・モバイル共通 ===== */
+    .mobile-action-bar{
+      display:none; /* hidden時はnone、表示時はflex */
+      background:var(--bg-surface);
+      border-top:1px solid var(--border-subtle);
+      padding:8px 16px;
+      gap:8px;
+      flex-shrink:0;
+      justify-content:flex-end;
+      align-items:center;
+    }
+    .mobile-action-bar .btn{font-size:12px;padding:7px 14px;}
+    .mobile-action-bar:not(.hidden){display:flex;}
+    /* モバイルのみfixed配置に上書き */
+    @media (max-width: 768px) {
+      .mobile-action-bar{
+        position:fixed;bottom:0;left:0;right:0;
+        padding:8px 12px;
+        padding-bottom:calc(8px + var(--sab));
+        justify-content:center;
+        z-index:30;
+      }
+      .mobile-action-bar .btn{flex:1;max-width:160px;}
+    }
+
     /* ===== モバイル用パネルボタン（PC時は非表示） ===== */
     .mobile-panel-btn{display:none;}
     .panel-overlay{display:none;position:fixed;inset:0;z-index:40;background:rgba(0,0,0,0.5);}
@@ -187,13 +212,11 @@
       .logo{font-size:15px;}
       .btn{padding:6px 8px;font-size:11px;}
       .header-right{gap:4px;}
-      /* ヘッダーの「まとめる」「ファシリテータ介入」は短縮表示 */
-      #summarizeBtn::before{content:'📝';} 
-      #summarizeBtn{font-size:0;}
-      #summarizeBtn::before{font-size:16px;}
-      #facilitatorBtn::before{content:'🎯';}
-      #facilitatorBtn{font-size:0;}
-      #facilitatorBtn::before{font-size:16px;}
+      /* ヘッダーの「まとめる」「ファシリテータ介入」をモバイルでは完全非表示 */
+      #summarizeBtn{display:none!important;}
+      #facilitatorBtn{display:none!important;}
+      /* モバイル用アクションバーを表示 */
+      /* mobile-action-barのfixed化はCSSブロック内で処理済み */
 
       /* 議題バー */
       .theme-bar{padding:8px 10px;gap:6px;flex-wrap:wrap;}
@@ -231,7 +254,7 @@
       .welcome-sub{font-size:12px;}
 
       /* 入力エリア */
-      .chat-input-area{padding:8px 10px calc(60px + var(--sab)) 10px;gap:6px;} /* 下余白で👥ボタンと重ならないよう */
+      .chat-input-area{padding:8px 10px calc(120px + var(--sab)) 10px;gap:6px;} /* 下余白でモバイルアクションバーと重ならないよう */
       .chat-input{font-size:14px;padding:10px 12px;min-height:42px;}
       .action-row{gap:4px;flex-wrap:wrap;}
       .action-label{display:none;}
@@ -296,8 +319,8 @@
     <div id="authArea">
       <button class="btn" id="loginBtnHeader">🔑 ログイン</button>
     </div>
-    <button class="btn btn-orange" id="summarizeBtn" disabled>🤔 議論のまとめ</button>
-    <button class="btn btn-purple" id="facilitatorBtn" disabled>🎯 ファシリテータ介入</button>
+    <button class="btn btn-orange" id="summarizeBtn" disabled style="display:none;">🤔 議論のまとめ</button>
+    <button class="btn btn-purple" id="facilitatorBtn" disabled style="display:none;">🎯 ファシリテータ介入</button>
   </div>
 </header>
 
@@ -369,6 +392,12 @@
 
 <!-- モバイル用メンバーパネル開閉ボタン -->
 <button class="mobile-panel-btn" id="mobilePanelBtn">👥</button>
+
+<!-- モバイル用アクションバー（まとめ・ファシリテーター） -->
+<div class="mobile-action-bar hidden" id="mobileActionBar">
+  <button class="btn btn-orange" id="mobileSummarizeBtn" disabled>📝 まとめ</button>
+  <button class="btn btn-purple" id="mobileFacilitatorBtn" disabled>🎯 ファシリ介入</button>
+</div>
 
 <!-- メンバー選択モーダル -->
 <div class="modal-overlay hidden" id="memberSelectModal">

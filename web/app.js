@@ -54,6 +54,7 @@ const DOM = {
   addAvatarPreview: $('addAvatarPreview'), editAvatarPreview: $('editAvatarPreview'),
   learnDataList: $('learnDataList'), editLearnDataList: $('editLearnDataList'),
   learnStatus: $('learnStatus'), editLearnStatus: $('editLearnStatus'),
+  mobileActionBar: $('mobileActionBar'), mobileSummarizeBtn: $('mobileSummarizeBtn'), mobileFacilitatorBtn: $('mobileFacilitatorBtn'),
   memberSelectModal: $('memberSelectModal'),
   cancelMemberSelect: $('cancelMemberSelect'),
   confirmMemberSelect: $('confirmMemberSelect'),
@@ -730,6 +731,10 @@ async function startMeeting() {
     renderMemberList(); renderMemberTriggers();
     addSystemMessage(`会議を開始しました。議題：${State.topic}`);
     showToast('会議を開始しました！', 'success');
+    // モバイルアクションバーを表示
+    if (DOM.mobileActionBar) { DOM.mobileActionBar.classList.remove('hidden'); }
+    if (DOM.mobileSummarizeBtn) DOM.mobileSummarizeBtn.disabled = false;
+    if (DOM.mobileFacilitatorBtn) DOM.mobileFacilitatorBtn.disabled = false;
     await invokeFacilitator();
   } catch (e) { showToast(translateApiError(e.message, '会議の開始'), 'error'); }
   finally { setLoading(false); }
@@ -749,6 +754,10 @@ function resetMeeting() {
   DOM.startMeetingBtn.disabled = false; DOM.facilitatorBtn.disabled = true;
   DOM.autoDiscussBtn.disabled = true; DOM.summarizeBtn.disabled = true;
   State.selectedMemberIds = State.members.map(m => m.id);
+  // モバイルアクションバーを非表示
+  if (DOM.mobileActionBar) { DOM.mobileActionBar.classList.add('hidden'); }
+  if (DOM.mobileSummarizeBtn) DOM.mobileSummarizeBtn.disabled = true;
+  if (DOM.mobileFacilitatorBtn) DOM.mobileFacilitatorBtn.disabled = true;
   renderMemberList();
 }
 
@@ -980,6 +989,9 @@ function setStreamingButtons(isStreaming) {
   DOM.sendBtn.disabled = isStreaming; DOM.allRespondBtn.disabled = isStreaming;
   DOM.autoDiscussBtn.disabled = isStreaming; DOM.facilitatorBtn.disabled = isStreaming;
   DOM.memberTriggers.querySelectorAll('.member-trigger-btn').forEach(btn => btn.disabled = isStreaming);
+  // モバイルボタンも連動
+  if (DOM.mobileSummarizeBtn) DOM.mobileSummarizeBtn.disabled = isStreaming || !State.sessionId;
+  if (DOM.mobileFacilitatorBtn) DOM.mobileFacilitatorBtn.disabled = isStreaming || !State.sessionId;
 }
 
 function setLoading(isLoading) {
@@ -1363,4 +1375,10 @@ async function reloadPersonas() {
   } catch (e) { showToast(translateApiError(e.message, 'ペルソナの再読み込み'), 'error'); }
 }
 
-document.addEventListener('DOMContentLoaded', init);
+// モバイルアクションバーのボタンをPC版と連動
+function initMobileActionBar() {
+  if (DOM.mobileSummarizeBtn) DOM.mobileSummarizeBtn.addEventListener('click', summarizeMeeting);
+  if (DOM.mobileFacilitatorBtn) DOM.mobileFacilitatorBtn.addEventListener('click', invokeFacilitator);
+}
+
+document.addEventListener('DOMContentLoaded', () => { init(); initMobileActionBar(); });
