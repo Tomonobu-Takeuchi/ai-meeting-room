@@ -270,18 +270,18 @@ def fetch_learn_youtube():
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     ydl.download([url])
 
-                # mp3ファイルを探す（postprocessor成功時）
-                mp3_files = glob.glob(f'{tmpdir}/audio.mp3')
-                if mp3_files:
-                    audio_path = mp3_files[0]
+                # 変換済み音声ファイルを探す（postprocessor成功時）
+                converted_files = glob.glob(f'{tmpdir}/audio.mp3') + glob.glob(f'{tmpdir}/audio.m4a')
+                if converted_files:
+                    audio_path = converted_files[0]
                 else:
                     # postprocessorが失敗した場合、元ファイルをffmpegで直接変換
-                    raw_files = [f for f in glob.glob(f'{tmpdir}/audio.*') if not f.endswith('.mp3')]
+                    raw_files = [f for f in glob.glob(f'{tmpdir}/audio.*') if not f.endswith('.m4a')]
                     if not raw_files:
                         raise Exception("動画のダウンロードに失敗しました。非公開・地域制限の動画の可能性があります。")
-                    converted_path = f'{tmpdir}/audio_conv.mp3'
+                    converted_path = f'{tmpdir}/audio_conv.m4a'
                     conv = subprocess.run(
-                        ["ffmpeg", "-i", raw_files[0], "-vn", "-acodec", "libmp3lame",
+                        ["ffmpeg", "-i", raw_files[0], "-vn", "-acodec", "aac",
                          "-b:a", "32k", "-ar", "16000", "-ac", "1", converted_path, "-y"],
                         capture_output=True, timeout=180
                     )
@@ -292,9 +292,9 @@ def fetch_learn_youtube():
                 # Whisper送信前：ファイルサイズ確認 + 安全な再エンコード
                 if os.path.getsize(audio_path) == 0:
                     raise Exception("音声ファイルが空です。動画に音声トラックがない可能性があります。")
-                safe_path = f'{tmpdir}/audio_safe.mp3'
+                safe_path = f'{tmpdir}/audio_safe.m4a'
                 re_enc = subprocess.run(
-                    ["ffmpeg", "-i", audio_path, "-acodec", "libmp3lame",
+                    ["ffmpeg", "-i", audio_path, "-acodec", "aac",
                      "-b:a", "32k", "-ar", "16000", "-ac", "1", safe_path, "-y"],
                     capture_output=True, timeout=180
                 )
@@ -326,7 +326,7 @@ def fetch_learn_youtube():
                     full_text = ""
                     for i in range(num_chunks):
                         start = i * chunk_duration
-                        chunk_path = f'{tmpdir}/chunk_{i}.mp3'
+                        chunk_path = f'{tmpdir}/chunk_{i}.m4a'
                         subprocess.run(
                             ["ffmpeg", "-i", audio_path, "-ss", str(start),
                              "-t", str(chunk_duration), "-acodec", "copy",
@@ -359,15 +359,15 @@ def transcribe_audio():
 
         # 32kbpsモノラルに圧縮（1時間20分のmp3でも約19MBになる）
         with tempfile.TemporaryDirectory() as tmpdir:
-            compressed_path = f'{tmpdir}/audio_compressed.mp3'
+            compressed_path = f'{tmpdir}/audio_compressed.m4a'
             proc = subprocess.run(
-                ["ffmpeg", "-i", raw_path, "-vn", "-acodec", "libmp3lame",
+                ["ffmpeg", "-i", raw_path, "-vn", "-acodec", "aac",
                  "-b:a", "32k", "-ar", "16000", "-ac", "1", compressed_path, "-y"],
                 capture_output=True, timeout=300
             )
             os.unlink(raw_path)
             if proc.returncode != 0 or not os.path.exists(compressed_path) or os.path.getsize(compressed_path) == 0:
-                raise Exception("音声ファイルの変換に失敗しました。対応していない形式の可能性があります。")
+                raise Exception("音声の変換に失敗しました。対応していない形式の可能性があります。")
 
             file_size = os.path.getsize(compressed_path)
             MAX_SIZE = 24 * 1024 * 1024
@@ -394,7 +394,7 @@ def transcribe_audio():
                 full_text = ""
                 for i in range(num_chunks):
                     start = i * chunk_duration
-                    chunk_path = f'{tmpdir}/chunk_{i}.mp3'
+                    chunk_path = f'{tmpdir}/chunk_{i}.m4a'
                     subprocess.run(
                         ["ffmpeg", "-i", compressed_path, "-ss", str(start),
                          "-t", str(chunk_duration), "-acodec", "copy",
@@ -425,15 +425,16 @@ def transcribe_video():
             video_path = f.name
 
         # 音声抽出（32kbps モノラルで圧縮）
-        audio_path = video_path.replace(suffix, ".mp3")
+        # ★ suffixを単純replace→入力と同じパスになるバグを修正。splitextで安全に生成
+        audio_path = os.path.splitext(video_path)[0] + "_audio.m4a"
         proc = subprocess.run(
-            ["ffmpeg", "-i", video_path, "-vn", "-acodec", "libmp3lame",
+            ["ffmpeg", "-i", video_path, "-vn", "-acodec", "aac",
              "-b:a", "32k", "-ar", "16000", "-ac", "1", audio_path, "-y"],
             capture_output=True, timeout=300
         )
         os.unlink(video_path)
         if proc.returncode != 0 or not os.path.exists(audio_path) or os.path.getsize(audio_path) == 0:
-            raise Exception("音声抽出に失敗しました。動画に音声トラックがないか、対応していない形式の可能性があります。")
+            raise Exception("音声の変換に失敗しました。動画に音声トラックがないか、対応していない形式の可能性があります。")
 
         file_size = os.path.getsize(audio_path)
         MAX_SIZE = 24 * 1024 * 1024  # 24MB（余裕を持って）
@@ -468,7 +469,7 @@ def transcribe_video():
             with tempfile.TemporaryDirectory() as tmpdir:
                 for i in range(num_chunks):
                     start = i * chunk_duration
-                    chunk_path = f"{tmpdir}/chunk_{i}.mp3"
+                    chunk_path = f"{tmpdir}/chunk_{i}.m4a"
                     subprocess.run(
                         ["ffmpeg", "-i", audio_path, "-ss", str(start),
                          "-t", str(chunk_duration), "-acodec", "copy",
