@@ -75,7 +75,7 @@
     .member-status.online{background:var(--accent-green);box-shadow:0 0 6px rgba(22,163,74,0.6);}
     .member-status.speaking{background:#F59E0B;box-shadow:0 0 6px rgba(245,158,11,0.6);animation:pulse 1s infinite;}
     @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
-    .panel-actions{padding:12px;border-top:1px solid var(--border);}
+    .panel-actions{padding:12px;border-top:1px solid var(--border);flex-shrink:0;}
     .chat-area{flex:1;display:flex;flex-direction:column;overflow:hidden;}
     .chat-messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px;}
     .chat-messages::-webkit-scrollbar{width:6px;}
@@ -177,7 +177,7 @@
 
     /* ===== アクションバー（まとめ・ファシリ介入）PC・モバイル共通 ===== */
     .mobile-action-bar{
-      display:none; /* hidden時はnone、表示時はflex */
+      display:none;
       background:var(--bg-surface);
       border-top:1px solid var(--border-subtle);
       padding:8px 16px;
@@ -186,11 +186,12 @@
       justify-content:flex-end;
       align-items:center;
     }
+    .mobile-action-bar.visible{display:flex;}
     .mobile-action-bar .btn{font-size:12px;padding:7px 14px;}
-    .mobile-action-bar:not(.hidden){display:flex;}
     /* モバイルのみfixed配置に上書き */
     @media (max-width: 768px) {
-      .mobile-action-bar{
+      .mobile-action-bar.visible{
+        display:flex;
         position:fixed;bottom:0;left:0;right:0;
         padding:8px 12px;
         padding-bottom:calc(8px + var(--sab));
@@ -230,9 +231,12 @@
       .left-panel{
         position:absolute;left:0;top:0;bottom:0;z-index:50;
         transform:translateX(-100%);transition:transform 0.25s ease;
-        width:200px;min-width:200px;box-shadow:4px 0 20px rgba(0,0,0,0.6);
+        width:220px;min-width:220px;box-shadow:4px 0 20px rgba(0,0,0,0.6);
+        display:flex;flex-direction:column;
       }
       .left-panel.open{transform:translateX(0);}
+      .left-panel .member-list{flex:1;overflow-y:auto;}
+      .left-panel .panel-actions{position:sticky;bottom:0;background:var(--bg-surface);}
 
       /* メンバーパネル開閉ボタン */
       .mobile-panel-btn{
