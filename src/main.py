@@ -231,84 +231,57 @@ def fetch_learn_youtube():
     except Exception as e:
         return jsonify({"error": f"字幕取得エラー: {str(e)}"}), 500
 
-@app.route("/api/learn/extract-pdf", methods=["POST"])
-def extract_pdf():
-    """PDFからテキストを抽出する"""
-    pdf_file = request.files.get("pdf")
-    if not pdf_file:
-        return jsonify({"error": "PDFファイルが見つかりません"}), 400
-    try:
-        import pdfplumber, tempfile
-        suffix = '.pdf'
-        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
-            pdf_file.save(f.name)
-            temp_path = f.name
-        text = ''
-        with pdfplumber.open(temp_path) as pdf:
-            for page in pdf.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    text += page_text + '\n'
-        os.unlink(temp_path)
-        if not text.strip():
-            return jsonify({"error": "PDFからテキストを抽出できませんでした（スキャン画像PDFの可能性があります）"}), 400
-        return jsonify({"text": text[:10000], "chars": len(text)})
-    except Exception as e:
-        return jsonify({"error": f"PDF抽出エラー: {str(e)}"}), 500
-
-@app.route("/api/learn/transcribe-video", methods=["POST"])
-def transcribe_video():
-    """動画ファイルから音声を抽出して文字起こし"""
-    video_file = request.files.get("video")
-    if not video_file:
-        return jsonify({"error": "動画ファイルが見つかりません"}), 400
-    try:
-        import tempfile, subprocess, speech_recognition as sr
-        suffix = os.path.splitext(video_file.filename)[1].lower()
-        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
-            video_file.save(f.name)
-            video_path = f.name
-        # ffmpegで音声抽出
-        audio_path = video_path.replace(suffix, '.wav')
-        result = subprocess.run(
-            ['ffmpeg', '-i', video_path, '-vn', '-acodec', 'pcm_s16le',
-             '-ar', '16000', '-ac', '1', audio_path, '-y'],
-            capture_output=True, timeout=120
-        )
-        os.unlink(video_path)
-        if result.returncode != 0:
-            raise Exception("音声抽出失敗（ffmpegエラー）")
-        # 音声を文字起こし
-        r = sr.Recognizer()
-        with sr.AudioFile(audio_path) as source:
-            audio = r.record(source)
-        text = r.recognize_google(audio, language='ja-JP')
-        os.unlink(audio_path)
-        return jsonify({"text": text})
-    except Exception as e:
-        if 'video_path' in dir() and os.path.exists(video_path):
-            os.unlink(video_path)
-        return jsonify({"error": f"動画文字起こしエラー: {str(e)}"}), 500
-
 @app.route("/api/learn/transcribe-audio", methods=["POST"])
 def transcribe_audio():
     audio_file = request.files.get("audio")
     if not audio_file:
         return jsonify({"error": "音声ファイルが見つかりません"}), 400
     try:
-        import tempfile, speech_recognition as sr
-        suffix = os.path.splitext(audio_file.filename)[1].lower()
+        import tempfile, openai
+        client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        suffix = os.path.splitext(audio_file.filename)[1].lower() or '.mp3'
         with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
             audio_file.save(f.name)
             temp_path = f.name
-        r = sr.Recognizer()
-        with sr.AudioFile(temp_path) as source:
-            audio = r.record(source)
-        text = r.recognize_google(audio, language='ja-JP')
+        with open(temp_path, 'rb') as af:
+            result = client.audio.transcriptions.create(
+                model="whisper-1", file=af, language="ja"
+            )
         os.unlink(temp_path)
-        return jsonify({"text": text})
+        return jsonify({"text": result.text})
     except Exception as e:
         return jsonify({"error": f"文字起こしエラー: {str(e)}"}), 500
+
+
+@app.route("/api/learn/transcribe-video", methods=["POST"])
+def transcribe_video():
+    video_file = request.files.get("video")
+    if not video_file:
+        return jsonify({"error": "動画ファイルが見つかりません"}), 400
+    try:
+        import tempfile, subprocess, openai
+        client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        suffix = os.path.splitext(video_file.filename)[1].lower() or ".mp4"
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
+            video_file.save(f.name)
+            video_path = f.name
+        audio_path = video_path.replace(suffix, ".mp3")
+        proc = subprocess.run(
+            ["ffmpeg", "-i", video_path, "-vn", "-acodec", "mp3",
+             "-ar", "16000", "-ac", "1", audio_path, "-y"],
+            capture_output=True, timeout=120
+        )
+        os.unlink(video_path)
+        if proc.returncode != 0:
+            raise Exception("音声抽出失敗（ffmpegエラー）")
+        with open(audio_path, "rb") as af:
+            transcription = client.audio.transcriptions.create(
+                model="whisper-1", file=af, language="ja"
+            )
+        os.unlink(audio_path)
+        return jsonify({"text": transcription.text})
+    except Exception as e:
+        return jsonify({"error": f"動画文字起こしエラー: {str(e)}"}), 500
 
 
 # ===== 会議API =====
