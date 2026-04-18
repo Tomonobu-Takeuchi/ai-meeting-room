@@ -1018,8 +1018,8 @@ async function handleLearnVideo(e, mode) {
     const formData = new FormData();
     formData.append('video', file);
     const res = await fetch('/api/learn/transcribe-video', { method: 'POST', body: formData });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || '動画文字起こし失敗');
+    let data; try { data = await res.json(); } catch { data = {}; }
+    if (!res.ok) throw new Error(data.error || (res.status === 504 || res.status === 502 ? 'サーバーがタイムアウトしました。ファイルが大きすぎるか処理時間が超過した可能性があります。' : `サーバーエラー（${res.status}）が発生しました。`));
     const listKey = mode === 'add' ? 'addLearnFiles' : 'editLearnFiles';
     State[listKey].push({ name: `🎬 ${file.name}`, type: 'text', content: data.text });
     renderLearnDataList(mode);
@@ -1053,8 +1053,8 @@ async function fetchLearnUrl(mode, type) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || '取得失敗');
+    let data; try { data = await res.json(); } catch { data = {}; }
+    if (!res.ok) throw new Error(data.error || (res.status === 504 || res.status === 502 ? 'サーバーがタイムアウトしました。しばらく待ってから再試行してください。' : `サーバーエラー（${res.status}）が発生しました。`));
 
     const listKey = mode === 'add' ? 'addLearnFiles' : 'editLearnFiles';
     const icon = type === 'youtube' ? '▶' : '🌐';
@@ -1096,8 +1096,8 @@ async function handleLearnAudio(e, mode) {
     const formData = new FormData();
     formData.append('audio', file);
     const res = await fetch('/api/learn/transcribe-audio', { method: 'POST', body: formData });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || '文字起こし失敗');
+    let data; try { data = await res.json(); } catch { data = {}; }
+    if (!res.ok) throw new Error(data.error || (res.status === 504 || res.status === 502 ? 'サーバーがタイムアウトしました。ファイルが大きすぎるか処理時間が超過した可能性があります。' : `サーバーエラー（${res.status}）が発生しました。`));
 
     const listKey = mode === 'add' ? 'addLearnFiles' : 'editLearnFiles';
     State[listKey].push({ name: `🎵 ${file.name}`, type: 'text', content: data.text });
@@ -1124,8 +1124,11 @@ function translateLearnError(errorMsg, type) {
   if (msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('network request failed')) {
     return '❌ サーバーに接続できませんでした\nインターネット接続を確認して再試行してください';
   }
-  if (msg.includes('timeout') || msg.includes('timed out')) {
-    return '⚠️ 処理がタイムアウトしました\n動画が長すぎる可能性があります（目安：90分以内）\nしばらく待ってから再試行してください';
+  if (msg.includes('タイムアウトしました') || msg.includes('timeout') || msg.includes('timed out')) {
+    return '⚠️ 処理がタイムアウトしました\n大きなファイルや長い動画は時間がかかります\n💡 YouTubeの場合はURLを「YouTube」ボタンで入力するか\n　 ファイルを短く分割してからアップロードしてください';
+  }
+  if (msg.includes('サーバーエラー') || msg.includes('502') || msg.includes('504') || msg.includes('bad gateway') || msg.includes('gateway timeout')) {
+    return '⚠️ サーバーで一時的なエラーが発生しました\nしばらく待ってから再試行してください\n💡 大きなファイルは処理に時間がかかるため、繰り返し失敗する場合は\n　 ファイルを短く分割するか YouTube URLをお試しください';
   }
   if (msg.includes('maximum content size') || msg.includes('413') || msg.includes('request entity too large')) {
     return '❌ ファイルが大きすぎてサーバーに届きませんでした\nYouTube URLを「YouTube」ボタンで入力するか\n動画をmp3に変換してからアップロードしてください';
