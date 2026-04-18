@@ -320,6 +320,8 @@ async function init() {
   $('editLearnTextFile').addEventListener('change', (e) => handleLearnFiles(e, 'edit', 'text'));
   $('editLearnImageFile').addEventListener('change', (e) => handleLearnFiles(e, 'edit', 'image'));
   $('editLearnAudioFile').addEventListener('change', (e) => handleLearnAudio(e, 'edit'));
+  $('learnVideoFile')?.addEventListener('change', (e) => handleLearnVideo(e, 'add'));
+  $('editLearnVideoFile')?.addEventListener('change', (e) => handleLearnVideo(e, 'edit'));
   $('addFetchWebBtn').addEventListener('click', () => fetchLearnUrl('add', 'web'));
   $('addFetchYoutubeBtn').addEventListener('click', () => fetchLearnUrl('add', 'youtube'));
   $('editFetchWebBtn').addEventListener('click', () => fetchLearnUrl('edit', 'web'));
@@ -421,8 +423,24 @@ async function handleLearnFiles(e, mode, type) {
     statusEl.textContent = `${file.name} を読み込み中...`;
     let content = '', fileType = type;
     if (type === 'text') {
-      if (file.name.endsWith('.pdf')) { content = `[PDFファイル: ${file.name}]`; fileType = 'pdf'; }
-      else { content = await readFileAsText(file); }
+      if (file.name.endsWith('.pdf')) {
+        statusEl.textContent = `${file.name} のテキストを抽出中...`;
+        try {
+          const formData = new FormData();
+          formData.append('pdf', file);
+          const res = await fetch('/api/learn/extract-pdf', { method: 'POST', body: formData });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'PDF抽出失敗');
+          content = data.text;
+          fileType = 'pdf';
+          statusEl.textContent = `✓ ${file.name}（${data.chars}文字）を抽出しました`;
+          setTimeout(() => { statusEl.textContent = ''; }, 3000);
+        } catch (err) {
+          statusEl.textContent = `エラー: ${err.message}`;
+          setTimeout(() => { statusEl.textContent = ''; }, 4000);
+          continue;
+        }
+      } else { content = await readFileAsText(file); }
     } else if (type === 'image') { content = await readFileAsDataUrl(file); fileType = 'image'; }
     State[listKey].push({ name: file.name, type: fileType, content });
     statusEl.textContent = `✓ ${file.name} を読み込みました`;
@@ -586,10 +604,6 @@ async function submitEditPersona() {
     const data = await API.put(`/api/personas/${memberId}`, { name, avatar, description, personality, speaking_style: speakingStyle, background, color });
     const idx = State.members.findIndex(m => m.id === memberId);
     if (idx >= 0) State.members[idx] = { ...State.members[idx], ...data.persona };
-
-    // ★ 学習データをDBに保存
-    await saveLearnFilesToDB(memberId, State.editLearnFiles);
-
     renderMemberList(); closeEditModal();
     showToast(`${name} の設定を保存しました`, 'success');
   } catch (e) { showToast('保存エラー: ' + e.message, 'error'); }
@@ -773,31 +787,10 @@ async function submitAddPersona() {
   try {
     const data = await API.post('/api/personas/add', { name, avatar, description, personality, speaking_style: speakingStyle, background, role: 'member', color });
     if (State.addAvatarDataUrl) State.avatarImages[data.persona.id] = State.addAvatarDataUrl;
-
-    // ★ 学習データをDBに保存
-    await saveLearnFilesToDB(data.persona.id, State.addLearnFiles);
-
     State.members.push(data.persona); State.selectedMemberIds.push(data.persona.id);
     renderMemberList(); closeAddModal();
     showToast(`${name} を追加しました`, 'success');
   } catch (e) { showToast('追加エラー: ' + e.message, 'error'); }
-}
-
-async function saveLearnFilesToDB(personaId, learnFiles) {
-  if (!learnFiles || learnFiles.length === 0) return;
-  let savedCount = 0;
-  for (const file of learnFiles) {
-    try {
-      const content = file.content || '';
-      if (!content || content.length < 5) continue;
-      const source = file.name || file.url || file.type || '手動入力';
-      await API.post(`/api/personas/${personaId}/learn`, { content, source });
-      savedCount++;
-    } catch (e) {
-      console.error('学習データ保存エラー:', e);
-    }
-  }
-  if (savedCount > 0) showToast(`学習データ ${savedCount}件 を保存しました`, 'success');
 }
 
 function handleFileAttach(e) {
@@ -919,6 +912,30 @@ function scrollToBottom() { DOM.chatMessages.scrollTop = DOM.chatMessages.scroll
 function showToast(msg, type = 'info') {
   const toast = document.createElement('div'); toast.className = `toast ${type}`; toast.textContent = msg;
   DOM.toastContainer.appendChild(toast); setTimeout(() => toast.remove(), 3500);
+}
+
+// ★ 動画ファイルを文字起こして学習データに追加
+async function handleLearnVideo(e, mode) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const statusEl = mode === 'add' ? DOM.learnStatus : DOM.editLearnStatus;
+  statusEl.textContent = `${file.name} を文字起こし中...（時間がかかります）`;
+  try {
+    const formData = new FormData();
+    formData.append('video', file);
+    const res = await fetch('/api/learn/transcribe-video', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '動画文字起こし失敗');
+    const listKey = mode === 'add' ? 'addLearnFiles' : 'editLearnFiles';
+    State[listKey].push({ name: `🎬 ${file.name}`, type: 'text', content: data.text });
+    renderLearnDataList(mode);
+    statusEl.textContent = `✓ 文字起こし完了（${data.text.length}文字）`;
+    setTimeout(() => { statusEl.textContent = ''; }, 3000);
+  } catch (e) {
+    statusEl.textContent = `エラー: ${e.message}`;
+    setTimeout(() => { statusEl.textContent = ''; }, 4000);
+  }
+  e.target.value = '';
 }
 
 // ★ URL・SNS・YouTube から学習データを取得
