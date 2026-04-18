@@ -217,15 +217,36 @@ def fetch_learn_youtube():
         return jsonify({"error": "YouTube URLを入力してください"}), 400
     try:
         import re
-        from youtube_transcript_api import YouTubeTranscriptApi
+        from youtube_transcript_api import YouTubeTranscriptApi, TranscriptList
         match = re.search(r'(?:v=|youtu\.be/)([a-zA-Z0-9_-]{11})', url)
         if not match:
             return jsonify({"error": "YouTube URLが正しくありません"}), 400
         video_id = match.group(1)
+        transcript = None
+        # 優先順位：日本語手動 → 日本語自動生成 → 英語手動 → 英語自動生成 → 何でも最初の1つ
         try:
-            transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=['ja'])
+            transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+            for lang in ['ja', 'en']:
+                try:
+                    t = transcript_list.find_transcript([lang])
+                    transcript = t.fetch()
+                    break
+                except Exception:
+                    try:
+                        t = transcript_list.find_generated_transcript([lang])
+                        transcript = t.fetch()
+                        break
+                    except Exception:
+                        continue
+            if transcript is None:
+                # 全言語から最初の字幕を取得
+                for t in transcript_list:
+                    transcript = t.fetch()
+                    break
         except Exception:
-            transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=['en'])
+            transcript = YouTubeTranscriptApi.get_transcript(video_id)
+        if not transcript:
+            return jsonify({"error": "字幕が見つかりませんでした"}), 400
         text = ' '.join([t['text'] for t in transcript])[:4000]
         return jsonify({"text": text, "url": url})
     except Exception as e:
