@@ -732,7 +732,7 @@ async function startMeeting() {
     addSystemMessage(`会議を開始しました。議題：${State.topic}`);
     showToast('会議を開始しました！', 'success');
     // モバイルアクションバーを表示
-    if (DOM.mobileActionBar) { DOM.mobileActionBar.classList.remove('hidden'); }
+    if (DOM.mobileActionBar) { DOM.mobileActionBar.classList.add('visible'); }
     if (DOM.mobileSummarizeBtn) DOM.mobileSummarizeBtn.disabled = false;
     if (DOM.mobileFacilitatorBtn) DOM.mobileFacilitatorBtn.disabled = false;
     await invokeFacilitator();
@@ -755,7 +755,7 @@ function resetMeeting() {
   DOM.autoDiscussBtn.disabled = true; DOM.summarizeBtn.disabled = true;
   State.selectedMemberIds = State.members.map(m => m.id);
   // モバイルアクションバーを非表示
-  if (DOM.mobileActionBar) { DOM.mobileActionBar.classList.add('hidden'); }
+  if (DOM.mobileActionBar) { DOM.mobileActionBar.classList.remove('visible'); }
   if (DOM.mobileSummarizeBtn) DOM.mobileSummarizeBtn.disabled = true;
   if (DOM.mobileFacilitatorBtn) DOM.mobileFacilitatorBtn.disabled = true;
   renderMemberList();
