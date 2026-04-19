@@ -25,6 +25,7 @@ app = Flask(
     static_url_path=""
 )
 app.secret_key = os.environ.get('SECRET_KEY', 'ai-persona-secret-key-2026')
+app.config['JSON_ENSURE_ASCII'] = False  # 日本語をUnicodeエスケープしない
 
 init_db()
 persona_manager = PersonaManager()
