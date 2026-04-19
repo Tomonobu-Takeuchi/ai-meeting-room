@@ -1233,7 +1233,16 @@ function translateApiError(errorMsg, context) {
   if (msg.includes('insufficient_quota') || msg.includes('quota')) {
     return 'AIサービスの利用上限に達しました。管理者にお問い合わせください。';
   }
-  if (msg.includes('unauthorized') || msg.includes('401') || msg.includes('ログインが必要')) {
+  // Anthropic API認証エラー（"error code: 401" の形式）
+  if (msg.includes('authentication_error') || msg.includes('invalid x-api-key') || msg.includes('invalid api key')) {
+    return '⚠️ AIサービスの認証に失敗しました。APIキーを確認してください。';
+  }
+  // サーバーログインエラー（Flaskが返す "ログインが必要です" のみ）
+  if (msg.includes('ログインが必要') || msg === 'unauthorized') {
+    return 'ログインが必要です。右上の「ログイン」からログインしてください。';
+  }
+  // 汎用401（ただしAnthropicエラーは上で捕捉済みのため、ここに来るのはFlask 401のみ）
+  if (msg.includes('unauthorized')) {
     return 'ログインが必要です。右上の「ログイン」からログインしてください。';
   }
   if (msg.includes('not found') || msg.includes('404')) {
