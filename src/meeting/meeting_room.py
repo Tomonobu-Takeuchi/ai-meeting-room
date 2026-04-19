@@ -112,7 +112,7 @@ class MeetingRoom:
             return
         discussion_text = self._format_discussion(session)
         system_prompt = self.persona_manager.build_facilitator_prompt(
-            session["topic"], session["members"], discussion_text
+            session["facilitator"], session["topic"], discussion_text
         )
         try:
             full_response = ""
