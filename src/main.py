@@ -180,6 +180,11 @@ def add_learn_data(persona_id):
     if not content:
         return jsonify({"error": "コンテンツが空です"}), 400
     count = persona_manager.add_learn_data(persona_id, content, source, user_id)
+    # Growth: 知識量スコア更新
+    try:
+        persona_manager.on_learn_data_added(persona_id, user_id, content)
+    except Exception as e:
+        print(f"Growth知識更新エラー（無視）: {e}")
     return jsonify({"message": "学習データを保存しました", "total_count": count})
 
 @app.route("/api/personas/<persona_id>/learn/<int:learn_id>", methods=["DELETE"])
@@ -648,6 +653,11 @@ JSONのみ出力してください。"""
                 persona_manager.increment_persona_meeting_count(member['id'], _uid)
         except Exception as e:
             print(f"Phase3エラー（無視）: {e}")
+        # ===== Growth: 成熟度スコア更新 =====
+        try:
+            persona_manager.on_conversation_end(summary, _uid)
+        except Exception as e:
+            print(f"Growthエラー（無視）: {e}")
 
         return send_file(buf, as_attachment=True, download_name=filename, mimetype='application/pdf')
     except Exception as e:
@@ -696,6 +706,18 @@ def get_persona_evolution(persona_id):
         "meeting_count": count,
         "next_level_at": [4, 10, None][min(level, 2)]
     })
+
+
+@app.route("/api/personas/<persona_id>/growth", methods=["GET"])
+def get_persona_growth(persona_id):
+    """成熟度スコアを返す"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"growth": None})
+    growth = persona_manager.get_growth(persona_id, user_id)
+    if growth:
+        growth["level_name"] = persona_manager.get_maturity_label(growth["maturity_level"])
+    return jsonify({"growth": growth})
 
 
 @app.route("/api/health")

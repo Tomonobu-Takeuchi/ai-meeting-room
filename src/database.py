@@ -420,3 +420,185 @@ def get_meeting_count(persona_id, user_id):
         return rows[0][0] if rows else 0
     finally:
         conn.close()
+
+
+# ===== Growth: 成熟度スコア管理 =====
+
+def ensure_growth_record(persona_id, user_id, app_type='meeting'):
+    """persona_growthの初期レコードを作成（なければ）"""
+    conn = get_connection()
+    try:
+        existing = conn.run("""
+            SELECT id FROM persona_growth
+            WHERE persona_id=:persona_id AND user_id=:user_id AND app_type=:app_type
+        """, persona_id=persona_id, user_id=user_id, app_type=app_type)
+        if not existing:
+            conn.run("""
+                INSERT INTO persona_growth
+                    (persona_id, user_id, app_type)
+                VALUES (:persona_id, :user_id, :app_type)
+            """, persona_id=persona_id, user_id=user_id, app_type=app_type)
+            print(f"Growth初期レコード作成: {persona_id} / user:{user_id}")
+    finally:
+        conn.close()
+
+
+def update_growth_conversation(persona_id, user_id, topic, app_type='meeting'):
+    """会話終了時にconversation_countとunique_topic_countを更新"""
+    conn = get_connection()
+    try:
+        # 既存トピック一覧を取得してユニーク数を計算
+        rows = conn.run("""
+            SELECT unique_topic_count, conversation_count FROM persona_growth
+            WHERE persona_id=:persona_id AND user_id=:user_id AND app_type=:app_type
+        """, persona_id=persona_id, user_id=user_id, app_type=app_type)
+        if not rows:
+            return
+        current_unique = rows[0][0] or 0
+        current_conv = rows[0][1] or 0
+        # トピックログをpersona_learnから取得してユニーク数を推定
+        topic_rows = conn.run("""
+            SELECT COUNT(DISTINCT source) FROM persona_learn
+            WHERE persona_id=:persona_id AND user_id=:user_id
+        """, persona_id=persona_id, user_id=user_id)
+        unique_topics = topic_rows[0][0] if topic_rows else current_unique
+        conn.run("""
+            UPDATE persona_growth
+            SET conversation_count = conversation_count + 1,
+                unique_topic_count = :unique_topics,
+                updated_at = NOW()
+            WHERE persona_id=:persona_id AND user_id=:user_id AND app_type=:app_type
+        """, persona_id=persona_id, user_id=user_id, app_type=app_type,
+             unique_topics=unique_topics)
+    finally:
+        conn.close()
+
+
+def update_growth_knowledge(persona_id, user_id, token_count, app_type='meeting'):
+    """学習データ追加時にdoc_token_countを更新"""
+    conn = get_connection()
+    try:
+        conn.run("""
+            UPDATE persona_growth
+            SET doc_token_count = doc_token_count + :token_count,
+                updated_at = NOW()
+            WHERE persona_id=:persona_id AND user_id=:user_id AND app_type=:app_type
+        """, persona_id=persona_id, user_id=user_id, app_type=app_type,
+             token_count=token_count)
+    finally:
+        conn.close()
+
+
+def calculate_and_save_maturity(persona_id, user_id, app_type='meeting'):
+    """
+    成熟度スコアを計算してDBに保存
+    score = A*0.5 + B*0.3 + C*0.2
+    """
+    conn = get_connection()
+    try:
+        rows = conn.run("""
+            SELECT doc_token_count, conversation_count, unique_topic_count,
+                   feedback_count, positive_count, recent_positive_rate,
+                   profile_completeness, avg_session_length, tuning_count
+            FROM persona_growth
+            WHERE persona_id=:persona_id AND user_id=:user_id AND app_type=:app_type
+        """, persona_id=persona_id, user_id=user_id, app_type=app_type)
+        if not rows:
+            return
+        r = rows[0]
+        doc_tokens, conv_count, unique_topics = r[0] or 0, r[1] or 0, r[2] or 0
+        feedback_count, positive_count, recent_positive = r[3] or 0, r[4] or 0, r[5] or 0.0
+        profile_comp, avg_session, tuning = r[6] or 0.0, r[7] or 0.0, r[8] or 0
+
+        # 軸A：知識量スコア（0-100）
+        a_doc = min(doc_tokens / 5000 * 40, 40)        # 最大40点（5000トークンで満点）
+        a_conv = min(conv_count / 20 * 40, 40)          # 最大40点（20回で満点）
+        a_topic = min(unique_topics / 10 * 20, 20)      # 最大20点（10トピックで満点）
+        score_knowledge = a_doc + a_conv + a_topic      # 0-100
+
+        # 軸B：応答精度スコア（0-100）
+        if feedback_count > 0:
+            positive_rate = positive_count / feedback_count
+            score_accuracy = (positive_rate * 0.7 + recent_positive * 0.3) * 100
+        else:
+            score_accuracy = 50.0  # フィードバックなし → 中立50点
+
+        # 軸C：個性スコア（0-100）
+        c_profile = min(profile_comp, 40)               # 最大40点
+        c_session = min(avg_session / 10 * 30, 30)      # 最大30点（10分で満点）
+        c_tuning = min(tuning / 5 * 30, 30)             # 最大30点（5回で満点）
+        score_personality = c_profile + c_session + c_tuning
+
+        # 総合スコア（0-100）
+        maturity_score = (
+            score_knowledge * 0.5 +
+            score_accuracy * 0.3 +
+            score_personality * 0.2
+        )
+
+        # レベル変換（1-10）
+        if maturity_score < 10:
+            level = 1
+        elif maturity_score < 20:
+            level = 2
+        elif maturity_score < 30:
+            level = 3
+        elif maturity_score < 40:
+            level = 4
+        elif maturity_score < 50:
+            level = 5
+        elif maturity_score < 60:
+            level = 6
+        elif maturity_score < 70:
+            level = 7
+        elif maturity_score < 80:
+            level = 8
+        elif maturity_score < 90:
+            level = 9
+        else:
+            level = 10
+
+        conn.run("""
+            UPDATE persona_growth
+            SET score_knowledge=:sk, score_accuracy=:sa, score_personality=:sp,
+                maturity_score=:ms, maturity_level=:ml,
+                updated_at=NOW()
+            WHERE persona_id=:persona_id AND user_id=:user_id AND app_type=:app_type
+        """, persona_id=persona_id, user_id=user_id, app_type=app_type,
+             sk=round(score_knowledge, 2), sa=round(score_accuracy, 2),
+             sp=round(score_personality, 2), ms=round(maturity_score, 2), ml=level)
+
+        return {"maturity_score": maturity_score, "maturity_level": level}
+    finally:
+        conn.close()
+
+
+def get_growth_record(persona_id, user_id, app_type='meeting'):
+    """成熟度レコードを取得"""
+    conn = get_connection()
+    try:
+        rows = conn.run("""
+            SELECT persona_id, user_id, app_type,
+                   score_knowledge, score_accuracy, score_personality,
+                   maturity_score, maturity_level,
+                   doc_token_count, conversation_count, unique_topic_count,
+                   feedback_count, positive_count, recent_positive_rate,
+                   profile_completeness, avg_session_length, tuning_count,
+                   updated_at
+            FROM persona_growth
+            WHERE persona_id=:persona_id AND user_id=:user_id AND app_type=:app_type
+        """, persona_id=persona_id, user_id=user_id, app_type=app_type)
+        if not rows:
+            return None
+        r = rows[0]
+        return {
+            "persona_id": r[0], "user_id": r[1], "app_type": r[2],
+            "score_knowledge": r[3], "score_accuracy": r[4], "score_personality": r[5],
+            "maturity_score": r[6], "maturity_level": r[7],
+            "doc_token_count": r[8], "conversation_count": r[9], "unique_topic_count": r[10],
+            "feedback_count": r[11], "positive_count": r[12], "recent_positive_rate": r[13],
+            "profile_completeness": r[14], "avg_session_length": r[15], "tuning_count": r[16],
+            "updated_at": str(r[17]) if r[17] else None
+        }
+    finally:
+        conn.close()

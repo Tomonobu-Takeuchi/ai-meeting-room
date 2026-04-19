@@ -8,7 +8,10 @@ from src.database import (
     save_learn_data, search_learn_data, get_learn_data_simple,
     get_learn_data_count, get_all_learn_data, delete_learn_data,
     save_persona_pattern, get_persona_patterns,
-    increment_meeting_count, get_meeting_count
+    increment_meeting_count, get_meeting_count,
+    ensure_growth_record, update_growth_conversation,
+    update_growth_knowledge, calculate_and_save_maturity,
+    get_growth_record
 )
 
 COLUMNS = ['id','user_id','name','avatar','description','personality',
@@ -270,6 +273,65 @@ class PersonaManager:
         if not user_id:
             return 0
         return increment_meeting_count(persona_id, user_id)
+
+    # ===== Growth: 成熟度スコア管理 =====
+
+    def ensure_growth(self, persona_id, user_id, app_type='meeting'):
+        """persona_growthの初期レコードを作成（なければ）"""
+        if user_id is None:
+            return
+        try:
+            ensure_growth_record(persona_id, user_id, app_type)
+        except Exception as e:
+            print(f"Growth初期化エラー（無視）: {e}")
+
+    def on_conversation_end(self, session_summary, user_id, app_type='meeting'):
+        """会話終了時にgrowthレコードを更新（conversation_count + maturity再計算）"""
+        if user_id is None:
+            return
+        members = session_summary.get('members', [])
+        topic = session_summary.get('topic', '')
+        for member in members:
+            persona_id = member.get('id', '')
+            if not persona_id or persona_id == 'facilitator':
+                continue
+            try:
+                ensure_growth_record(persona_id, user_id, app_type)
+                update_growth_conversation(persona_id, user_id, topic, app_type)
+                calculate_and_save_maturity(persona_id, user_id, app_type)
+            except Exception as e:
+                print(f"Growth更新エラー（無視）: {e}")
+
+    def on_learn_data_added(self, persona_id, user_id, content, app_type='meeting'):
+        """学習データ追加時にdoc_token_countを更新"""
+        if user_id is None:
+            return
+        try:
+            ensure_growth_record(persona_id, user_id, app_type)
+            token_count = len(content) // 4  # 簡易トークン数推定
+            update_growth_knowledge(persona_id, user_id, token_count, app_type)
+            calculate_and_save_maturity(persona_id, user_id, app_type)
+        except Exception as e:
+            print(f"Growth知識更新エラー（無視）: {e}")
+
+    def get_growth(self, persona_id, user_id, app_type='meeting'):
+        """成熟度レコードを取得"""
+        if user_id is None:
+            return None
+        try:
+            return get_growth_record(persona_id, user_id, app_type)
+        except Exception as e:
+            print(f"Growth取得エラー（無視）: {e}")
+            return None
+
+    # 成熟度レベル名（引き継ぎ資料の10段階）
+    MATURITY_LEVEL_NAMES = {
+        1: "入門", 2: "見習い", 3: "研究生", 4: "助手", 5: "同僚",
+        6: "専門家", 7: "論客", 8: "賢者", 9: "師匠", 10: "覚醒"
+    }
+
+    def get_maturity_label(self, level):
+        return self.MATURITY_LEVEL_NAMES.get(level, "入門")
 
     # ===== RAG学習データ =====
 
