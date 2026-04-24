@@ -170,6 +170,62 @@ function speakText(text, personaId, targetEl = null) {
   });
 }
 
+// ===== OpenAI TTS 音声再生 =====
+async function speakWithTTS(text, voiceId, targetEl = null) {
+  if (!State.voiceMode || !voiceId) return;
+  try {
+    const res = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text.slice(0, 200), voice_id: voiceId })
+    });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    if (targetEl) targetEl.classList.add('voice-speaking');
+    State.isSpeaking = true;
+    return new Promise(resolve => {
+      const done = () => {
+        State.isSpeaking = false;
+        if (targetEl) targetEl.classList.remove('voice-speaking');
+        URL.revokeObjectURL(url);
+        resolve();
+      };
+      audio.onended = done;
+      audio.onerror = done;
+      audio.play().catch(done);
+    });
+  } catch (e) {
+    console.error('TTS error:', e);
+  }
+}
+
+async function previewVoice(mode) {
+  const radioName = mode === 'add' ? 'pVoiceId' : 'eVoiceId';
+  const selected = document.querySelector(`input[name="${radioName}"]:checked`);
+  const voiceId = selected?.value;
+  if (!voiceId || voiceId === 'none') return;
+  const name = mode === 'add' ? $('pName').value.trim() : $('eName').value.trim();
+  const sampleText = name ? `こんにちは。私は${name}です。よろしくお願いします。` : 'こんにちは。よろしくお願いします。';
+  try {
+    const res = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: sampleText, voice_id: voiceId })
+    });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    audio.onended = () => URL.revokeObjectURL(url);
+    audio.onerror = () => URL.revokeObjectURL(url);
+    audio.play();
+  } catch (e) {
+    console.error('Preview TTS error:', e);
+  }
+}
+
 function stopSpeaking() {
   if (window.speechSynthesis) window.speechSynthesis.cancel();
   State.isSpeaking = false;
@@ -358,6 +414,16 @@ async function init() {
   $('addFetchYoutubeBtn').addEventListener('click', () => fetchLearnUrl('add', 'youtube'));
   $('editFetchWebBtn').addEventListener('click', () => fetchLearnUrl('edit', 'web'));
   $('editFetchYoutubeBtn').addEventListener('click', () => fetchLearnUrl('edit', 'youtube'));
+
+  // ===== 音声設定ラジオ変更でプレビューボタンのdisabled切り替え =====
+  document.querySelectorAll('input[name="pVoiceId"]').forEach(radio => {
+    radio.addEventListener('change', () => { $('addPreviewVoiceBtn').disabled = radio.value === 'none'; });
+  });
+  document.querySelectorAll('input[name="eVoiceId"]').forEach(radio => {
+    radio.addEventListener('change', () => { $('editPreviewVoiceBtn').disabled = radio.value === 'none'; });
+  });
+  $('addPreviewVoiceBtn')?.addEventListener('click', () => previewVoice('add'));
+  $('editPreviewVoiceBtn')?.addEventListener('click', () => previewVoice('edit'));
 
   // ★ URL入力欄フォーカス時に事前案内を表示
   const urlHints = [
@@ -617,6 +683,8 @@ function openAddModal() {
   $('pName').value = ''; $('pColor').value = '#8B5CF6';
   $('pDescription').value = ''; $('pPersonality').value = '';
   $('pSpeakingStyle').value = ''; $('pBackground').value = '';
+  const noneR = document.querySelector('input[name="pVoiceId"][value="none"]');
+  if (noneR) { noneR.checked = true; $('addPreviewVoiceBtn').disabled = true; }
   DOM.learnDataList.innerHTML = '';
   DOM.learnStatus.textContent = '💡 音声・動画：200MB以下のmp3/mp4に対応。それ以上はYouTube URLをご利用ください。\nYouTube：Bot制限で取得できない場合は動画ファイルを直接アップロードしてください。';
   DOM.learnStatus.style.color = 'var(--text-muted)';
@@ -639,6 +707,11 @@ function openEditModal(memberId) {
   $('eSpeakingStyle').value = member.speaking_style || ''; $('eBackground').value = member.background || '';
   DOM.editLearnDataList.innerHTML = ''; DOM.editLearnStatus.textContent = '';
   DOM.editAvatarPreview.innerHTML = State.editAvatarDataUrl ? `<img src="${State.editAvatarDataUrl}" alt="avatar" />` : (member.avatar || '👤');
+  const voiceVal = member.voice_id || 'none';
+  const voiceRadio = document.querySelector(`input[name="eVoiceId"][value="${voiceVal}"]`);
+  if (voiceRadio) { voiceRadio.checked = true; }
+  else { const nr = document.querySelector('input[name="eVoiceId"][value="none"]'); if (nr) nr.checked = true; }
+  $('editPreviewVoiceBtn').disabled = (voiceVal === 'none');
   DOM.editPersonaModal.classList.remove('hidden');
   // 保存済み学習データを読み込む
   loadSavedLearnData(memberId);
@@ -689,10 +762,11 @@ async function submitEditPersona() {
   const description = $('eDescription').value.trim(), personality = $('ePersonality').value.trim();
   const speakingStyle = $('eSpeakingStyle').value.trim(), color = $('eColor').value;
   let background = buildBackgroundFromLearnData($('eBackground').value.trim(), State.editLearnFiles);
+  const voiceId = document.querySelector('input[name="eVoiceId"]:checked')?.value || 'none';
   if (!name || !description || !personality || !speakingStyle) { showToast('必須項目を入力してください', 'error'); return; }
   if (State.editAvatarDataUrl) State.avatarImages[memberId] = State.editAvatarDataUrl;
   try {
-    const data = await API.put(`/api/personas/${memberId}`, { name, avatar, description, personality, speaking_style: speakingStyle, background, color });
+    const data = await API.put(`/api/personas/${memberId}`, { name, avatar, description, personality, speaking_style: speakingStyle, background, color, voice_id: voiceId === 'none' ? null : voiceId });
     const idx = State.members.findIndex(m => m.id === memberId);
     if (idx >= 0) State.members[idx] = { ...State.members[idx], ...data.persona };
 
@@ -826,7 +900,11 @@ async function triggerMemberResponse(personaId, trigger = null) {
         evtSource.close(); State.isStreaming = false;
         setStreamingButtons(false); setMemberSpeaking(personaId, false); scrollToBottom();
         if (State.voiceMode && fullText) {
-          await speakText(fullText, personaId, streamEl?.querySelector('.msg-bubble'));
+          if (persona.voice_id) {
+            await speakWithTTS(fullText, persona.voice_id, streamEl?.querySelector('.msg-bubble'));
+          } else {
+            await speakText(fullText, personaId, streamEl?.querySelector('.msg-bubble'));
+          }
         }
         resolve();
       } else if (data.type === 'error') {
@@ -893,9 +971,10 @@ async function submitAddPersona() {
   const description = $('pDescription').value.trim(), personality = $('pPersonality').value.trim();
   const speakingStyle = $('pSpeakingStyle').value.trim(), color = $('pColor').value;
   let background = buildBackgroundFromLearnData($('pBackground').value.trim(), State.addLearnFiles);
+  const voiceId = document.querySelector('input[name="pVoiceId"]:checked')?.value || 'none';
   if (!name || !description || !personality || !speakingStyle) { showToast('必須項目を入力してください', 'error'); return; }
   try {
-    const data = await API.post('/api/personas/add', { name, avatar, description, personality, speaking_style: speakingStyle, background, role: 'member', color });
+    const data = await API.post('/api/personas/add', { name, avatar, description, personality, speaking_style: speakingStyle, background, role: 'member', color, voice_id: voiceId === 'none' ? null : voiceId });
     if (State.addAvatarDataUrl) State.avatarImages[data.persona.id] = State.addAvatarDataUrl;
 
     // ★ 学習データをpersona_learnテーブルにDB保存
@@ -1528,6 +1607,7 @@ window.selectFeedbackRating = selectFeedbackRating;
 window.submitFeedback = submitFeedback;
 window.skipFeedback = skipFeedback;
 window.closeGuideModal = closeGuideModal;
+window.previewVoice = previewVoice;
 
 // モバイルアクションバーのボタンをPC版と連動
 function initMobileActionBar() {

@@ -1,0 +1,40 @@
+﻿接続中...
+[OK] 接続成功!
+
+=== テーブル一覧 ===
+  persona_learn
+  persona_meeting_stats
+  persona_patterns
+  personas
+  users
+
+=== 各テーブルのカラム ===
+
+[persona_learn]
+  id                             integer              NOT NULL  default=nextval('persona_learn_id_seq'::regclass)
+  persona_id                     text                 NOT NULL
+  content                        text                 NOT NULL
+  source                         text                 NULL可  default=''::text
+  embedding                      USER-DEFINED         NULL可
+  created_at                     timestamp without time zone NULL可  default=now()
+  user_id                        integer              NULL可
+
+[persona_meeting_stats]
+  persona_id                     text                 NOT NULL
+  user_id                        integer              NOT NULL
+  meeting_count                  integer              NULL可  default=0
+  last_meeting_at                timestamp without time zone NULL可  default=now()
+
+[persona_patterns]
+  id                             integer              NOT NULL  default=nextval('persona_patterns_id_seq'::regclass)
+  persona_id                     text                 NOT NULL
+  user_id                        integer              NULL可
+  pattern_type                   text                 NOT NULL
+  pattern_text                   text                 NOT NULL
+  topic_category                 text                 NULL可  default='general'::text
+  usage_count                    integer              NULL可  default=1
+  created_at                     timestamp without time zone NULL可  default=now()
+
+[personas]
+  id                             text                 NOT NULL
+  name                           text                 NOT NULL

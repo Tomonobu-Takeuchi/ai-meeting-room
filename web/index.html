@@ -317,6 +317,12 @@
     #logoutBtn{font-size:11px;padding:4px 8px;}
     #loginBtnHeader{font-size:12px;padding:6px 12px;}
 
+    /* ===== 音声設定ラジオ ===== */
+    .voice-options{display:flex;flex-direction:column;gap:3px;margin-top:4px;}
+    .voice-option{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary);cursor:pointer;padding:2px 0;}
+    .voice-option:hover{color:var(--text-primary);}
+    .voice-option input{accent-color:var(--accent-purple);cursor:pointer;}
+
     /* ===== Lvバッジ ===== */
     .member-card{position:relative;}
     .lv-badge{position:absolute;bottom:6px;right:8px;background:rgba(124,58,237,0.85);color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;pointer-events:none;letter-spacing:0.3px;line-height:1.4;}
@@ -461,6 +467,19 @@
     <div class="form-group"><label>話し方の特徴 *</label><textarea id="pSpeakingStyle" placeholder="「リスクを考えると〜」という表現が多い。"></textarea></div>
     <div class="form-group"><label>バックグラウンド</label><textarea id="pBackground" placeholder="大手商社に30年勤務後、独立。60代。"></textarea></div>
     <div class="form-group">
+      <label>音声設定（任意）</label>
+      <div class="voice-options">
+        <label class="voice-option"><input type="radio" name="pVoiceId" value="none" checked /> なし（テキストのみ）</label>
+        <label class="voice-option"><input type="radio" name="pVoiceId" value="alloy" /> Alloy - 中性的・落ち着いた</label>
+        <label class="voice-option"><input type="radio" name="pVoiceId" value="echo" /> Echo - 男性的・低め</label>
+        <label class="voice-option"><input type="radio" name="pVoiceId" value="fable" /> Fable - 温かみがある</label>
+        <label class="voice-option"><input type="radio" name="pVoiceId" value="onyx" /> Onyx - 男性・重厚</label>
+        <label class="voice-option"><input type="radio" name="pVoiceId" value="nova" /> Nova - 女性・明るい</label>
+        <label class="voice-option"><input type="radio" name="pVoiceId" value="shimmer" /> Shimmer - 女性・柔らかい</label>
+      </div>
+      <button type="button" class="avatar-file-btn" id="addPreviewVoiceBtn" style="margin-top:8px;" disabled>▶ 試聴する</button>
+    </div>
+    <div class="form-group">
       <label>学習データ（テキスト/PDF・画像・音声・URL）</label>
       <div class="learn-upload-row">
         <label class="avatar-file-btn">📄 テキスト/PDF<input type="file" id="learnTextFile" accept=".txt,.md,.pdf" multiple style="display:none" /></label>
@@ -506,6 +525,19 @@
     <div class="form-group"><label>性格・思考スタイル *</label><textarea id="ePersonality"></textarea></div>
     <div class="form-group"><label>話し方の特徴 *</label><textarea id="eSpeakingStyle"></textarea></div>
     <div class="form-group"><label>バックグラウンド</label><textarea id="eBackground"></textarea></div>
+    <div class="form-group">
+      <label>音声設定（任意）</label>
+      <div class="voice-options">
+        <label class="voice-option"><input type="radio" name="eVoiceId" value="none" checked /> なし（テキストのみ）</label>
+        <label class="voice-option"><input type="radio" name="eVoiceId" value="alloy" /> Alloy - 中性的・落ち着いた</label>
+        <label class="voice-option"><input type="radio" name="eVoiceId" value="echo" /> Echo - 男性的・低め</label>
+        <label class="voice-option"><input type="radio" name="eVoiceId" value="fable" /> Fable - 温かみがある</label>
+        <label class="voice-option"><input type="radio" name="eVoiceId" value="onyx" /> Onyx - 男性・重厚</label>
+        <label class="voice-option"><input type="radio" name="eVoiceId" value="nova" /> Nova - 女性・明るい</label>
+        <label class="voice-option"><input type="radio" name="eVoiceId" value="shimmer" /> Shimmer - 女性・柔らかい</label>
+      </div>
+      <button type="button" class="avatar-file-btn" id="editPreviewVoiceBtn" style="margin-top:8px;" disabled>▶ 試聴する</button>
+    </div>
     <div class="form-group">
       <label>追加学習データ</label>
       <div class="learn-upload-row">

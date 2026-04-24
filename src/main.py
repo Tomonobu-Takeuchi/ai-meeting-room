@@ -665,6 +665,35 @@ JSONのみ出力してください。"""
         return jsonify({"error": str(e)}), 500
 
 
+# ===== TTS API =====
+
+@app.route("/api/tts", methods=["POST"])
+def text_to_speech():
+    """OpenAI TTSでMP3を生成して返す"""
+    data = request.json or {}
+    text = data.get("text", "").strip()
+    voice_id = data.get("voice_id", "").strip()
+    if not voice_id:
+        return jsonify({"error": "voice_idが必要です"}), 400
+    if not text:
+        return jsonify({"error": "textが必要です"}), 400
+    text = text[:200]  # 最大200文字に切り詰め
+    try:
+        import openai
+        client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        response = client.audio.speech.create(
+            model="tts-1",
+            voice=voice_id,
+            input=text,
+            response_format="mp3"
+        )
+        mp3_bytes = response.read()
+        return Response(mp3_bytes, mimetype="audio/mpeg",
+                        headers={"Cache-Control": "no-cache"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # ===== ストリーミングAPI =====
 
 @app.route("/api/stream/member/<session_id>/<persona_id>")
