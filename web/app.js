@@ -464,7 +464,7 @@ async function downloadMinutes() {
     URL.revokeObjectURL(url);
     showToast('議事録をダウンロードしました', 'success');
     startFeedbackFlow();
-  } catch (e) { showToast(translateApiError(e.message, '議事録のダウンロード'), 'error'); }
+  } catch (e) { showToast(translateApiError(e.message, '議事録のダウンロード'), 'error'); startFeedbackFlow(); }
   finally { btn.disabled = false; btn.textContent = '📄 議事録をダウンロード（PDF）'; }
 }
 
