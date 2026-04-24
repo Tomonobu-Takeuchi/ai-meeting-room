@@ -1479,6 +1479,11 @@ async function reloadPersonas() {
   } catch (e) { showToast(translateApiError(e.message, 'ペルソナの再読み込み'), 'error'); }
 }
 
+// ===== グローバル公開（index.htmlのonclickから呼ぶため） =====
+window.selectFeedbackRating = selectFeedbackRating;
+window.submitFeedback = submitFeedback;
+window.skipFeedback = skipFeedback;
+
 // モバイルアクションバーのボタンをPC版と連動
 function initMobileActionBar() {
   if (DOM.mobileSummarizeBtn) DOM.mobileSummarizeBtn.addEventListener('click', summarizeMeeting);
