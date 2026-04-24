@@ -31,6 +31,7 @@ const State = {
   recognition: null, jaVoices: [],
   speakEndResolve: null,
   currentUser: null,  // ログイン中ユーザー情報
+  growthCache: {},    // Lvバッジキャッシュ
 };
 
 const $ = id => document.getElementById(id);
@@ -560,6 +561,32 @@ function renderMemberList() {
     DOM.memberList.appendChild(card);
   });
   renderMemberTriggers();
+  updateLevelBadges();
+}
+
+async function updateLevelBadges() {
+  if (!State.currentUser) return;
+  for (const member of State.members) {
+    const card = DOM.memberList.querySelector(`[data-id="${member.id}"]`);
+    if (!card) continue;
+    try {
+      let growth = State.growthCache[member.id];
+      if (!growth) {
+        const data = await API.get(`/api/personas/${member.id}/growth`);
+        if (data.growth) State.growthCache[member.id] = data.growth;
+        growth = data.growth;
+      }
+      if (growth && growth.maturity_level > 0) {
+        let badge = card.querySelector('.lv-badge');
+        if (!badge) {
+          badge = document.createElement('div');
+          badge.className = 'lv-badge';
+          card.appendChild(badge);
+        }
+        badge.textContent = `Lv${growth.maturity_level} ${growth.level_name}`;
+      }
+    } catch (e) { /* 無視 */ }
+  }
 }
 
 function toggleMemberSelection(memberId) {
@@ -1189,16 +1216,22 @@ async function submitFeedback() {
   }
   DOM.feedbackSubmitBtn.disabled = true;
   try {
-    await API.post(`/api/personas/${persona.id}/feedback`, {
+    const data = await API.post(`/api/personas/${persona.id}/feedback`, {
       rating: FeedbackState.rating,
       correct_response: DOM.feedbackComment.value.trim(),
       add_to_learn: DOM.feedbackLearnCheck.checked,
       session_id: State.sessionId
     });
+    if (data.level_up) {
+      delete State.growthCache[persona.id];
+      showToast(`✨ ${persona.name} が Lv${data.new_level}「${data.level_name}」に上がりました！`, 'success');
+    }
     FeedbackState.currentIndex++;
     if (FeedbackState.currentIndex >= members.length) {
       closeFeedbackModal();
-      showToast('フィードバックを送信しました。ありがとうございます！', 'success');
+      if (!data.level_up) {
+        showToast('フィードバックを送信しました。ありがとうございます！', 'success');
+      }
     } else {
       showFeedbackModal();
     }
@@ -1418,6 +1451,7 @@ async function submitLogin() {
     showToast(`${data.user.name || data.user.email} でログインしました`, 'success');
     // ペルソナを再読み込み（ユーザー固有のペルソナを反映）
     await reloadPersonas();
+    if (!localStorage.getItem('guide_shown')) showGuideModal();
   } catch (e) {
     $('loginError').textContent = translateApiError(e.message, 'ログイン');
   } finally {
@@ -1442,6 +1476,7 @@ async function submitRegister() {
     closeAuthModal();
     showToast(`登録完了！${data.user.name || data.user.email} でログインしました`, 'success');
     await reloadPersonas();
+    if (!localStorage.getItem('guide_shown')) showGuideModal();
   } catch (e) {
     $('registerError').textContent = translateApiError(e.message, '登録');
   } finally {
@@ -1479,10 +1514,20 @@ async function reloadPersonas() {
   } catch (e) { showToast(translateApiError(e.message, 'ペルソナの再読み込み'), 'error'); }
 }
 
+// ===== はじめ方ガイド =====
+function showGuideModal() {
+  $('guideModal').classList.remove('hidden');
+}
+function closeGuideModal() {
+  $('guideModal').classList.add('hidden');
+  localStorage.setItem('guide_shown', '1');
+}
+
 // ===== グローバル公開（index.htmlのonclickから呼ぶため） =====
 window.selectFeedbackRating = selectFeedbackRating;
 window.submitFeedback = submitFeedback;
 window.skipFeedback = skipFeedback;
+window.closeGuideModal = closeGuideModal;
 
 // モバイルアクションバーのボタンをPC版と連動
 function initMobileActionBar() {

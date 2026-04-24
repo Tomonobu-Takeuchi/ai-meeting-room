@@ -316,6 +316,20 @@
     .user-badge .user-name{max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
     #logoutBtn{font-size:11px;padding:4px 8px;}
     #loginBtnHeader{font-size:12px;padding:6px 12px;}
+
+    /* ===== Lvバッジ ===== */
+    .member-card{position:relative;}
+    .lv-badge{position:absolute;bottom:6px;right:8px;background:rgba(124,58,237,0.85);color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;pointer-events:none;letter-spacing:0.3px;line-height:1.4;}
+
+    /* ===== はじめ方ガイドモーダル ===== */
+    .guide-modal{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:28px;width:440px;max-width:92vw;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow);}
+    .guide-modal h2{font-size:18px;font-weight:700;margin-bottom:6px;}
+    .guide-subtitle{font-size:13px;color:var(--text-secondary);margin-bottom:20px;}
+    .guide-steps{display:flex;flex-direction:column;gap:14px;}
+    .guide-step{display:flex;gap:14px;align-items:flex-start;}
+    .guide-step-num{width:28px;height:28px;border-radius:50%;background:var(--accent-purple);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;}
+    .guide-step-title{font-size:14px;font-weight:600;margin-bottom:3px;}
+    .guide-step-desc{font-size:12px;color:var(--text-secondary);line-height:1.6;}
   </style>
 </head>
 <body>
@@ -598,6 +612,45 @@
 </script>
 
 <script src="app.js"></script>
+
+<!-- ===== はじめ方ガイドモーダル ===== -->
+<div class="modal-overlay hidden" id="guideModal">
+  <div class="guide-modal">
+    <h2>🎉 AI-PERSONA会議室へようこそ！</h2>
+    <p class="guide-subtitle">まずはここから始めてみましょう</p>
+    <div class="guide-steps">
+      <div class="guide-step">
+        <div class="guide-step-num">①</div>
+        <div>
+          <div class="guide-step-title">ペルソナを選ぶ</div>
+          <div class="guide-step-desc">左のメンバーリストから会議に参加させたいAIを選択します</div>
+        </div>
+      </div>
+      <div class="guide-step">
+        <div class="guide-step-num">②</div>
+        <div>
+          <div class="guide-step-title">議題を入力して会議開始</div>
+          <div class="guide-step-desc">上のテキストボックスに議題を入力し「会議開始」を押します</div>
+        </div>
+      </div>
+      <div class="guide-step">
+        <div class="guide-step-num">③</div>
+        <div>
+          <div class="guide-step-title">まとめ・議事録ダウンロード</div>
+          <div class="guide-step-desc">「まとめる」ボタンで議論を整理し、PDFで議事録をダウンロードできます</div>
+        </div>
+      </div>
+      <div class="guide-step">
+        <div class="guide-step-num">④</div>
+        <div>
+          <div class="guide-step-title">フィードバックでペルソナを育てる</div>
+          <div class="guide-step-desc">議事録ダウンロード後にフィードバックを送るとペルソナが成長します</div>
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-primary" style="width:100%;margin-top:20px;" onclick="closeGuideModal()">はじめる！</button>
+  </div>
+</div>
 
 <!-- ===== 認証モーダル ===== -->
 <div class="auth-modal-overlay hidden" id="authModalOverlay">

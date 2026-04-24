@@ -724,12 +724,26 @@ def post_persona_feedback(persona_id):
     if rating is None:
         return jsonify({"error": "ratingは必須です"}), 400
     try:
+        # 保存前のmaturity_levelを取得
+        growth_before = persona_manager.get_growth(persona_id, user_id) or {}
+        level_before = growth_before.get("maturity_level", 0)
+
         persona_manager.save_feedback(
             persona_id, user_id, session_id,
             bool(rating), detail_category, correct_response,
             add_to_learn=add_to_learn
         )
-        return jsonify({"message": "フィードバックを保存しました"})
+
+        # 保存後のmaturity_levelを取得してレベルアップ判定
+        growth_after = persona_manager.get_growth(persona_id, user_id) or {}
+        level_after = growth_after.get("maturity_level", 0)
+
+        resp = {"message": "フィードバックを保存しました"}
+        if level_after > level_before:
+            resp["level_up"] = True
+            resp["new_level"] = level_after
+            resp["level_name"] = persona_manager.get_maturity_label(level_after)
+        return jsonify(resp)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
