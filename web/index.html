@@ -6,6 +6,7 @@
   <title>AI-PERSONA会議室</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <script src="https://js.stripe.com/v3/"></script>
   <style>
     :root {
       --sat: env(safe-area-inset-top, 0px);
@@ -326,6 +327,36 @@
     /* ===== Lvバッジ ===== */
     .member-card{position:relative;}
     .lv-badge{position:absolute;bottom:6px;right:8px;background:rgba(124,58,237,0.85);color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;pointer-events:none;letter-spacing:0.3px;line-height:1.4;}
+
+    /* ===== プランバッジ ===== */
+    .plan-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:0.3px;margin-left:4px;}
+    .plan-badge.free{background:rgba(75,85,99,0.4);color:#9CA3AF;border:1px solid #374151;}
+    .plan-badge.standard{background:rgba(37,99,235,0.2);color:#60A5FA;border:1px solid rgba(37,99,235,0.4);}
+    .plan-badge.pro{background:rgba(124,58,237,0.2);color:#C4B5FD;border:1px solid rgba(124,58,237,0.4);}
+    .credits-badge{font-size:10px;color:var(--text-secondary);padding:2px 6px;background:var(--bg-elevated);border-radius:8px;border:1px solid var(--border);}
+    .btn-upgrade{background:linear-gradient(135deg,#7C3AED,#2563EB);border:none;color:#fff;font-size:11px;padding:5px 10px;}
+    .btn-upgrade:hover{opacity:0.9;background:linear-gradient(135deg,#6D28D9,#1D4ED8);}
+
+    /* ===== 料金モーダル ===== */
+    .pricing-modal{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:32px;width:520px;max-width:94vw;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow);}
+    .pricing-modal h2{font-size:20px;font-weight:700;margin-bottom:6px;text-align:center;}
+    .pricing-subtitle{font-size:13px;color:var(--text-secondary);text-align:center;margin-bottom:24px;}
+    .pricing-cards{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:20px;}
+    @media(max-width:600px){.pricing-cards{grid-template-columns:1fr;}}
+    .pricing-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 16px;display:flex;flex-direction:column;gap:10px;position:relative;}
+    .pricing-card.recommended{border-color:var(--accent-purple);box-shadow:0 0 0 1px rgba(124,58,237,0.4);}
+    .pricing-card-label{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);}
+    .pricing-card-price{font-size:26px;font-weight:700;color:var(--text-primary);}
+    .pricing-card-price span{font-size:12px;font-weight:400;color:var(--text-secondary);}
+    .pricing-card-desc{font-size:12px;color:var(--text-secondary);line-height:1.6;}
+    .pricing-card-features{list-style:none;display:flex;flex-direction:column;gap:5px;flex:1;}
+    .pricing-card-features li{font-size:12px;color:var(--text-secondary);padding-left:16px;position:relative;}
+    .pricing-card-features li::before{content:'✓';position:absolute;left:0;color:var(--accent-green);}
+    .pricing-card-features li.dim::before{color:var(--text-muted);}
+    .pricing-card-features li.dim{color:var(--text-muted);}
+    .badge-recommended{position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:var(--accent-purple);color:#fff;font-size:10px;font-weight:700;padding:2px 10px;border-radius:10px;white-space:nowrap;}
+    .pricing-modal-footer{text-align:center;font-size:11px;color:var(--text-muted);}
+    .pricing-current{text-align:center;font-size:13px;color:var(--text-secondary);margin-bottom:16px;padding:10px;background:var(--bg-elevated);border-radius:var(--radius);border:1px solid var(--border);}
 
     /* ===== はじめ方ガイドモーダル ===== */
     .guide-modal{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:28px;width:440px;max-width:92vw;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow);}
@@ -685,6 +716,61 @@
 </div>
 
 <!-- ===== 認証モーダル ===== -->
+<!-- 料金プランモーダル -->
+<div class="auth-modal-overlay hidden" id="pricingModalOverlay" onclick="if(event.target===this)closePricingModal()">
+  <div class="pricing-modal">
+    <h2>プランを選択</h2>
+    <p class="pricing-subtitle">会議の使用頻度に合わせてプランをお選びください</p>
+    <div id="pricingCurrentPlan" class="pricing-current hidden"></div>
+    <div class="pricing-cards">
+      <!-- 無料 -->
+      <div class="pricing-card">
+        <div class="pricing-card-label">無料</div>
+        <div class="pricing-card-price">¥0<span>/月</span></div>
+        <div class="pricing-card-desc">はじめての方に</div>
+        <ul class="pricing-card-features">
+          <li>月5回まで会議</li>
+          <li>全ペルソナ利用可</li>
+          <li>学習データ登録</li>
+          <li class="dim">PDF議事録は無制限</li>
+        </ul>
+        <button class="btn" disabled>現在のプラン</button>
+      </div>
+      <!-- スタンダード -->
+      <div class="pricing-card">
+        <div class="pricing-card-label">スタンダード</div>
+        <div class="pricing-card-price">¥480<span>/50チケット</span></div>
+        <div class="pricing-card-desc">単発購入・有効期限なし</div>
+        <ul class="pricing-card-features">
+          <li>50回分の会議チケット</li>
+          <li>全ペルソナ利用可</li>
+          <li>学習データ登録</li>
+          <li>PDF議事録は無制限</li>
+        </ul>
+        <button class="btn btn-primary" id="buyStandardBtn" onclick="purchasePlan('standard')">チケットを購入</button>
+      </div>
+      <!-- プロ -->
+      <div class="pricing-card recommended">
+        <div class="badge-recommended">おすすめ</div>
+        <div class="pricing-card-label">プロ</div>
+        <div class="pricing-card-price">¥980<span>/月</span></div>
+        <div class="pricing-card-desc">ヘビーユーザーに</div>
+        <ul class="pricing-card-features">
+          <li>月間会議回数無制限</li>
+          <li>全ペルソナ利用可</li>
+          <li>学習データ登録</li>
+          <li>PDF議事録は無制限</li>
+        </ul>
+        <button class="btn btn-purple" id="buyProBtn" onclick="purchasePlan('pro')">プロプランに登録</button>
+      </div>
+    </div>
+    <div class="pricing-modal-footer">
+      安全なStripe決済 · SSL暗号化 · いつでもキャンセル可能<br>
+      <a onclick="closePricingModal()" style="cursor:pointer;color:var(--text-secondary);text-decoration:underline;font-size:12px;">閉じる</a>
+    </div>
+  </div>
+</div>
+
 <div class="auth-modal-overlay hidden" id="authModalOverlay">
   <div class="auth-modal">
     <!-- ログイン画面 -->

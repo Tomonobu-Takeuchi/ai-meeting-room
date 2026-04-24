@@ -15,9 +15,25 @@ import bcrypt
 
 from src.persona.persona_manager import PersonaManager
 from src.meeting.meeting_room import MeetingRoom
-from src.database import init_db, get_user_by_email, get_user_by_id, create_user
+import stripe
+from src.database import (
+    init_db, get_user_by_email, get_user_by_id, create_user,
+    get_user_payment_status, check_and_use_meeting,
+    add_user_credits, update_user_plan, save_payment, complete_payment,
+    get_user_by_stripe_customer,
+)
 
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
+
+STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
+STRIPE_PUBLIC_KEY = os.environ.get('STRIPE_PUBLIC_KEY', '')
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+if STRIPE_SECRET_KEY:
+    stripe.api_key = STRIPE_SECRET_KEY
+
+STANDARD_PRICE_JPY = 480
+PRO_PRICE_JPY = 980
+STANDARD_CREDITS = 50
 
 app = Flask(
     __name__,
@@ -506,6 +522,10 @@ def start_meeting():
     member_ids = data.get("member_ids", [])
     if not topic:
         return jsonify({"error": "議題を入力してください"}), 400
+    if user_id:
+        ok, reason = check_and_use_meeting(user_id)
+        if not ok:
+            return jsonify({"error": reason, "code": "PLAN_LIMIT"}), 403
     if not member_ids:
         member_ids = [p["id"] for p in persona_manager.get_members_only(user_id)]
     session_data = meeting_room.create_session(topic, member_ids, user_id)
@@ -787,6 +807,139 @@ def get_persona_growth(persona_id):
     if growth:
         growth["level_name"] = persona_manager.get_maturity_label(growth["maturity_level"])
     return jsonify({"growth": growth})
+
+
+# ===== 課金API =====
+
+@app.route("/api/payment/checkout", methods=["POST"])
+@login_required
+def payment_checkout():
+    user_id = get_current_user_id()
+    data = request.json or {}
+    payment_type = data.get("type")
+
+    if payment_type not in ('standard', 'pro'):
+        return jsonify({"error": "typeは 'standard' または 'pro' を指定してください"}), 400
+    if not STRIPE_SECRET_KEY:
+        return jsonify({"error": "決済機能が設定されていません"}), 500
+
+    base_url = request.host_url.rstrip('/')
+    try:
+        if payment_type == 'standard':
+            checkout_session = stripe.checkout.Session.create(
+                payment_method_types=['card'],
+                line_items=[{
+                    'price_data': {
+                        'currency': 'jpy',
+                        'product_data': {
+                            'name': 'スタンダードプラン – 50会議チケット',
+                            'description': 'AI-PERSONA会議室 50回分の会議チケット（有効期限なし）',
+                        },
+                        'unit_amount': STANDARD_PRICE_JPY,
+                    },
+                    'quantity': 1,
+                }],
+                mode='payment',
+                success_url=f'{base_url}/?payment=success',
+                cancel_url=f'{base_url}/?payment=cancel',
+                metadata={'user_id': str(user_id), 'payment_type': 'standard'},
+            )
+        else:
+            checkout_session = stripe.checkout.Session.create(
+                payment_method_types=['card'],
+                line_items=[{
+                    'price_data': {
+                        'currency': 'jpy',
+                        'product_data': {
+                            'name': 'プロプラン – 月額サブスクリプション',
+                            'description': 'AI-PERSONA会議室 月間会議無制限プラン',
+                        },
+                        'unit_amount': PRO_PRICE_JPY,
+                        'recurring': {'interval': 'month'},
+                    },
+                    'quantity': 1,
+                }],
+                mode='subscription',
+                success_url=f'{base_url}/?payment=success',
+                cancel_url=f'{base_url}/?payment=cancel',
+                metadata={'user_id': str(user_id), 'payment_type': 'pro'},
+                subscription_data={'metadata': {'user_id': str(user_id)}},
+            )
+
+        save_payment(
+            user_id, checkout_session.id, payment_type,
+            STANDARD_PRICE_JPY if payment_type == 'standard' else PRO_PRICE_JPY,
+            STANDARD_CREDITS if payment_type == 'standard' else 0,
+        )
+        return jsonify({"checkout_url": checkout_session.url})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/payment/webhook", methods=["POST"])
+def payment_webhook():
+    payload = request.get_data()
+    sig_header = request.headers.get("Stripe-Signature", "")
+
+    if not STRIPE_WEBHOOK_SECRET:
+        return jsonify({"error": "Webhook秘密鍵未設定"}), 500
+
+    try:
+        event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
+    except stripe.error.SignatureVerificationError:
+        return jsonify({"error": "署名検証エラー"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+    from datetime import datetime, timedelta
+
+    if event['type'] == 'checkout.session.completed':
+        s = event['data']['object']
+        meta = s.get('metadata', {})
+        user_id = int(meta.get('user_id', 0) or 0)
+        payment_type = meta.get('payment_type')
+        customer_id = s.get('customer')
+
+        if not user_id or not payment_type:
+            return jsonify({"status": "skip"}), 200
+
+        try:
+            if payment_type == 'standard':
+                add_user_credits(user_id, STANDARD_CREDITS)
+            elif payment_type == 'pro':
+                expires_at = datetime.utcnow() + timedelta(days=31)
+                update_user_plan(user_id, 'pro', expires_at, stripe_customer_id=customer_id)
+            complete_payment(s['id'])
+        except Exception as e:
+            print(f"Webhook checkout.session.completed 処理エラー: {e}")
+            return jsonify({"error": str(e)}), 500
+
+    elif event['type'] == 'invoice.payment_succeeded':
+        invoice = event['data']['object']
+        # サブスク更新: stripe_customer_id でユーザーを特定して期限を延長
+        customer_id = invoice.get('customer')
+        subscription_id = invoice.get('subscription')
+        if customer_id and subscription_id:
+            try:
+                uid = get_user_by_stripe_customer(customer_id)
+                if uid:
+                    expires_at = datetime.utcnow() + timedelta(days=31)
+                    update_user_plan(uid, 'pro', expires_at)
+            except Exception as e:
+                print(f"Webhook invoice.payment_succeeded 処理エラー: {e}")
+
+    return jsonify({"status": "ok"}), 200
+
+
+@app.route("/api/payment/status", methods=["GET"])
+@login_required
+def payment_status():
+    user_id = get_current_user_id()
+    status = get_user_payment_status(user_id)
+    if not status:
+        return jsonify({"error": "ユーザーが見つかりません"}), 404
+    status['public_key'] = STRIPE_PUBLIC_KEY
+    return jsonify(status)
 
 
 @app.route("/api/health")

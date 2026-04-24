@@ -31,6 +31,7 @@ const State = {
   recognition: null, jaVoices: [],
   speakEndResolve: null,
   currentUser: null,  // ログイン中ユーザー情報
+  paymentStatus: null, // 課金ステータスキャッシュ
   growthCache: {},    // Lvバッジキャッシュ
 };
 
@@ -84,7 +85,12 @@ const API = {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    if (!res.ok) { const e = await res.json().catch(() => ({ error: res.statusText })); throw new Error(e.error || res.statusText); }
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({ error: res.statusText }));
+      const err = new Error(e.error || res.statusText);
+      err.code = e.code;
+      throw err;
+    }
     return res.json();
   },
   async put(path, body) {
@@ -841,7 +847,13 @@ async function startMeeting() {
     if (DOM.mobileSummarizeBtn) DOM.mobileSummarizeBtn.disabled = false;
     if (DOM.mobileFacilitatorBtn) DOM.mobileFacilitatorBtn.disabled = false;
     await invokeFacilitator();
-  } catch (e) { showToast(translateApiError(e.message, '会議の開始'), 'error'); }
+  } catch (e) {
+    if (e.code === 'PLAN_LIMIT') {
+      openPricingModal(e.message);
+    } else {
+      showToast(translateApiError(e.message, '会議の開始'), 'error');
+    }
+  }
   finally { setLoading(false); }
 }
 
@@ -1470,6 +1482,16 @@ async function checkAuthStatus() {
     if (data.user) {
       State.currentUser = data.user;
       renderAuthArea();
+      // 支払い完了後のリダイレクト処理
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('payment') === 'success') {
+        await refreshPaymentStatus();
+        showToast('お支払いが完了しました！プランが更新されました。', 'success');
+        history.replaceState(null, '', window.location.pathname);
+      } else if (params.get('payment') === 'cancel') {
+        showToast('お支払いがキャンセルされました。', 'info');
+        history.replaceState(null, '', window.location.pathname);
+      }
     } else {
       renderAuthArea();
     }
@@ -1478,15 +1500,44 @@ async function checkAuthStatus() {
   }
 }
 
+async function refreshPaymentStatus() {
+  if (!State.currentUser) return;
+  try {
+    const data = await API.get('/api/payment/status');
+    State.paymentStatus = data;
+    // currentUser にプラン情報を反映
+    State.currentUser.plan = data.plan;
+    State.currentUser.credits = data.credits;
+    State.currentUser.plan_expires_at = data.plan_expires_at;
+    State.currentUser.monthly_meeting_count = data.monthly_meeting_count;
+    renderAuthArea();
+  } catch (e) {
+    // ログインしていない場合などは無視
+  }
+}
+
 function renderAuthArea() {
   const area = $('authArea');
   if (!area) return;
   if (State.currentUser) {
+    const u = State.currentUser;
+    const plan = u.plan || 'free';
+    const planLabels = { free: '無料', standard: 'スタンダード', pro: 'PRO' };
+    const planLabel = planLabels[plan] || plan;
+    const creditsHtml = (plan === 'standard')
+      ? `<span class="credits-badge">${u.credits || 0}回</span>`
+      : '';
+    const upgradeHtml = (plan === 'free')
+      ? `<button class="btn btn-upgrade" onclick="openPricingModal()">アップグレード</button>`
+      : '';
     area.innerHTML = `
       <div class="user-badge">
         <span>👤</span>
-        <span class="user-name">${escapeHtml(State.currentUser.name || State.currentUser.email)}</span>
+        <span class="user-name">${escapeHtml(u.name || u.email)}</span>
+        <span class="plan-badge ${plan}">${planLabel}</span>
+        ${creditsHtml}
       </div>
+      ${upgradeHtml}
       <button class="btn" id="logoutBtn" onclick="logout()">ログアウト</button>
     `;
   } else {
@@ -1602,12 +1653,73 @@ function closeGuideModal() {
   localStorage.setItem('guide_shown', '1');
 }
 
+// ===== 料金プランモーダル =====
+
+function openPricingModal(reason) {
+  const overlay = $('pricingModalOverlay');
+  if (!overlay) return;
+  const planEl = $('pricingCurrentPlan');
+  if (planEl && State.currentUser) {
+    const plan = State.currentUser.plan || 'free';
+    const credits = State.currentUser.credits || 0;
+    const monthly = State.currentUser.monthly_meeting_count || 0;
+    let msg = '';
+    if (reason) msg = `<div style="color:#FCA5A5;margin-bottom:6px;font-size:12px;">⚠️ ${escapeHtml(reason)}</div>`;
+    if (plan === 'free') {
+      msg += `現在のプラン: <b>無料</b> · 今月 ${monthly}/5 回使用済み`;
+    } else if (plan === 'standard') {
+      msg += `現在のプラン: <b>スタンダード</b> · 残り ${credits} チケット`;
+    } else if (plan === 'pro') {
+      const exp = State.currentUser.plan_expires_at
+        ? new Date(State.currentUser.plan_expires_at).toLocaleDateString('ja-JP')
+        : '—';
+      msg += `現在のプラン: <b>PRO</b> · 有効期限: ${exp}`;
+    }
+    planEl.innerHTML = msg;
+    planEl.classList.remove('hidden');
+  }
+  // ボタン状態更新
+  const plan = State.currentUser?.plan || 'free';
+  const stdBtn = $('buyStandardBtn');
+  const proBtn = $('buyProBtn');
+  if (stdBtn) stdBtn.disabled = false;
+  if (proBtn) proBtn.disabled = (plan === 'pro');
+  overlay.classList.remove('hidden');
+}
+
+function closePricingModal() {
+  const overlay = $('pricingModalOverlay');
+  if (overlay) overlay.classList.add('hidden');
+}
+
+async function purchasePlan(type) {
+  if (!State.currentUser) {
+    closePricingModal();
+    openAuthModal();
+    return;
+  }
+  const btn = type === 'standard' ? $('buyStandardBtn') : $('buyProBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '処理中...'; }
+  try {
+    const data = await API.post('/api/payment/checkout', { type });
+    if (data.checkout_url) {
+      window.location.href = data.checkout_url;
+    }
+  } catch (e) {
+    showToast(`決済エラー: ${e.message}`, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = type === 'standard' ? 'チケットを購入' : 'プロプランに登録'; }
+  }
+}
+
 // ===== グローバル公開（index.htmlのonclickから呼ぶため） =====
 window.selectFeedbackRating = selectFeedbackRating;
 window.submitFeedback = submitFeedback;
 window.skipFeedback = skipFeedback;
 window.closeGuideModal = closeGuideModal;
 window.previewVoice = previewVoice;
+window.openPricingModal = openPricingModal;
+window.closePricingModal = closePricingModal;
+window.purchasePlan = purchasePlan;
 
 // モバイルアクションバーのボタンをPC版と連動
 function initMobileActionBar() {

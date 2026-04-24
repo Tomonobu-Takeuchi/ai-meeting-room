@@ -176,6 +176,8 @@ def init_db():
 
     # Phase 1-3テーブル初期化
     init_phase_tables(conn)
+    # 課金テーブル初期化
+    init_payment_tables(conn)
     conn.close()
     print("✅ DB初期化完了（ユーザー認証対応）")
 
@@ -206,11 +208,175 @@ def get_user_by_email(email):
 
 def get_user_by_id(user_id):
     conn = get_connection()
+    try:
+        rows = conn.run("""
+            SELECT id, email, name, plan, credits, plan_expires_at,
+                   monthly_meeting_count, monthly_reset_at
+            FROM users WHERE id=:id
+        """, id=user_id)
+        if not rows:
+            conn.close()
+            return None
+        r = rows[0]
+        d = row_to_dict(['id','email','name','plan','credits','plan_expires_at',
+                         'monthly_meeting_count','monthly_reset_at'], r)
+        conn.close()
+        d['credits'] = d['credits'] or 0
+        d['monthly_meeting_count'] = d['monthly_meeting_count'] or 0
+        if d['plan_expires_at']:
+            d['plan_expires_at'] = d['plan_expires_at'].isoformat()
+        return d
+    except Exception:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        conn2 = get_connection()
+        rows = conn2.run("SELECT id, email, name, plan FROM users WHERE id=:id", id=user_id)
+        conn2.close()
+        return row_to_dict(['id','email','name','plan'], rows[0]) if rows else None
+
+
+# ===== 課金関連 =====
+
+def get_user_payment_status(user_id):
+    conn = get_connection()
     rows = conn.run("""
-        SELECT id, email, name, plan FROM users WHERE id=:id
+        SELECT plan, credits, plan_expires_at, monthly_meeting_count, monthly_reset_at
+        FROM users WHERE id=:id
     """, id=user_id)
     conn.close()
-    return row_to_dict(['id','email','name','plan'], rows[0]) if rows else None
+    if not rows:
+        return None
+    plan, credits, expires_at, monthly_count, reset_at = rows[0]
+    return {
+        'plan': plan or 'free',
+        'credits': credits or 0,
+        'plan_expires_at': expires_at.isoformat() if expires_at else None,
+        'monthly_meeting_count': monthly_count or 0,
+        'monthly_reset_at': reset_at.isoformat() if reset_at else None,
+    }
+
+
+def check_and_use_meeting(user_id):
+    """会議開始時のプラン制限チェック＆消費。Returns (ok, reason)"""
+    from datetime import datetime
+    conn = get_connection()
+    try:
+        rows = conn.run("""
+            SELECT plan, credits, plan_expires_at, monthly_meeting_count, monthly_reset_at
+            FROM users WHERE id=:id
+        """, id=user_id)
+        if not rows:
+            conn.close()
+            return False, "ユーザーが見つかりません"
+
+        plan, credits, plan_expires_at, monthly_count, monthly_reset_at = rows[0]
+        plan = plan or 'free'
+        credits = credits or 0
+        monthly_count = monthly_count or 0
+
+        now = datetime.utcnow()
+
+        # 月初リセット判定
+        needs_reset = (
+            monthly_reset_at is None or
+            monthly_reset_at.year < now.year or
+            (monthly_reset_at.year == now.year and monthly_reset_at.month < now.month)
+        )
+        if needs_reset:
+            monthly_count = 0
+
+        # プロプラン
+        if plan == 'pro':
+            if plan_expires_at and plan_expires_at < now:
+                # 期限切れ → free に降格
+                conn.run("UPDATE users SET plan='free', plan_expires_at=NULL WHERE id=:id", id=user_id)
+                plan = 'free'
+            else:
+                if needs_reset:
+                    conn.run("UPDATE users SET monthly_meeting_count=1, monthly_reset_at=NOW() WHERE id=:id", id=user_id)
+                else:
+                    conn.run("UPDATE users SET monthly_meeting_count=monthly_meeting_count+1 WHERE id=:id", id=user_id)
+                conn.close()
+                return True, "ok"
+
+        # スタンダードプラン（クレジット消費）
+        if plan == 'standard':
+            if credits <= 0:
+                conn.close()
+                return False, "チケットが不足しています。チケットを購入してください。"
+            conn.run("UPDATE users SET credits=credits-1 WHERE id=:id", id=user_id)
+            conn.close()
+            return True, "ok"
+
+        # 無料プラン（月5回）
+        FREE_LIMIT = 5
+        if monthly_count >= FREE_LIMIT:
+            conn.close()
+            return False, f"無料プランの月{FREE_LIMIT}回の制限に達しました。プランをアップグレードしてください。"
+
+        if needs_reset:
+            conn.run("UPDATE users SET monthly_meeting_count=1, monthly_reset_at=NOW() WHERE id=:id", id=user_id)
+        else:
+            conn.run("UPDATE users SET monthly_meeting_count=monthly_meeting_count+1 WHERE id=:id", id=user_id)
+        conn.close()
+        return True, "ok"
+    except Exception as e:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        # DBエラー時はフォールスルー（会議を許可）
+        print(f"check_and_use_meeting エラー（フォールスルー）: {e}")
+        return True, "ok"
+
+
+def add_user_credits(user_id, amount):
+    conn = get_connection()
+    conn.run("UPDATE users SET credits=COALESCE(credits,0)+:amount WHERE id=:id", amount=amount, id=user_id)
+    conn.close()
+
+
+def update_user_plan(user_id, plan_type, expires_at=None, stripe_customer_id=None):
+    conn = get_connection()
+    if expires_at and stripe_customer_id:
+        conn.run("""UPDATE users SET plan=:plan, plan_expires_at=:expires_at,
+                    stripe_customer_id=:cid WHERE id=:id""",
+                 plan=plan_type, expires_at=expires_at, cid=stripe_customer_id, id=user_id)
+    elif expires_at:
+        conn.run("UPDATE users SET plan=:plan, plan_expires_at=:expires_at WHERE id=:id",
+                 plan=plan_type, expires_at=expires_at, id=user_id)
+    else:
+        conn.run("UPDATE users SET plan=:plan WHERE id=:id", plan=plan_type, id=user_id)
+    conn.close()
+
+
+def save_payment(user_id, stripe_session_id, payment_type, amount_jpy, credits_added=0, stripe_customer_id=None):
+    conn = get_connection()
+    conn.run("""
+        INSERT INTO payments (user_id, stripe_session_id, stripe_customer_id, payment_type, amount_jpy, credits_added)
+        VALUES (:user_id, :session_id, :cid, :payment_type, :amount_jpy, :credits_added)
+        ON CONFLICT (stripe_session_id) DO NOTHING
+    """, user_id=user_id, session_id=stripe_session_id, cid=stripe_customer_id,
+        payment_type=payment_type, amount_jpy=amount_jpy, credits_added=credits_added)
+    conn.close()
+
+
+def complete_payment(stripe_session_id):
+    conn = get_connection()
+    conn.run("""
+        UPDATE payments SET status='completed', completed_at=NOW()
+        WHERE stripe_session_id=:session_id
+    """, session_id=stripe_session_id)
+    conn.close()
+
+
+def get_user_by_stripe_customer(stripe_customer_id):
+    conn = get_connection()
+    rows = conn.run("SELECT id FROM users WHERE stripe_customer_id=:cid", cid=stripe_customer_id)
+    conn.close()
+    return rows[0][0] if rows else None
 
 
 # ===== RAG関連 =====
@@ -302,6 +468,36 @@ def delete_learn_data(persona_id, user_id, learn_id):
 
 
 # ===== Phase 2: 発言パターンテーブル =====
+
+def init_payment_tables(conn):
+    """課金用テーブル・カラム初期化"""
+    for sql in [
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS credits INTEGER DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_expires_at TIMESTAMP",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS monthly_meeting_count INTEGER DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS monthly_reset_at TIMESTAMP DEFAULT NOW()",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT",
+    ]:
+        try:
+            conn.run(sql)
+        except Exception:
+            pass
+
+    conn.run("""
+        CREATE TABLE IF NOT EXISTS payments (
+            id                  SERIAL PRIMARY KEY,
+            user_id             INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            stripe_session_id   TEXT UNIQUE,
+            stripe_customer_id  TEXT,
+            payment_type        TEXT NOT NULL,
+            amount_jpy          INTEGER NOT NULL,
+            credits_added       INTEGER DEFAULT 0,
+            status              TEXT DEFAULT 'pending',
+            created_at          TIMESTAMP DEFAULT NOW(),
+            completed_at        TIMESTAMP
+        )
+    """)
+
 
 def init_phase_tables(conn):
     """Phase 1-3用テーブル初期化"""
