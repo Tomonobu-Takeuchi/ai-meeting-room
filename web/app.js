@@ -55,6 +55,9 @@ const DOM = {
   learnDataList: $('learnDataList'), editLearnDataList: $('editLearnDataList'),
   learnStatus: $('learnStatus'), editLearnStatus: $('editLearnStatus'),
   mobileActionBar: $('mobileActionBar'), mobileSummarizeBtn: $('mobileSummarizeBtn'), mobileFacilitatorBtn: $('mobileFacilitatorBtn'),
+  feedbackModal: $('feedbackModal'), feedbackPersonaIcons: $('feedbackPersonaIcons'), feedbackModalTitle: $('feedbackModalTitle'),
+  feedbackBtnGood: $('feedbackBtnGood'), feedbackBtnBad: $('feedbackBtnBad'), feedbackComment: $('feedbackComment'),
+  feedbackLearnCheck: $('feedbackLearnCheck'), feedbackSubmitBtn: $('feedbackSubmitBtn'),
   memberSelectModal: $('memberSelectModal'),
   cancelMemberSelect: $('cancelMemberSelect'),
   confirmMemberSelect: $('confirmMemberSelect'),
@@ -460,6 +463,7 @@ async function downloadMinutes() {
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
     showToast('議事録をダウンロードしました', 'success');
+    startFeedbackFlow();
   } catch (e) { showToast(translateApiError(e.message, '議事録のダウンロード'), 'error'); }
   finally { btn.disabled = false; btn.textContent = '📄 議事録をダウンロード（PDF）'; }
 }
@@ -1126,6 +1130,97 @@ async function handleLearnAudio(e, mode) {
 }
 
 function escapeHtml(text) { const d = document.createElement('div'); d.textContent = text; return d.innerHTML; }
+
+// ===== フィードバックモーダル制御 =====
+const FeedbackState = { members: [], currentIndex: 0, rating: null };
+
+function startFeedbackFlow() {
+  if (!State.sessionId || !State.members || State.members.length === 0) return;
+  // ログインユーザーのみフィードバックを表示
+  if (!State.currentUser) return;
+  FeedbackState.members = State.members.filter(m => m.id !== 'facilitator');
+  FeedbackState.currentIndex = 0;
+  FeedbackState.rating = null;
+  showFeedbackModal();
+}
+
+function showFeedbackModal() {
+  const members = FeedbackState.members;
+  const idx = FeedbackState.currentIndex;
+  if (idx >= members.length) {
+    closeFeedbackModal();
+    return;
+  }
+  const persona = members[idx];
+
+  // アイコン行を更新
+  DOM.feedbackPersonaIcons.innerHTML = members.map((m, i) => {
+    const initial = m.name ? m.name[0] : '?';
+    const cls = i === idx ? 'active' : 'inactive';
+    return `<div class="feedback-persona-icon ${cls}">${initial}</div>`;
+  }).join('') + `<span style="font-size:12px;color:var(--text-muted);margin-left:6px;">ペルソナ ${idx + 1} / ${members.length}</span>`;
+
+  // タイトル更新
+  DOM.feedbackModalTitle.textContent = `${persona.name}へのフィードバック`;
+
+  // フォームリセット
+  DOM.feedbackBtnGood.className = 'feedback-rating-btn';
+  DOM.feedbackBtnBad.className = 'feedback-rating-btn';
+  DOM.feedbackComment.value = '';
+  DOM.feedbackLearnCheck.checked = false;
+  FeedbackState.rating = null;
+
+  DOM.feedbackModal.classList.remove('hidden');
+}
+
+function selectFeedbackRating(isGood) {
+  FeedbackState.rating = isGood;
+  DOM.feedbackBtnGood.className = 'feedback-rating-btn' + (isGood ? ' selected-good' : '');
+  DOM.feedbackBtnBad.className = 'feedback-rating-btn' + (!isGood ? ' selected-bad' : '');
+}
+
+async function submitFeedback() {
+  const members = FeedbackState.members;
+  const idx = FeedbackState.currentIndex;
+  const persona = members[idx];
+  if (FeedbackState.rating === null) {
+    showToast('「良かった」か「良くなかった」を選んでください', 'error');
+    return;
+  }
+  DOM.feedbackSubmitBtn.disabled = true;
+  try {
+    await API.post(`/api/personas/${persona.id}/feedback`, {
+      rating: FeedbackState.rating,
+      correct_response: DOM.feedbackComment.value.trim(),
+      add_to_learn: DOM.feedbackLearnCheck.checked,
+      session_id: State.sessionId
+    });
+    FeedbackState.currentIndex++;
+    if (FeedbackState.currentIndex >= members.length) {
+      closeFeedbackModal();
+      showToast('フィードバックを送信しました。ありがとうございます！', 'success');
+    } else {
+      showFeedbackModal();
+    }
+  } catch (e) {
+    showToast(translateApiError(e.message, 'フィードバックの送信'), 'error');
+  } finally {
+    DOM.feedbackSubmitBtn.disabled = false;
+  }
+}
+
+function skipFeedback() {
+  FeedbackState.currentIndex++;
+  if (FeedbackState.currentIndex >= FeedbackState.members.length) {
+    closeFeedbackModal();
+  } else {
+    showFeedbackModal();
+  }
+}
+
+function closeFeedbackModal() {
+  if (DOM.feedbackModal) DOM.feedbackModal.classList.add('hidden');
+}
 
 // ★ 学習データ取得エラーをユーザー向けに翻訳
 function translateLearnError(errorMsg, type) {

@@ -11,7 +11,7 @@ from src.database import (
     increment_meeting_count, get_meeting_count,
     ensure_growth_record, update_growth_conversation,
     update_growth_knowledge, calculate_and_save_maturity,
-    get_growth_record
+    get_growth_record, save_feedback_record
 )
 
 COLUMNS = ['id','user_id','name','avatar','description','personality',
@@ -329,6 +329,19 @@ class PersonaManager:
         1: "入門", 2: "見習い", 3: "研究生", 4: "助手", 5: "同僚",
         6: "専門家", 7: "論客", 8: "賢者", 9: "師匠", 10: "覚醒"
     }
+
+    def save_feedback(self, persona_id, user_id, session_id, rating, detail_category, correct_response, add_to_learn=False, app_type='meeting'):
+        """フィードバックを保存し、必要に応じてpersona_learnにも追加"""
+        if user_id is None:
+            return
+        try:
+            save_feedback_record(persona_id, user_id, session_id, rating, detail_category, correct_response, app_type)
+            calculate_and_save_maturity(persona_id, user_id, app_type)
+            # チェックON: コメントをpersona_learnにも追加学習
+            if add_to_learn and correct_response and correct_response.strip():
+                self.add_learn_data(persona_id, correct_response, 'feedback', user_id)
+        except Exception as e:
+            print(f"フィードバック保存エラー（無視）: {e}")
 
     def get_maturity_label(self, level):
         return self.MATURITY_LEVEL_NAMES.get(level, "入門")

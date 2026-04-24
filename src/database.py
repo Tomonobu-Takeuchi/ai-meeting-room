@@ -602,3 +602,46 @@ def get_growth_record(persona_id, user_id, app_type='meeting'):
         }
     finally:
         conn.close()
+
+
+# ===== フィードバック保存 =====
+
+def save_feedback_record(persona_id, user_id, session_id, rating, detail_category, correct_response, app_type='meeting'):
+    """フィードバックをpersona_feedbackに保存し、growthのスコアを更新"""
+    conn = get_connection()
+    try:
+        conn.run("""
+            INSERT INTO persona_feedback
+                (persona_id, user_id, session_id, rating, detail_category, correct_response)
+            VALUES
+                (:persona_id, :user_id, :session_id, :rating, :detail_category, :correct_response)
+        """, persona_id=persona_id, user_id=user_id, session_id=session_id,
+             rating=rating, detail_category=detail_category, correct_response=correct_response)
+
+        # persona_growthのfeedback_count・positive_countを更新
+        conn.run("""
+            INSERT INTO persona_growth (persona_id, user_id, app_type, feedback_count, positive_count)
+            VALUES (:persona_id, :user_id, :app_type, 1, :pos)
+            ON CONFLICT (persona_id, user_id, app_type)
+            DO UPDATE SET
+                feedback_count = persona_growth.feedback_count + 1,
+                positive_count = persona_growth.positive_count + :pos,
+                updated_at = NOW()
+        """, persona_id=persona_id, user_id=user_id, app_type=app_type,
+             pos=1 if rating else 0)
+
+        # 直近20件のpositive_rateを計算して更新
+        rows = conn.run("""
+            SELECT rating FROM persona_feedback
+            WHERE persona_id=:persona_id AND user_id=:user_id
+            ORDER BY created_at DESC LIMIT 20
+        """, persona_id=persona_id, user_id=user_id)
+        if rows:
+            recent_positive = sum(1 for r in rows if r[0]) / len(rows)
+            conn.run("""
+                UPDATE persona_growth SET recent_positive_rate=:rate, updated_at=NOW()
+                WHERE persona_id=:persona_id AND user_id=:user_id AND app_type=:app_type
+            """, persona_id=persona_id, user_id=user_id, app_type=app_type,
+                 rate=round(recent_positive, 3))
+    finally:
+        conn.close()

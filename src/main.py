@@ -709,6 +709,31 @@ def get_persona_evolution(persona_id):
     })
 
 
+@app.route("/api/personas/<persona_id>/feedback", methods=["POST"])
+def post_persona_feedback(persona_id):
+    """フィードバックを保存する"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"error": "ログインが必要です"}), 401
+    data = request.json or {}
+    rating = data.get("rating")           # True=良かった / False=良くなかった
+    detail_category = data.get("detail_category", "")
+    correct_response = data.get("correct_response", "")
+    add_to_learn = data.get("add_to_learn", False)
+    session_id = data.get("session_id", "")
+    if rating is None:
+        return jsonify({"error": "ratingは必須です"}), 400
+    try:
+        persona_manager.save_feedback(
+            persona_id, user_id, session_id,
+            bool(rating), detail_category, correct_response,
+            add_to_learn=add_to_learn
+        )
+        return jsonify({"message": "フィードバックを保存しました"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/personas/<persona_id>/growth", methods=["GET"])
 def get_persona_growth(persona_id):
     """成熟度スコアを返す"""
