@@ -1485,9 +1485,15 @@ async function checkAuthStatus() {
       // 支払い完了後のリダイレクト処理
       const params = new URLSearchParams(window.location.search);
       if (params.get('payment') === 'success') {
-        await refreshPaymentStatus();
-        showToast('お支払いが完了しました！プランが更新されました。', 'success');
+        const sessionId = params.get('session_id');
         history.replaceState(null, '', window.location.pathname);
+        if (sessionId) {
+          await verifyAndApplyPayment(sessionId);
+        } else {
+          // session_id がない場合は従来の polling fallback
+          await refreshPaymentStatus();
+          showToast('お支払いが完了しました！', 'success');
+        }
       } else if (params.get('payment') === 'cancel') {
         showToast('お支払いがキャンセルされました。', 'info');
         history.replaceState(null, '', window.location.pathname);
@@ -1505,7 +1511,6 @@ async function refreshPaymentStatus() {
   try {
     const data = await API.get('/api/payment/status');
     State.paymentStatus = data;
-    // currentUser にプラン情報を反映
     State.currentUser.plan = data.plan;
     State.currentUser.credits = data.credits;
     State.currentUser.plan_expires_at = data.plan_expires_at;
@@ -1514,6 +1519,44 @@ async function refreshPaymentStatus() {
   } catch (e) {
     // ログインしていない場合などは無視
   }
+}
+
+async function verifyAndApplyPayment(sessionId) {
+  // Stripe セッションを直接検証してプランを即時反映（webhook 到着前でも動作）
+  showToast('お支払いを確認中...', 'info');
+  let retries = 0;
+  const maxRetries = 6;
+  const delays = [1000, 2000, 3000, 4000, 5000, 8000];
+
+  while (retries < maxRetries) {
+    await new Promise(r => setTimeout(r, delays[retries] || 3000));
+    try {
+      const data = await API.post('/api/payment/verify-session', { session_id: sessionId });
+      if (data.verified && data.status) {
+        State.currentUser.plan = data.status.plan;
+        State.currentUser.credits = data.status.credits;
+        State.currentUser.plan_expires_at = data.status.plan_expires_at;
+        State.currentUser.monthly_meeting_count = data.status.monthly_meeting_count;
+        renderAuthArea();
+        const planLabels = { standard: 'スタンダード（50チケット）', pro: 'プロ（月間無制限）' };
+        const label = planLabels[data.status.plan] || data.status.plan;
+        showToast(`お支払い完了！${label}に更新されました。`, 'success');
+        return;
+      }
+      if (data.verified === false) {
+        // 未完了状態 → リトライ
+        retries++;
+        continue;
+      }
+    } catch (e) {
+      retries++;
+      continue;
+    }
+    retries++;
+  }
+  // タイムアウト: webhook 処理を待って status を更新
+  await refreshPaymentStatus();
+  showToast('お支払いは完了していますが反映に時間がかかっています。しばらくお待ちください。', 'info');
 }
 
 function renderAuthArea() {

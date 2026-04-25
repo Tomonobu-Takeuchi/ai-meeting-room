@@ -840,7 +840,7 @@ def payment_checkout():
                     'quantity': 1,
                 }],
                 mode='payment',
-                success_url=f'{base_url}/?payment=success',
+                success_url=f'{base_url}/?payment=success&session_id={{CHECKOUT_SESSION_ID}}',
                 cancel_url=f'{base_url}/?payment=cancel',
                 metadata={'user_id': str(user_id), 'payment_type': 'standard'},
             )
@@ -860,7 +860,7 @@ def payment_checkout():
                     'quantity': 1,
                 }],
                 mode='subscription',
-                success_url=f'{base_url}/?payment=success',
+                success_url=f'{base_url}/?payment=success&session_id={{CHECKOUT_SESSION_ID}}',
                 cancel_url=f'{base_url}/?payment=cancel',
                 metadata={'user_id': str(user_id), 'payment_type': 'pro'},
                 subscription_data={'metadata': {'user_id': str(user_id)}},
@@ -876,6 +876,83 @@ def payment_checkout():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/payment/verify-session", methods=["POST"])
+@login_required
+def verify_payment_session():
+    """Stripe セッションを直接検証してプランを即時反映（webhook 非依存）"""
+    user_id = get_current_user_id()
+    data = request.json or {}
+    session_id = data.get("session_id", "").strip()
+    if not session_id:
+        return jsonify({"error": "session_id が必要です"}), 400
+    if not STRIPE_SECRET_KEY:
+        return jsonify({"error": "Stripe未設定"}), 500
+
+    try:
+        s = stripe.checkout.Session.retrieve(session_id)
+    except Exception as e:
+        print(f"[verify-session] Stripe取得エラー: {e}")
+        return jsonify({"error": str(e)}), 500
+
+    # セッションのユーザーIDと照合（なりすまし防止）
+    meta = s.get("metadata") or {}
+    meta_user_id = int(meta.get("user_id", 0) or 0)
+    if meta_user_id != user_id:
+        return jsonify({"error": "セッションが一致しません"}), 403
+
+    payment_type = meta.get("payment_type")
+    payment_status = s.get("payment_status")  # 'paid' / 'no_payment_required' / 'unpaid'
+    status = s.get("status")                   # 'complete' / 'open' / 'expired'
+
+    print(f"[verify-session] session={session_id} status={status} payment_status={payment_status} type={payment_type}")
+
+    if status != "complete":
+        return jsonify({"verified": False, "reason": f"status={status}"}), 200
+
+    # 支払い済み or サブスク（no_payment_required は初回請求書で処理済み）
+    if payment_status not in ("paid", "no_payment_required"):
+        return jsonify({"verified": False, "reason": f"payment_status={payment_status}"}), 200
+
+    from datetime import datetime, timedelta
+    try:
+        if payment_type == "standard":
+            # 二重付与防止: payments テーブルで未完了か確認
+            from src.database import get_connection
+            conn = get_connection()
+            rows = conn.run(
+                "SELECT status FROM payments WHERE stripe_session_id=:sid",
+                sid=session_id
+            )
+            conn.close()
+            already_done = rows and rows[0][0] == "completed"
+            if not already_done:
+                add_user_credits(user_id, STANDARD_CREDITS)
+                complete_payment(session_id)
+        elif payment_type == "pro":
+            from src.database import get_connection
+            conn = get_connection()
+            rows = conn.run(
+                "SELECT status FROM payments WHERE stripe_session_id=:sid",
+                sid=session_id
+            )
+            conn.close()
+            already_done = rows and rows[0][0] == "completed"
+            if not already_done:
+                expires_at = datetime.utcnow() + timedelta(days=31)
+                customer_id = s.get("customer")
+                update_user_plan(user_id, "pro", expires_at, stripe_customer_id=customer_id)
+                complete_payment(session_id)
+        else:
+            return jsonify({"verified": False, "reason": "unknown payment_type"}), 200
+    except Exception as e:
+        print(f"[verify-session] DB更新エラー: {e}")
+        return jsonify({"error": str(e)}), 500
+
+    status_data = get_user_payment_status(user_id)
+    print(f"[verify-session] 完了 user={user_id} plan={status_data.get('plan')} credits={status_data.get('credits')}")
+    return jsonify({"verified": True, "status": status_data})
+
+
 @app.route("/api/payment/webhook", methods=["POST"])
 def payment_webhook():
     payload = request.get_data()
@@ -886,47 +963,63 @@ def payment_webhook():
 
     try:
         event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
-    except stripe.error.SignatureVerificationError:
+    except stripe.error.SignatureVerificationError as e:
+        print(f"[webhook] 署名検証エラー: {e}")
         return jsonify({"error": "署名検証エラー"}), 400
     except Exception as e:
+        print(f"[webhook] イベント構築エラー: {e}")
         return jsonify({"error": str(e)}), 400
 
     from datetime import datetime, timedelta
+    event_type = event['type']
+    print(f"[webhook] 受信 type={event_type}")
 
-    if event['type'] == 'checkout.session.completed':
+    if event_type == 'checkout.session.completed':
         s = event['data']['object']
-        meta = s.get('metadata', {})
+        meta = s.get('metadata') or {}
         user_id = int(meta.get('user_id', 0) or 0)
         payment_type = meta.get('payment_type')
         customer_id = s.get('customer')
+        payment_status = s.get('payment_status')
+        print(f"[webhook] checkout.session.completed user={user_id} type={payment_type} payment_status={payment_status}")
 
         if not user_id or not payment_type:
+            print(f"[webhook] skip: user_id={user_id} payment_type={payment_type}")
             return jsonify({"status": "skip"}), 200
 
         try:
             if payment_type == 'standard':
                 add_user_credits(user_id, STANDARD_CREDITS)
+                print(f"[webhook] {STANDARD_CREDITS}クレジット付与 user={user_id}")
             elif payment_type == 'pro':
                 expires_at = datetime.utcnow() + timedelta(days=31)
                 update_user_plan(user_id, 'pro', expires_at, stripe_customer_id=customer_id)
+                print(f"[webhook] proプラン設定 user={user_id} expires={expires_at}")
             complete_payment(s['id'])
         except Exception as e:
-            print(f"Webhook checkout.session.completed 処理エラー: {e}")
+            print(f"[webhook] checkout.session.completed DB更新エラー: {e}")
             return jsonify({"error": str(e)}), 500
 
-    elif event['type'] == 'invoice.payment_succeeded':
+    elif event_type == 'invoice.payment_succeeded':
         invoice = event['data']['object']
-        # サブスク更新: stripe_customer_id でユーザーを特定して期限を延長
         customer_id = invoice.get('customer')
         subscription_id = invoice.get('subscription')
-        if customer_id and subscription_id:
+        billing_reason = invoice.get('billing_reason')
+        print(f"[webhook] invoice.payment_succeeded customer={customer_id} sub={subscription_id} reason={billing_reason}")
+        # subscription_create は checkout.session.completed で処理済みのためスキップ
+        if customer_id and subscription_id and billing_reason == 'subscription_cycle':
             try:
                 uid = get_user_by_stripe_customer(customer_id)
                 if uid:
                     expires_at = datetime.utcnow() + timedelta(days=31)
                     update_user_plan(uid, 'pro', expires_at)
+                    print(f"[webhook] サブスク更新 user={uid} expires={expires_at}")
+                else:
+                    print(f"[webhook] stripe_customer_id={customer_id} に対応するユーザーなし")
             except Exception as e:
-                print(f"Webhook invoice.payment_succeeded 処理エラー: {e}")
+                print(f"[webhook] invoice.payment_succeeded DB更新エラー: {e}")
+    else:
+        print(f"[webhook] 未処理イベント: {event_type}")
 
     return jsonify({"status": "ok"}), 200
 
