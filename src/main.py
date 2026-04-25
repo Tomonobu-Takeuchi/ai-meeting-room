@@ -962,86 +962,123 @@ def verify_payment_session():
 
 @app.route("/api/payment/webhook", methods=["POST"])
 def payment_webhook():
-    """
-    Stripe webhook: 常に 200 を返す（Stripe ベストプラクティス）。
-    500 を返すと Stripe が最大3日間リトライし続けるため、エラーはログのみ。
-    """
+    """Stripe webhook。常に 200 を返す（Stripe ベストプラクティス）。"""
     import traceback
     from datetime import datetime, timedelta
 
-    payload = request.get_data()
-    sig_header = request.headers.get("Stripe-Signature", "")
+    # ── STEP 1: リクエスト受信ログ ──────────────────────────────
+    try:
+        payload = request.get_data()
+        sig_header = request.headers.get("Stripe-Signature", "")
+        print(f"[webhook][1] 受信 payload={len(payload)}bytes "
+              f"has_sig={'yes' if sig_header else 'NO'} "
+              f"secret_set={'yes' if STRIPE_WEBHOOK_SECRET else 'NO'}")
+    except Exception as e:
+        print(f"[webhook][1] リクエスト取得エラー: {type(e).__name__}: {e}")
+        return jsonify({"status": "ok"}), 200
 
-    # STRIPE_WEBHOOK_SECRET 未設定: 署名検証スキップして警告ログ
-    if not STRIPE_WEBHOOK_SECRET:
-        print("[webhook] WARNING: STRIPE_WEBHOOK_SECRET が未設定。署名検証をスキップします。")
-        try:
+    # ── STEP 2: 署名検証 ─────────────────────────────────────────
+    event = None
+    try:
+        if not STRIPE_WEBHOOK_SECRET:
+            print("[webhook][2] STRIPE_WEBHOOK_SECRET 未設定 → 署名検証スキップ")
             event = json.loads(payload)
-        except Exception as e:
-            print(f"[webhook] JSON解析エラー: {e}")
-            return jsonify({"status": "ok"}), 200
-    else:
-        try:
+            print(f"[webhook][2] JSON解析成功: type={event.get('type','?')}")
+        else:
             event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
-        except Exception as e:
-            # SignatureVerificationError も含む全例外を 400 で返す（Stripe 仕様）
-            print(f"[webhook] 署名検証失敗: {type(e).__name__}: {e}")
-            return jsonify({"error": str(e)}), 400
+            print(f"[webhook][2] 署名検証成功: type={event['type']}")
+    except json.JSONDecodeError as e:
+        print(f"[webhook][2] JSON解析失敗: {e}")
+        return jsonify({"error": "invalid json"}), 400
+    except stripe.error.SignatureVerificationError as e:
+        print(f"[webhook][2] 署名不一致: {e}")
+        return jsonify({"error": "signature mismatch"}), 400
+    except Exception as e:
+        print(f"[webhook][2] 予期せぬ検証エラー: {type(e).__name__}: {e}")
+        print(traceback.format_exc())
+        return jsonify({"error": str(e)}), 400
 
-    event_type = event.get('type', 'unknown') if isinstance(event, dict) else event['type']
-    event_id   = event.get('id', 'unknown')  if isinstance(event, dict) else event.get('id', 'unknown')
-    print(f"[webhook] 受信 id={event_id} type={event_type}")
+    # ── STEP 3: event_type 取得 ──────────────────────────────────
+    try:
+        event_type = event['type'] if hasattr(event, '__getitem__') else str(event)
+        event_id   = event.get('id', 'unknown') if hasattr(event, 'get') else 'unknown'
+        print(f"[webhook][3] event_type={event_type!r} event_id={event_id}")
+    except Exception as e:
+        print(f"[webhook][3] event_type取得エラー: {type(e).__name__}: {e}")
+        return jsonify({"status": "ok"}), 200
 
+    # ── STEP 4: イベント処理 ─────────────────────────────────────
     try:
         if event_type == 'checkout.session.completed':
+            print("[webhook][4] checkout.session.completed 処理開始")
             _handle_checkout_completed(event, datetime, timedelta)
+            print("[webhook][4] checkout.session.completed 処理完了")
         elif event_type == 'invoice.payment_succeeded':
+            print("[webhook][4] invoice.payment_succeeded 処理開始")
             _handle_invoice_payment(event, datetime, timedelta)
+            print("[webhook][4] invoice.payment_succeeded 処理完了")
         else:
-            print(f"[webhook] 未処理イベント: {event_type}")
+            print(f"[webhook][4] 未処理イベント（スキップ）: {event_type}")
     except Exception as e:
-        # 処理中の例外は 200 を返してログ記録（Stripe にリトライさせない）
-        print(f"[webhook] 処理エラー（200で返却）: {e}")
+        print(f"[webhook][4] 処理例外（200で返却）: {type(e).__name__}: {e}")
         print(traceback.format_exc())
 
+    # ── STEP 5: 正常終了 ─────────────────────────────────────────
+    print("[webhook][5] 正常終了 → 200")
     return jsonify({"status": "ok"}), 200
 
 
 def _handle_checkout_completed(event, datetime, timedelta):
-    s = event['data']['object']
-    meta = s.get('metadata') or {}
-    raw_uid = meta.get('user_id', '0') or '0'
-    user_id = int(raw_uid) if str(raw_uid).isdigit() else 0
-    payment_type = meta.get('payment_type', '')
-    customer_id = s.get('customer')
-    payment_status = s.get('payment_status')
-    session_id = s.get('id', '')
+    import traceback
 
-    print(f"[webhook] checkout.session.completed "
-          f"user={user_id} type={payment_type} "
-          f"payment_status={payment_status} customer={customer_id}")
+    # セッションオブジェクト取得
+    try:
+        s = event['data']['object']
+        meta = s.get('metadata') or {}
+        raw_uid = meta.get('user_id', '0') or '0'
+        user_id = int(raw_uid) if str(raw_uid).isdigit() else 0
+        payment_type = meta.get('payment_type', '')
+        customer_id = s.get('customer')
+        payment_status = s.get('payment_status')
+        session_id = s.get('id', '')
+        print(f"[webhook][ch1] user_id={user_id} payment_type={payment_type!r} "
+              f"payment_status={payment_status} customer={customer_id} session={session_id}")
+    except Exception as e:
+        print(f"[webhook][ch1] セッション解析エラー: {type(e).__name__}: {e}")
+        print(traceback.format_exc())
+        return
 
     if not user_id or not payment_type:
-        print(f"[webhook] skip: metadata不足 user_id={user_id} payment_type={payment_type!r}")
+        print(f"[webhook][ch2] skip: metadata不足 user_id={user_id} payment_type={payment_type!r}")
         return
 
-    if payment_type == 'standard':
-        add_user_credits(user_id, STANDARD_CREDITS)
-        print(f"[webhook] {STANDARD_CREDITS}クレジット付与完了 user={user_id}")
-    elif payment_type == 'pro':
-        expires_at = datetime.utcnow() + timedelta(days=31)
-        update_user_plan(user_id, 'pro', expires_at, stripe_customer_id=customer_id)
-        print(f"[webhook] proプラン設定完了 user={user_id} expires={expires_at}")
-    else:
-        print(f"[webhook] 未知の payment_type={payment_type!r}")
-        return
+    # DB 更新
+    try:
+        if payment_type == 'standard':
+            print(f"[webhook][ch3] add_user_credits 開始 user={user_id} amount={STANDARD_CREDITS}")
+            add_user_credits(user_id, STANDARD_CREDITS)
+            print(f"[webhook][ch3] add_user_credits 完了")
+        elif payment_type == 'pro':
+            expires_at = datetime.utcnow() + timedelta(days=31)
+            print(f"[webhook][ch3] update_user_plan 開始 user={user_id} expires={expires_at}")
+            update_user_plan(user_id, 'pro', expires_at, stripe_customer_id=customer_id)
+            print(f"[webhook][ch3] update_user_plan 完了")
+        else:
+            print(f"[webhook][ch3] 未知の payment_type={payment_type!r}")
+            return
+    except Exception as e:
+        print(f"[webhook][ch3] DB更新エラー: {type(e).__name__}: {e}")
+        print(traceback.format_exc())
+        raise  # 外側の try/except に伝播してログ記録
 
+    # payments テーブル更新（失敗しても致命的でない）
     if session_id:
         try:
+            print(f"[webhook][ch4] complete_payment 開始 session={session_id}")
             complete_payment(session_id)
+            print(f"[webhook][ch4] complete_payment 完了")
         except Exception as e:
-            # payments レコードが存在しない場合は無視
-            print(f"[webhook] complete_payment スキップ: {e}")
+            print(f"[webhook][ch4] complete_payment 失敗（無視）: {type(e).__name__}: {e}")
 
 
 def _handle_invoice_payment(event, datetime, timedelta):
