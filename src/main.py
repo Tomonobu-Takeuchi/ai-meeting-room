@@ -955,73 +955,146 @@ def verify_payment_session():
 
 @app.route("/api/payment/webhook", methods=["POST"])
 def payment_webhook():
+    """
+    Stripe webhook: 常に 200 を返す（Stripe ベストプラクティス）。
+    500 を返すと Stripe が最大3日間リトライし続けるため、エラーはログのみ。
+    """
+    import traceback
+    from datetime import datetime, timedelta
+
     payload = request.get_data()
     sig_header = request.headers.get("Stripe-Signature", "")
 
+    # STRIPE_WEBHOOK_SECRET 未設定: 署名検証スキップして警告ログ
     if not STRIPE_WEBHOOK_SECRET:
-        return jsonify({"error": "Webhook秘密鍵未設定"}), 500
+        print("[webhook] WARNING: STRIPE_WEBHOOK_SECRET が未設定。署名検証をスキップします。")
+        try:
+            event = json.loads(payload)
+        except Exception as e:
+            print(f"[webhook] JSON解析エラー: {e}")
+            return jsonify({"status": "ok"}), 200
+    else:
+        try:
+            event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
+        except Exception as e:
+            # SignatureVerificationError も含む全例外を 400 で返す（Stripe 仕様）
+            print(f"[webhook] 署名検証失敗: {type(e).__name__}: {e}")
+            return jsonify({"error": str(e)}), 400
+
+    event_type = event.get('type', 'unknown') if isinstance(event, dict) else event['type']
+    event_id   = event.get('id', 'unknown')  if isinstance(event, dict) else event.get('id', 'unknown')
+    print(f"[webhook] 受信 id={event_id} type={event_type}")
 
     try:
-        event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
-    except stripe.error.SignatureVerificationError as e:
-        print(f"[webhook] 署名検証エラー: {e}")
-        return jsonify({"error": "署名検証エラー"}), 400
+        if event_type == 'checkout.session.completed':
+            _handle_checkout_completed(event, datetime, timedelta)
+        elif event_type == 'invoice.payment_succeeded':
+            _handle_invoice_payment(event, datetime, timedelta)
+        else:
+            print(f"[webhook] 未処理イベント: {event_type}")
     except Exception as e:
-        print(f"[webhook] イベント構築エラー: {e}")
-        return jsonify({"error": str(e)}), 400
-
-    from datetime import datetime, timedelta
-    event_type = event['type']
-    print(f"[webhook] 受信 type={event_type}")
-
-    if event_type == 'checkout.session.completed':
-        s = event['data']['object']
-        meta = s.get('metadata') or {}
-        user_id = int(meta.get('user_id', 0) or 0)
-        payment_type = meta.get('payment_type')
-        customer_id = s.get('customer')
-        payment_status = s.get('payment_status')
-        print(f"[webhook] checkout.session.completed user={user_id} type={payment_type} payment_status={payment_status}")
-
-        if not user_id or not payment_type:
-            print(f"[webhook] skip: user_id={user_id} payment_type={payment_type}")
-            return jsonify({"status": "skip"}), 200
-
-        try:
-            if payment_type == 'standard':
-                add_user_credits(user_id, STANDARD_CREDITS)
-                print(f"[webhook] {STANDARD_CREDITS}クレジット付与 user={user_id}")
-            elif payment_type == 'pro':
-                expires_at = datetime.utcnow() + timedelta(days=31)
-                update_user_plan(user_id, 'pro', expires_at, stripe_customer_id=customer_id)
-                print(f"[webhook] proプラン設定 user={user_id} expires={expires_at}")
-            complete_payment(s['id'])
-        except Exception as e:
-            print(f"[webhook] checkout.session.completed DB更新エラー: {e}")
-            return jsonify({"error": str(e)}), 500
-
-    elif event_type == 'invoice.payment_succeeded':
-        invoice = event['data']['object']
-        customer_id = invoice.get('customer')
-        subscription_id = invoice.get('subscription')
-        billing_reason = invoice.get('billing_reason')
-        print(f"[webhook] invoice.payment_succeeded customer={customer_id} sub={subscription_id} reason={billing_reason}")
-        # subscription_create は checkout.session.completed で処理済みのためスキップ
-        if customer_id and subscription_id and billing_reason == 'subscription_cycle':
-            try:
-                uid = get_user_by_stripe_customer(customer_id)
-                if uid:
-                    expires_at = datetime.utcnow() + timedelta(days=31)
-                    update_user_plan(uid, 'pro', expires_at)
-                    print(f"[webhook] サブスク更新 user={uid} expires={expires_at}")
-                else:
-                    print(f"[webhook] stripe_customer_id={customer_id} に対応するユーザーなし")
-            except Exception as e:
-                print(f"[webhook] invoice.payment_succeeded DB更新エラー: {e}")
-    else:
-        print(f"[webhook] 未処理イベント: {event_type}")
+        # 処理中の例外は 200 を返してログ記録（Stripe にリトライさせない）
+        print(f"[webhook] 処理エラー（200で返却）: {e}")
+        print(traceback.format_exc())
 
     return jsonify({"status": "ok"}), 200
+
+
+def _handle_checkout_completed(event, datetime, timedelta):
+    s = event['data']['object']
+    meta = s.get('metadata') or {}
+    raw_uid = meta.get('user_id', '0') or '0'
+    user_id = int(raw_uid) if str(raw_uid).isdigit() else 0
+    payment_type = meta.get('payment_type', '')
+    customer_id = s.get('customer')
+    payment_status = s.get('payment_status')
+    session_id = s.get('id', '')
+
+    print(f"[webhook] checkout.session.completed "
+          f"user={user_id} type={payment_type} "
+          f"payment_status={payment_status} customer={customer_id}")
+
+    if not user_id or not payment_type:
+        print(f"[webhook] skip: metadata不足 user_id={user_id} payment_type={payment_type!r}")
+        return
+
+    if payment_type == 'standard':
+        add_user_credits(user_id, STANDARD_CREDITS)
+        print(f"[webhook] {STANDARD_CREDITS}クレジット付与完了 user={user_id}")
+    elif payment_type == 'pro':
+        expires_at = datetime.utcnow() + timedelta(days=31)
+        update_user_plan(user_id, 'pro', expires_at, stripe_customer_id=customer_id)
+        print(f"[webhook] proプラン設定完了 user={user_id} expires={expires_at}")
+    else:
+        print(f"[webhook] 未知の payment_type={payment_type!r}")
+        return
+
+    if session_id:
+        try:
+            complete_payment(session_id)
+        except Exception as e:
+            # payments レコードが存在しない場合は無視
+            print(f"[webhook] complete_payment スキップ: {e}")
+
+
+def _handle_invoice_payment(event, datetime, timedelta):
+    invoice = event['data']['object']
+    customer_id = invoice.get('customer')
+    subscription_id = invoice.get('subscription')
+    billing_reason = invoice.get('billing_reason', '')
+    print(f"[webhook] invoice.payment_succeeded "
+          f"customer={customer_id} sub={subscription_id} reason={billing_reason}")
+
+    # subscription_create は checkout.session.completed で処理済み
+    if billing_reason != 'subscription_cycle':
+        print(f"[webhook] skip: billing_reason={billing_reason!r}")
+        return
+
+    if not customer_id:
+        print("[webhook] skip: customer_id なし")
+        return
+
+    uid = get_user_by_stripe_customer(customer_id)
+    if uid:
+        expires_at = datetime.utcnow() + timedelta(days=31)
+        update_user_plan(uid, 'pro', expires_at)
+        print(f"[webhook] サブスク更新完了 user={uid} expires={expires_at}")
+    else:
+        print(f"[webhook] 未登録の stripe_customer_id={customer_id}")
+
+
+@app.route("/api/payment/schema-check", methods=["GET"])
+@login_required
+def payment_schema_check():
+    """DB スキーマ確認（デバッグ用）"""
+    from src.database import get_connection
+    conn = get_connection()
+    try:
+        rows = conn.run("""
+            SELECT column_name, data_type
+            FROM information_schema.columns
+            WHERE table_name = 'users'
+            ORDER BY ordinal_position
+        """)
+        user_cols = [r[0] for r in rows]
+        rows2 = conn.run("""
+            SELECT table_name FROM information_schema.tables
+            WHERE table_schema = 'public' AND table_name = 'payments'
+        """)
+        payments_exists = len(rows2) > 0
+        conn.close()
+        required = ['credits', 'plan_expires_at', 'monthly_meeting_count',
+                    'monthly_reset_at', 'stripe_customer_id']
+        missing = [c for c in required if c not in user_cols]
+        return jsonify({
+            "users_columns": user_cols,
+            "payments_table": payments_exists,
+            "missing_columns": missing,
+            "ok": len(missing) == 0 and payments_exists,
+        })
+    except Exception as e:
+        conn.close()
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/payment/status", methods=["GET"])

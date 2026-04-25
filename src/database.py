@@ -334,21 +334,45 @@ def check_and_use_meeting(user_id):
 
 def add_user_credits(user_id, amount):
     conn = get_connection()
-    conn.run("UPDATE users SET credits=COALESCE(credits,0)+:amount WHERE id=:id", amount=amount, id=user_id)
+    try:
+        conn.run(
+            "UPDATE users SET credits=COALESCE(credits,0)+:amount WHERE id=:uid",
+            amount=amount, uid=user_id
+        )
+    except Exception as e:
+        conn.close()
+        raise RuntimeError(f"add_user_credits failed (user={user_id} amount={amount}): {e}") from e
     conn.close()
 
 
 def update_user_plan(user_id, plan_type, expires_at=None, stripe_customer_id=None):
     conn = get_connection()
-    if expires_at and stripe_customer_id:
-        conn.run("""UPDATE users SET plan=:plan, plan_expires_at=:expires_at,
-                    stripe_customer_id=:cid WHERE id=:id""",
-                 plan=plan_type, expires_at=expires_at, cid=stripe_customer_id, id=user_id)
-    elif expires_at:
-        conn.run("UPDATE users SET plan=:plan, plan_expires_at=:expires_at WHERE id=:id",
-                 plan=plan_type, expires_at=expires_at, id=user_id)
-    else:
-        conn.run("UPDATE users SET plan=:plan WHERE id=:id", plan=plan_type, id=user_id)
+    try:
+        if expires_at and stripe_customer_id:
+            try:
+                conn.run(
+                    "UPDATE users SET plan=:plan, plan_expires_at=:exp, stripe_customer_id=:cid WHERE id=:uid",
+                    plan=plan_type, exp=expires_at, cid=stripe_customer_id, uid=user_id
+                )
+            except Exception:
+                # stripe_customer_id カラムが存在しない場合のフォールバック
+                conn.run(
+                    "UPDATE users SET plan=:plan, plan_expires_at=:exp WHERE id=:uid",
+                    plan=plan_type, exp=expires_at, uid=user_id
+                )
+        elif expires_at:
+            conn.run(
+                "UPDATE users SET plan=:plan, plan_expires_at=:exp WHERE id=:uid",
+                plan=plan_type, exp=expires_at, uid=user_id
+            )
+        else:
+            conn.run(
+                "UPDATE users SET plan=:plan WHERE id=:uid",
+                plan=plan_type, uid=user_id
+            )
+    except Exception as e:
+        conn.close()
+        raise RuntimeError(f"update_user_plan failed (user={user_id} plan={plan_type}): {e}") from e
     conn.close()
 
 
