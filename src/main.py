@@ -871,7 +871,7 @@ def payment_checkout():
 
         checkout_url = checkout_session.url
         print(f"[checkout] Stripeセッション作成成功 session_id={checkout_session.id} "
-              f"metadata_confirmed={checkout_session.metadata}")
+              f"metadata_confirmed={repr(checkout_session.metadata)[:200]}")
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -907,13 +907,13 @@ def verify_payment_session():
         return jsonify({"error": str(e)}), 500
 
     # セッションのユーザーIDと照合（なりすまし防止）
-    # StripeObject はドット記法。metadata は dict なので .get() を使用
-    meta = s.metadata or {}
-    meta_user_id = int(meta.get("user_id", 0) or 0)
+    # metadata は StripeObject のためドット記法（getattr）で統一
+    meta = s.metadata
+    meta_user_id = int(getattr(meta, 'user_id', None) or 0)
     if meta_user_id != user_id:
         return jsonify({"error": "セッションが一致しません"}), 403
 
-    payment_type = meta.get("payment_type")
+    payment_type = getattr(meta, 'payment_type', None)
     payment_status = s.payment_status  # 'paid' / 'no_payment_required' / 'unpaid'
     status = s.status                  # 'complete' / 'open' / 'expired'
 
@@ -1086,6 +1086,16 @@ def _handle_checkout_completed(event, datetime, timedelta):
     # DB 更新
     try:
         if payment_type == 'standard':
+            from src.database import get_connection
+            _conn = get_connection()
+            _rows = _conn.run(
+                "SELECT status FROM payments WHERE stripe_session_id=:sid",
+                sid=session_id
+            )
+            _conn.close()
+            if _rows and _rows[0][0] == "completed":
+                print(f"[webhook][ch3] skip: 二重付与防止 session={session_id} already completed")
+                return
             print(f"[webhook][ch3] add_user_credits 開始 user={user_id} amount={STANDARD_CREDITS}")
             add_user_credits(user_id, STANDARD_CREDITS)
             print(f"[webhook][ch3] add_user_credits 完了")
