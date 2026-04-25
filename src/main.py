@@ -824,6 +824,9 @@ def payment_checkout():
         return jsonify({"error": "決済機能が設定されていません"}), 500
 
     base_url = request.host_url.rstrip('/')
+    meta_to_send = {'user_id': str(user_id), 'payment_type': payment_type}
+    print(f"[checkout] user_id={user_id!r} (type={type(user_id).__name__}) "
+          f"payment_type={payment_type!r} metadata送信={meta_to_send}")
     try:
         if payment_type == 'standard':
             checkout_session = stripe.checkout.Session.create(
@@ -842,7 +845,7 @@ def payment_checkout():
                 mode='payment',
                 success_url=f'{base_url}/?payment=success&session_id={{CHECKOUT_SESSION_ID}}',
                 cancel_url=f'{base_url}/?payment=cancel',
-                metadata={'user_id': str(user_id), 'payment_type': 'standard'},
+                metadata=meta_to_send,
             )
         else:
             checkout_session = stripe.checkout.Session.create(
@@ -862,11 +865,13 @@ def payment_checkout():
                 mode='subscription',
                 success_url=f'{base_url}/?payment=success&session_id={{CHECKOUT_SESSION_ID}}',
                 cancel_url=f'{base_url}/?payment=cancel',
-                metadata={'user_id': str(user_id), 'payment_type': 'pro'},
+                metadata=meta_to_send,
                 subscription_data={'metadata': {'user_id': str(user_id)}},
             )
 
         checkout_url = checkout_session.url
+        print(f"[checkout] Stripeセッション作成成功 session_id={checkout_session.id} "
+              f"metadata_confirmed={checkout_session.metadata}")
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -1039,13 +1044,15 @@ def _handle_checkout_completed(event, datetime, timedelta):
     try:
         s = event.data.object
         meta = s.metadata or {}
+        print(f"[webhook][ch1] raw_meta={dict(meta)} meta_type={type(meta).__name__}")
         raw_uid = meta.get('user_id', '0') or '0'
+        print(f"[webhook][ch1] raw_uid={raw_uid!r} (type={type(raw_uid).__name__}) isdigit={str(raw_uid).isdigit()}")
         user_id = int(raw_uid) if str(raw_uid).isdigit() else 0
         payment_type = meta.get('payment_type', '')
         customer_id = s.customer
         payment_status = s.payment_status
         session_id = s.id or ''
-        print(f"[webhook][ch1] user_id={user_id} payment_type={payment_type!r} "
+        print(f"[webhook][ch1] user_id={user_id} (int) payment_type={payment_type!r} "
               f"payment_status={payment_status} customer={customer_id} session={session_id}")
     except Exception as e:
         print(f"[webhook][ch1] セッション解析エラー: {type(e).__name__}: {e}")

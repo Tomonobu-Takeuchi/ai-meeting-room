@@ -333,12 +333,19 @@ def check_and_use_meeting(user_id):
 
 
 def add_user_credits(user_id, amount):
+    print(f"[DB][add_credits] 開始 user_id={user_id!r} (type={type(user_id).__name__}) amount={amount}")
     conn = get_connection()
     try:
         conn.run(
             "UPDATE users SET credits=COALESCE(credits,0)+:amount WHERE id=:uid",
             amount=amount, uid=user_id
         )
+        affected = conn.row_count
+        print(f"[DB][add_credits] UPDATE完了 rows_affected={affected} user_id={user_id}")
+        if affected == 0:
+            # user存在確認
+            rows = conn.run("SELECT id, credits FROM users WHERE id=:uid", uid=user_id)
+            print(f"[DB][add_credits] 警告: 0行更新 user検索結果={rows}")
     except Exception as e:
         conn.close()
         raise RuntimeError(f"add_user_credits failed (user={user_id} amount={amount}): {e}") from e
@@ -346,6 +353,8 @@ def add_user_credits(user_id, amount):
 
 
 def update_user_plan(user_id, plan_type, expires_at=None, stripe_customer_id=None):
+    print(f"[DB][update_plan] 開始 user_id={user_id!r} (type={type(user_id).__name__}) "
+          f"plan={plan_type!r} expires_at={expires_at} cid={stripe_customer_id!r}")
     if expires_at and stripe_customer_id:
         # stripe_customer_id カラムを含む UPDATE を試みる
         conn = get_connection()
@@ -354,9 +363,15 @@ def update_user_plan(user_id, plan_type, expires_at=None, stripe_customer_id=Non
                 "UPDATE users SET plan=:plan, plan_expires_at=:exp, stripe_customer_id=:cid WHERE id=:uid",
                 plan=plan_type, exp=expires_at, cid=stripe_customer_id, uid=user_id
             )
+            affected = conn.row_count
+            print(f"[DB][update_plan] UPDATE完了(with_cid) rows_affected={affected} user_id={user_id}")
+            if affected == 0:
+                rows = conn.run("SELECT id, plan FROM users WHERE id=:uid", uid=user_id)
+                print(f"[DB][update_plan] 警告: 0行更新 user検索結果={rows}")
             conn.close()
             return
-        except Exception:
+        except Exception as ex:
+            print(f"[DB][update_plan] with_cid失敗 → fallback: {type(ex).__name__}: {ex}")
             conn.close()  # abort 状態のコネクションを破棄
         # フォールバック: stripe_customer_id なしで更新（新コネクション）
         conn = get_connection()
@@ -365,6 +380,11 @@ def update_user_plan(user_id, plan_type, expires_at=None, stripe_customer_id=Non
                 "UPDATE users SET plan=:plan, plan_expires_at=:exp WHERE id=:uid",
                 plan=plan_type, exp=expires_at, uid=user_id
             )
+            affected = conn.row_count
+            print(f"[DB][update_plan] UPDATE完了(fallback) rows_affected={affected} user_id={user_id}")
+            if affected == 0:
+                rows = conn.run("SELECT id, plan FROM users WHERE id=:uid", uid=user_id)
+                print(f"[DB][update_plan] 警告: 0行更新(fallback) user検索結果={rows}")
         except Exception as e:
             conn.close()
             raise RuntimeError(f"update_user_plan fallback failed (user={user_id}): {e}") from e
@@ -376,6 +396,11 @@ def update_user_plan(user_id, plan_type, expires_at=None, stripe_customer_id=Non
                 "UPDATE users SET plan=:plan, plan_expires_at=:exp WHERE id=:uid",
                 plan=plan_type, exp=expires_at, uid=user_id
             )
+            affected = conn.row_count
+            print(f"[DB][update_plan] UPDATE完了(expires) rows_affected={affected} user_id={user_id}")
+            if affected == 0:
+                rows = conn.run("SELECT id, plan FROM users WHERE id=:uid", uid=user_id)
+                print(f"[DB][update_plan] 警告: 0行更新(expires) user検索結果={rows}")
         except Exception as e:
             conn.close()
             raise RuntimeError(f"update_user_plan failed (user={user_id}): {e}") from e
@@ -387,6 +412,11 @@ def update_user_plan(user_id, plan_type, expires_at=None, stripe_customer_id=Non
                 "UPDATE users SET plan=:plan WHERE id=:uid",
                 plan=plan_type, uid=user_id
             )
+            affected = conn.row_count
+            print(f"[DB][update_plan] UPDATE完了(plan_only) rows_affected={affected} user_id={user_id}")
+            if affected == 0:
+                rows = conn.run("SELECT id, plan FROM users WHERE id=:uid", uid=user_id)
+                print(f"[DB][update_plan] 警告: 0行更新(plan_only) user検索結果={rows}")
         except Exception as e:
             conn.close()
             raise RuntimeError(f"update_user_plan failed (user={user_id}): {e}") from e
