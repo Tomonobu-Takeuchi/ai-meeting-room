@@ -902,14 +902,15 @@ def verify_payment_session():
         return jsonify({"error": str(e)}), 500
 
     # セッションのユーザーIDと照合（なりすまし防止）
-    meta = s.get("metadata") or {}
+    # StripeObject はドット記法。metadata は dict なので .get() を使用
+    meta = s.metadata or {}
     meta_user_id = int(meta.get("user_id", 0) or 0)
     if meta_user_id != user_id:
         return jsonify({"error": "セッションが一致しません"}), 403
 
     payment_type = meta.get("payment_type")
-    payment_status = s.get("payment_status")  # 'paid' / 'no_payment_required' / 'unpaid'
-    status = s.get("status")                   # 'complete' / 'open' / 'expired'
+    payment_status = s.payment_status  # 'paid' / 'no_payment_required' / 'unpaid'
+    status = s.status                  # 'complete' / 'open' / 'expired'
 
     print(f"[verify-session] session={session_id} status={status} payment_status={payment_status} type={payment_type}")
 
@@ -946,7 +947,7 @@ def verify_payment_session():
             already_done = rows and rows[0][0] == "completed"
             if not already_done:
                 expires_at = datetime.utcnow() + timedelta(days=31)
-                customer_id = s.get("customer")
+                customer_id = s.customer
                 update_user_plan(user_id, "pro", expires_at, stripe_customer_id=customer_id)
                 complete_payment(session_id)
         else:
@@ -986,7 +987,7 @@ def payment_webhook():
             print(f"[webhook][2] JSON解析成功: type={event.get('type','?')}")
         else:
             event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
-            print(f"[webhook][2] 署名検証成功: type={event['type']}")
+            print(f"[webhook][2] 署名検証成功: type={event.type}")
     except json.JSONDecodeError as e:
         print(f"[webhook][2] JSON解析失敗: {e}")
         return jsonify({"error": "invalid json"}), 400
@@ -1000,8 +1001,9 @@ def payment_webhook():
 
     # ── STEP 3: event_type 取得 ──────────────────────────────────
     try:
-        event_type = event['type'] if hasattr(event, '__getitem__') else str(event)
-        event_id   = event.get('id', 'unknown') if hasattr(event, 'get') else 'unknown'
+        # StripeObject はドット記法でアクセス（.get() は使用不可）
+        event_type = event.type
+        event_id   = event.id
         print(f"[webhook][3] event_type={event_type!r} event_id={event_id}")
     except Exception as e:
         print(f"[webhook][3] event_type取得エラー: {type(e).__name__}: {e}")
@@ -1032,15 +1034,17 @@ def _handle_checkout_completed(event, datetime, timedelta):
     import traceback
 
     # セッションオブジェクト取得
+    # StripeObject はドット記法のみ有効（.get() は AttributeError になる）
+    # metadata だけは通常の dict なので .get() を使用
     try:
-        s = event['data']['object']
-        meta = s.get('metadata') or {}
+        s = event.data.object
+        meta = s.metadata or {}
         raw_uid = meta.get('user_id', '0') or '0'
         user_id = int(raw_uid) if str(raw_uid).isdigit() else 0
         payment_type = meta.get('payment_type', '')
-        customer_id = s.get('customer')
-        payment_status = s.get('payment_status')
-        session_id = s.get('id', '')
+        customer_id = s.customer
+        payment_status = s.payment_status
+        session_id = s.id or ''
         print(f"[webhook][ch1] user_id={user_id} payment_type={payment_type!r} "
               f"payment_status={payment_status} customer={customer_id} session={session_id}")
     except Exception as e:
@@ -1082,10 +1086,11 @@ def _handle_checkout_completed(event, datetime, timedelta):
 
 
 def _handle_invoice_payment(event, datetime, timedelta):
-    invoice = event['data']['object']
-    customer_id = invoice.get('customer')
-    subscription_id = invoice.get('subscription')
-    billing_reason = invoice.get('billing_reason', '')
+    # StripeObject はドット記法でアクセス
+    invoice = event.data.object
+    customer_id = invoice.customer
+    subscription_id = invoice.subscription
+    billing_reason = invoice.billing_reason or ''
     print(f"[webhook] invoice.payment_succeeded "
           f"customer={customer_id} sub={subscription_id} reason={billing_reason}")
 
