@@ -866,14 +866,21 @@ def payment_checkout():
                 subscription_data={'metadata': {'user_id': str(user_id)}},
             )
 
+        checkout_url = checkout_session.url
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    # save_payment は非致命的：失敗してもチェックアウト URL は返す
+    try:
         save_payment(
             user_id, checkout_session.id, payment_type,
             STANDARD_PRICE_JPY if payment_type == 'standard' else PRO_PRICE_JPY,
             STANDARD_CREDITS if payment_type == 'standard' else 0,
         )
-        return jsonify({"checkout_url": checkout_session.url})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"[checkout] save_payment 失敗（無視）: {e}")
+
+    return jsonify({"checkout_url": checkout_url})
 
 
 @app.route("/api/payment/verify-session", methods=["POST"])

@@ -346,53 +346,79 @@ def add_user_credits(user_id, amount):
 
 
 def update_user_plan(user_id, plan_type, expires_at=None, stripe_customer_id=None):
-    conn = get_connection()
-    try:
-        if expires_at and stripe_customer_id:
-            try:
-                conn.run(
-                    "UPDATE users SET plan=:plan, plan_expires_at=:exp, stripe_customer_id=:cid WHERE id=:uid",
-                    plan=plan_type, exp=expires_at, cid=stripe_customer_id, uid=user_id
-                )
-            except Exception:
-                # stripe_customer_id カラムが存在しない場合のフォールバック
-                conn.run(
-                    "UPDATE users SET plan=:plan, plan_expires_at=:exp WHERE id=:uid",
-                    plan=plan_type, exp=expires_at, uid=user_id
-                )
-        elif expires_at:
+    if expires_at and stripe_customer_id:
+        # stripe_customer_id カラムを含む UPDATE を試みる
+        conn = get_connection()
+        try:
+            conn.run(
+                "UPDATE users SET plan=:plan, plan_expires_at=:exp, stripe_customer_id=:cid WHERE id=:uid",
+                plan=plan_type, exp=expires_at, cid=stripe_customer_id, uid=user_id
+            )
+            conn.close()
+            return
+        except Exception:
+            conn.close()  # abort 状態のコネクションを破棄
+        # フォールバック: stripe_customer_id なしで更新（新コネクション）
+        conn = get_connection()
+        try:
             conn.run(
                 "UPDATE users SET plan=:plan, plan_expires_at=:exp WHERE id=:uid",
                 plan=plan_type, exp=expires_at, uid=user_id
             )
-        else:
+        except Exception as e:
+            conn.close()
+            raise RuntimeError(f"update_user_plan fallback failed (user={user_id}): {e}") from e
+        conn.close()
+    elif expires_at:
+        conn = get_connection()
+        try:
+            conn.run(
+                "UPDATE users SET plan=:plan, plan_expires_at=:exp WHERE id=:uid",
+                plan=plan_type, exp=expires_at, uid=user_id
+            )
+        except Exception as e:
+            conn.close()
+            raise RuntimeError(f"update_user_plan failed (user={user_id}): {e}") from e
+        conn.close()
+    else:
+        conn = get_connection()
+        try:
             conn.run(
                 "UPDATE users SET plan=:plan WHERE id=:uid",
                 plan=plan_type, uid=user_id
             )
-    except Exception as e:
+        except Exception as e:
+            conn.close()
+            raise RuntimeError(f"update_user_plan failed (user={user_id}): {e}") from e
         conn.close()
-        raise RuntimeError(f"update_user_plan failed (user={user_id} plan={plan_type}): {e}") from e
-    conn.close()
 
 
 def save_payment(user_id, stripe_session_id, payment_type, amount_jpy, credits_added=0, stripe_customer_id=None):
     conn = get_connection()
-    conn.run("""
-        INSERT INTO payments (user_id, stripe_session_id, stripe_customer_id, payment_type, amount_jpy, credits_added)
-        VALUES (:user_id, :session_id, :cid, :payment_type, :amount_jpy, :credits_added)
-        ON CONFLICT (stripe_session_id) DO NOTHING
-    """, user_id=user_id, session_id=stripe_session_id, cid=stripe_customer_id,
-        payment_type=payment_type, amount_jpy=amount_jpy, credits_added=credits_added)
+    try:
+        conn.run("""
+            INSERT INTO payments
+                (user_id, stripe_session_id, stripe_customer_id, payment_type, amount_jpy, credits_added)
+            VALUES (:user_id, :session_id, :cid, :payment_type, :amount_jpy, :credits_added)
+            ON CONFLICT (stripe_session_id) DO NOTHING
+        """, user_id=user_id, session_id=stripe_session_id, cid=stripe_customer_id,
+            payment_type=payment_type, amount_jpy=amount_jpy, credits_added=credits_added)
+    except Exception as e:
+        conn.close()
+        raise RuntimeError(f"save_payment failed (session={stripe_session_id}): {e}") from e
     conn.close()
 
 
 def complete_payment(stripe_session_id):
     conn = get_connection()
-    conn.run("""
-        UPDATE payments SET status='completed', completed_at=NOW()
-        WHERE stripe_session_id=:session_id
-    """, session_id=stripe_session_id)
+    try:
+        conn.run("""
+            UPDATE payments SET status='completed', completed_at=NOW()
+            WHERE stripe_session_id=:session_id
+        """, session_id=stripe_session_id)
+    except Exception as e:
+        conn.close()
+        raise RuntimeError(f"complete_payment failed (session={stripe_session_id}): {e}") from e
     conn.close()
 
 
