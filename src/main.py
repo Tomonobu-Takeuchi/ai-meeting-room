@@ -1043,12 +1043,32 @@ def _handle_checkout_completed(event, datetime, timedelta):
     # metadata だけは通常の dict なので .get() を使用
     try:
         s = event.data.object
-        meta = s.metadata or {}
-        print(f"[webhook][ch1] raw_meta={dict(meta)} meta_type={type(meta).__name__}")
-        raw_uid = meta.get('user_id', '0') or '0'
+        meta_raw = s.metadata
+        # dict(meta_raw) は StripeObject.keys() が整数インデックスを返すと KeyError: 0 になるため使用禁止
+        print(f"[webhook][ch1] metadata type={type(meta_raw).__name__} repr={repr(meta_raw)[:300]}")
+
+        # StripeObject の .get() はキー名で内部ストレージを検索するため正常動作する
+        # dict() / イテレータ経由のアクセスは NG
+        try:
+            raw_uid = (meta_raw.get('user_id') or '') if meta_raw else ''
+        except Exception as e1:
+            print(f"[webhook][ch1] meta.get失敗({e1}) → meta['user_id']を試行")
+            try:
+                raw_uid = str(meta_raw['user_id']) if meta_raw else ''
+            except Exception as e2:
+                print(f"[webhook][ch1] meta['user_id']も失敗: {e2}")
+                raw_uid = ''
+
+        try:
+            payment_type = (meta_raw.get('payment_type') or '') if meta_raw else ''
+        except Exception:
+            try:
+                payment_type = str(meta_raw['payment_type']) if meta_raw else ''
+            except Exception:
+                payment_type = ''
+
         print(f"[webhook][ch1] raw_uid={raw_uid!r} (type={type(raw_uid).__name__}) isdigit={str(raw_uid).isdigit()}")
         user_id = int(raw_uid) if str(raw_uid).isdigit() else 0
-        payment_type = meta.get('payment_type', '')
         customer_id = s.customer
         payment_status = s.payment_status
         session_id = s.id or ''
