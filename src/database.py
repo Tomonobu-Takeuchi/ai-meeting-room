@@ -337,7 +337,7 @@ def add_user_credits(user_id, amount):
     conn = get_connection()
     try:
         conn.run(
-            "UPDATE users SET credits=COALESCE(credits,0)+:amount, plan_type='standard' WHERE id=:uid",
+            "UPDATE users SET credits=COALESCE(credits,0)+:amount, plan='standard' WHERE id=:uid",
             amount=amount, uid=user_id
         )
         affected = conn.row_count
