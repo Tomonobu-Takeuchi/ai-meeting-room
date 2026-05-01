@@ -208,9 +208,9 @@ async function speakWithTTS(text, voiceId, targetEl = null) {
 }
 
 async function previewVoice(mode) {
-  const radioName = mode === 'add' ? 'pVoiceId' : 'eVoiceId';
-  const selected = document.querySelector(`input[name="${radioName}"]:checked`);
-  const voiceId = selected?.value;
+  const voiceId = mode === 'add'
+    ? document.querySelector('input[name="pVoiceId"]:checked')?.value
+    : $('eVoiceId')?.value;
   if (!voiceId || voiceId === 'none') return;
   const name = mode === 'add' ? $('pName').value.trim() : $('eName').value.trim();
   const sampleText = name ? `こんにちは。私は${name}です。よろしくお願いします。` : 'こんにちは。よろしくお願いします。';
@@ -425,9 +425,7 @@ async function init() {
   document.querySelectorAll('input[name="pVoiceId"]').forEach(radio => {
     radio.addEventListener('change', () => { $('addPreviewVoiceBtn').disabled = radio.value === 'none'; });
   });
-  document.querySelectorAll('input[name="eVoiceId"]').forEach(radio => {
-    radio.addEventListener('change', () => { $('editPreviewVoiceBtn').disabled = radio.value === 'none'; });
-  });
+  $('eVoiceId')?.addEventListener('change', () => { $('editPreviewVoiceBtn').disabled = $('eVoiceId').value === 'none'; });
   $('addPreviewVoiceBtn')?.addEventListener('click', () => previewVoice('add'));
   $('editPreviewVoiceBtn')?.addEventListener('click', () => previewVoice('edit'));
 
@@ -714,15 +712,31 @@ function openEditModal(memberId) {
   DOM.editLearnDataList.innerHTML = ''; DOM.editLearnStatus.textContent = '';
   DOM.editAvatarPreview.innerHTML = State.editAvatarDataUrl ? `<img src="${State.editAvatarDataUrl}" alt="avatar" />` : (member.avatar || '👤');
   const voiceVal = member.voice_id || 'none';
-  const voiceRadio = document.querySelector(`input[name="eVoiceId"][value="${voiceVal}"]`);
-  if (voiceRadio) { voiceRadio.checked = true; }
-  else { const nr = document.querySelector('input[name="eVoiceId"][value="none"]'); if (nr) nr.checked = true; }
+  const voiceSel = $('eVoiceId');
+  if (voiceSel) voiceSel.value = voiceVal;
   $('editPreviewVoiceBtn').disabled = (voiceVal === 'none');
   DOM.editPersonaModal.classList.remove('hidden');
   // 保存済み学習データを読み込む
   loadSavedLearnData(memberId);
   const refreshBtn = $('refreshLearnBtn');
   if (refreshBtn) { refreshBtn.onclick = () => loadSavedLearnData(memberId); }
+  // 成熟度表示
+  const maturityDisplay = $('editMaturityDisplay');
+  const maturityText = $('editMaturityText');
+  if (maturityDisplay && maturityText) {
+    maturityDisplay.style.display = 'none';
+    try {
+      let growth = State.growthCache[memberId];
+      if (!growth) {
+        const data = await API.get(`/api/personas/${memberId}/growth`);
+        if (data.growth) { State.growthCache[memberId] = data.growth; growth = data.growth; }
+      }
+      if (growth && growth.maturity_level > 0) {
+        maturityText.textContent = `Lv${growth.maturity_level} ${growth.level_name} / スコア${Math.round(growth.maturity_score ?? 0)}点`;
+        maturityDisplay.style.display = 'block';
+      }
+    } catch (e) { /* 無視 */ }
+  }
 }
 
 async function loadSavedLearnData(personaId) {
@@ -768,7 +782,7 @@ async function submitEditPersona() {
   const description = $('eDescription').value.trim(), personality = $('ePersonality').value.trim();
   const speakingStyle = $('eSpeakingStyle').value.trim(), color = $('eColor').value;
   let background = buildBackgroundFromLearnData($('eBackground').value.trim(), State.editLearnFiles);
-  const voiceId = document.querySelector('input[name="eVoiceId"]:checked')?.value || 'none';
+  const voiceId = $('eVoiceId')?.value || 'none';
   if (!name || !description || !personality || !speakingStyle) { showToast('必須項目を入力してください', 'error'); return; }
   if (State.editAvatarDataUrl) State.avatarImages[memberId] = State.editAvatarDataUrl;
   try {

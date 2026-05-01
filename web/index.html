@@ -561,16 +561,18 @@
     <div class="form-group"><label>バックグラウンド</label><textarea id="eBackground"></textarea></div>
     <div class="form-group">
       <label>音声設定（任意）</label>
-      <div class="voice-options">
-        <label class="voice-option"><input type="radio" name="eVoiceId" value="none" checked /> なし（テキストのみ）</label>
-        <label class="voice-option"><input type="radio" name="eVoiceId" value="alloy" /> Alloy - 中性的・落ち着いた</label>
-        <label class="voice-option"><input type="radio" name="eVoiceId" value="echo" /> Echo - 男性的・低め</label>
-        <label class="voice-option"><input type="radio" name="eVoiceId" value="fable" /> Fable - 温かみがある</label>
-        <label class="voice-option"><input type="radio" name="eVoiceId" value="onyx" /> Onyx - 男性・重厚</label>
-        <label class="voice-option"><input type="radio" name="eVoiceId" value="nova" /> Nova - 女性・明るい</label>
-        <label class="voice-option"><input type="radio" name="eVoiceId" value="shimmer" /> Shimmer - 女性・柔らかい</label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select id="eVoiceId" style="flex:1;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;color:var(--text-primary);font-size:13px;outline:none;">
+          <option value="none">なし（テキストのみ）</option>
+          <option value="alloy">Alloy - 中性的・落ち着いた</option>
+          <option value="echo">Echo - 男性的・低め</option>
+          <option value="fable">Fable - 温かみがある</option>
+          <option value="onyx">Onyx - 男性・重厚</option>
+          <option value="nova">Nova - 女性・明るい</option>
+          <option value="shimmer">Shimmer - 女性・柔らかい</option>
+        </select>
+        <button type="button" class="avatar-file-btn" id="editPreviewVoiceBtn" disabled>▶ 試聴する</button>
       </div>
-      <button type="button" class="avatar-file-btn" id="editPreviewVoiceBtn" style="margin-top:8px;" disabled>▶ 試聴する</button>
     </div>
     <div class="form-group">
       <label>追加学習データ</label>
@@ -594,6 +596,9 @@
       </div>
       <div id="editLearnDataList"></div>
       <div class="learn-status" id="editLearnStatus"></div>
+    </div>
+    <div id="editMaturityDisplay" style="display:none;padding:10px 12px;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);font-size:13px;color:var(--text-secondary);margin-bottom:12px;">
+      現在の成熟度：<span id="editMaturityText" style="color:var(--accent-purple);font-weight:600;"></span>
     </div>
     <div class="modal-footer">
       <button class="btn" id="cancelEditPersona">キャンセル</button>
