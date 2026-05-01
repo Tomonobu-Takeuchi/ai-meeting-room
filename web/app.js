@@ -697,7 +697,7 @@ function openAddModal() {
 }
 function closeAddModal() { DOM.addPersonaModal.classList.add('hidden'); }
 
-function openEditModal(memberId) {
+async function openEditModal(memberId) {
   const member = State.members.find(m => m.id === memberId); if (!member) return;
   State.editAvatarDataUrl = State.avatarImages[memberId] || null; State.editLearnFiles = [];
   if (DOM.editLearnStatus) {
