@@ -209,7 +209,7 @@ async function speakWithTTS(text, voiceId, targetEl = null) {
 
 async function previewVoice(mode) {
   const voiceId = mode === 'add'
-    ? document.querySelector('input[name="pVoiceId"]:checked')?.value
+    ? $('pVoiceId')?.value
     : $('eVoiceId')?.value;
   if (!voiceId || voiceId === 'none') return;
   const name = mode === 'add' ? $('pName').value.trim() : $('eName').value.trim();
@@ -421,10 +421,8 @@ async function init() {
   $('editFetchWebBtn').addEventListener('click', () => fetchLearnUrl('edit', 'web'));
   $('editFetchYoutubeBtn').addEventListener('click', () => fetchLearnUrl('edit', 'youtube'));
 
-  // ===== 音声設定ラジオ変更でプレビューボタンのdisabled切り替え =====
-  document.querySelectorAll('input[name="pVoiceId"]').forEach(radio => {
-    radio.addEventListener('change', () => { $('addPreviewVoiceBtn').disabled = radio.value === 'none'; });
-  });
+  // ===== 音声設定変更でプレビューボタンのdisabled切り替え =====
+  $('pVoiceId')?.addEventListener('change', () => { $('addPreviewVoiceBtn').disabled = $('pVoiceId').value === 'none'; });
   $('eVoiceId')?.addEventListener('change', () => { $('editPreviewVoiceBtn').disabled = $('eVoiceId').value === 'none'; });
   $('addPreviewVoiceBtn')?.addEventListener('click', () => previewVoice('add'));
   $('editPreviewVoiceBtn')?.addEventListener('click', () => previewVoice('edit'));
@@ -687,8 +685,7 @@ function openAddModal() {
   $('pName').value = ''; $('pColor').value = '#8B5CF6';
   $('pDescription').value = ''; $('pPersonality').value = '';
   $('pSpeakingStyle').value = ''; $('pBackground').value = '';
-  const noneR = document.querySelector('input[name="pVoiceId"][value="none"]');
-  if (noneR) { noneR.checked = true; $('addPreviewVoiceBtn').disabled = true; }
+  if ($('pVoiceId')) { $('pVoiceId').value = 'none'; $('addPreviewVoiceBtn').disabled = true; }
   DOM.learnDataList.innerHTML = '';
   DOM.learnStatus.textContent = '💡 音声・動画：200MB以下のmp3/mp4に対応。それ以上はYouTube URLをご利用ください。\nYouTube：Bot制限で取得できない場合は動画ファイルを直接アップロードしてください。';
   DOM.learnStatus.style.color = 'var(--text-muted)';
@@ -997,7 +994,7 @@ async function submitAddPersona() {
   const description = $('pDescription').value.trim(), personality = $('pPersonality').value.trim();
   const speakingStyle = $('pSpeakingStyle').value.trim(), color = $('pColor').value;
   let background = buildBackgroundFromLearnData($('pBackground').value.trim(), State.addLearnFiles);
-  const voiceId = document.querySelector('input[name="pVoiceId"]:checked')?.value || 'none';
+  const voiceId = $('pVoiceId')?.value || 'none';
   if (!name || !description || !personality || !speakingStyle) { showToast('必須項目を入力してください', 'error'); return; }
   try {
     const data = await API.post('/api/personas/add', { name, avatar, description, personality, speaking_style: speakingStyle, background, role: 'member', color, voice_id: voiceId === 'none' ? null : voiceId });

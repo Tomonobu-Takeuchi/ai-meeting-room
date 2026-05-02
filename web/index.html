@@ -259,7 +259,7 @@
       .welcome-sub{font-size:12px;}
 
       /* 入力エリア */
-      .chat-input-area{padding:8px 10px calc(120px + var(--sab)) 10px;gap:6px;} /* 下余白でモバイルアクションバーと重ならないよう */
+      .chat-input-area{padding:8px 10px calc(80px + var(--sab)) 10px;gap:6px;}
       .chat-input{font-size:14px;padding:10px 12px;min-height:42px;}
       .action-row{gap:4px;flex-wrap:wrap;}
       .action-label{display:none;}
@@ -318,15 +318,9 @@
     #logoutBtn{font-size:11px;padding:4px 8px;}
     #loginBtnHeader{font-size:12px;padding:6px 12px;}
 
-    /* ===== 音声設定ラジオ ===== */
-    .voice-options{display:flex;flex-direction:column;gap:3px;margin-top:4px;}
-    .voice-option{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary);cursor:pointer;padding:2px 0;}
-    .voice-option:hover{color:var(--text-primary);}
-    .voice-option input{accent-color:var(--accent-purple);cursor:pointer;}
-
     /* ===== Lvバッジ ===== */
     .member-card{position:relative;}
-    .lv-badge{position:absolute;bottom:6px;right:8px;background:rgba(124,58,237,0.85);color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;pointer-events:none;letter-spacing:0.3px;line-height:1.4;}
+    .lv-badge{position:absolute;top:5px;right:6px;background:rgba(124,58,237,0.85);color:#fff;font-size:9px;font-weight:700;padding:1px 4px;border-radius:10px;pointer-events:none;letter-spacing:0.3px;line-height:1.4;}
 
     /* ===== プランバッジ ===== */
     #planBtn{font-size:11px;padding:5px 11px;border-color:rgba(124,58,237,0.5);color:#C4B5FD;}
@@ -502,16 +496,18 @@
     <div class="form-group"><label>バックグラウンド</label><textarea id="pBackground" placeholder="大手商社に30年勤務後、独立。60代。"></textarea></div>
     <div class="form-group">
       <label>音声設定（任意）</label>
-      <div class="voice-options">
-        <label class="voice-option"><input type="radio" name="pVoiceId" value="none" checked /> なし（テキストのみ）</label>
-        <label class="voice-option"><input type="radio" name="pVoiceId" value="alloy" /> Alloy - 中性的・落ち着いた</label>
-        <label class="voice-option"><input type="radio" name="pVoiceId" value="echo" /> Echo - 男性的・低め</label>
-        <label class="voice-option"><input type="radio" name="pVoiceId" value="fable" /> Fable - 温かみがある</label>
-        <label class="voice-option"><input type="radio" name="pVoiceId" value="onyx" /> Onyx - 男性・重厚</label>
-        <label class="voice-option"><input type="radio" name="pVoiceId" value="nova" /> Nova - 女性・明るい</label>
-        <label class="voice-option"><input type="radio" name="pVoiceId" value="shimmer" /> Shimmer - 女性・柔らかい</label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select id="pVoiceId" style="flex:1;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;color:var(--text-primary);font-size:13px;outline:none;">
+          <option value="none">なし（テキストのみ）</option>
+          <option value="alloy">Alloy - 中性的・落ち着いた</option>
+          <option value="echo">Echo - 男性的・低め</option>
+          <option value="fable">Fable - 温かみがある</option>
+          <option value="onyx">Onyx - 男性・重厚</option>
+          <option value="nova">Nova - 女性・明るい</option>
+          <option value="shimmer">Shimmer - 女性・柔らかい</option>
+        </select>
+        <button type="button" class="avatar-file-btn" id="addPreviewVoiceBtn" disabled>▶ 試聴する</button>
       </div>
-      <button type="button" class="avatar-file-btn" id="addPreviewVoiceBtn" style="margin-top:8px;" disabled>▶ 試聴する</button>
     </div>
     <div class="form-group">
       <label>学習データ（テキスト/PDF・画像・音声・URL）</label>
@@ -740,7 +736,7 @@
           <li>月5回まで会議</li>
           <li>全ペルソナ利用可</li>
           <li>学習データ登録</li>
-          <li class="dim">PDF議事録は無制限</li>
+          <li>PDF議事録は無制限</li>
         </ul>
         <button class="btn" disabled>現在のプラン</button>
       </div>
