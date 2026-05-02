@@ -1775,6 +1775,27 @@ window.openPricingModal = openPricingModal;
 window.closePricingModal = closePricingModal;
 window.purchasePlan = purchasePlan;
 
+// ===== 使い方モーダル =====
+function openHowToModal(tabIdx) {
+  const overlay = $('howToModal');
+  if (!overlay) return;
+  overlay.classList.remove('hidden');
+  switchHowToTab(tabIdx ?? 0);
+}
+function closeHowToModal() {
+  $('howToModal')?.classList.add('hidden');
+}
+function switchHowToTab(idx) {
+  document.querySelectorAll('.howto-tab').forEach((t, i) => t.classList.toggle('active', i === idx));
+  document.querySelectorAll('.howto-section').forEach((s, i) => s.classList.toggle('active', i === idx));
+  // タブを画面内にスクロール
+  const tab = document.querySelectorAll('.howto-tab')[idx];
+  tab?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+}
+window.openHowToModal = openHowToModal;
+window.closeHowToModal = closeHowToModal;
+window.switchHowToTab = switchHowToTab;
+
 // モバイルアクションバーのボタンをPC版と連動
 function initMobileActionBar() {
   if (DOM.mobileSummarizeBtn) DOM.mobileSummarizeBtn.addEventListener('click', summarizeMeeting);

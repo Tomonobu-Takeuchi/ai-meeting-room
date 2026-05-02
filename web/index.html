@@ -363,6 +363,58 @@
     .guide-step-num{width:28px;height:28px;border-radius:50%;background:var(--accent-purple);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;}
     .guide-step-title{font-size:14px;font-weight:600;margin-bottom:3px;}
     .guide-step-desc{font-size:12px;color:var(--text-secondary);line-height:1.6;}
+
+    /* ===== 使い方モーダル ===== */
+    .howto-modal{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);width:700px;max-width:96vw;max-height:90svh;display:flex;flex-direction:column;box-shadow:var(--shadow);overflow:hidden;}
+    .howto-modal-header{display:flex;align-items:center;justify-content:space-between;padding:20px 24px 0;flex-shrink:0;}
+    .howto-modal-header h2{font-size:17px;font-weight:700;margin:0;}
+    .howto-close{width:30px;height:30px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;}
+    .howto-close:hover{background:var(--bg-hover);color:var(--text-primary);}
+    .howto-tabs{display:flex;overflow-x:auto;border-bottom:1px solid var(--border);padding:0 24px;margin-top:16px;flex-shrink:0;scrollbar-width:none;}
+    .howto-tabs::-webkit-scrollbar{display:none;}
+    .howto-tab{flex-shrink:0;padding:10px 14px;font-size:12px;color:var(--text-secondary);cursor:pointer;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color 0.15s,border-color 0.15s;white-space:nowrap;background:none;font-family:'Noto Sans JP',sans-serif;}
+    .howto-tab:hover{color:var(--text-primary);}
+    .howto-tab.active{color:var(--accent-purple);border-bottom-color:var(--accent-purple);font-weight:600;}
+    .howto-body{flex:1;overflow-y:auto;padding:24px;}
+    .howto-section{display:none;animation:fadeIn 0.2s ease;}
+    .howto-section.active{display:block;}
+    .howto-h3{font-size:14px;font-weight:700;color:var(--text-primary);margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border-subtle);}
+    .howto-h3:first-child{margin-top:0;}
+    .howto-p{font-size:13px;color:var(--text-secondary);line-height:1.85;margin-bottom:10px;}
+    .howto-step{display:flex;gap:14px;align-items:flex-start;margin-bottom:16px;}
+    .howto-step-num{width:26px;height:26px;border-radius:50%;background:var(--accent-purple);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+    .howto-step-body h4{font-size:13px;font-weight:600;margin:0 0 4px;color:var(--text-primary);}
+    .howto-step-body p{font-size:12px;color:var(--text-secondary);line-height:1.75;margin:0;}
+    .howto-tip{background:rgba(37,99,235,0.08);border:1px solid rgba(37,99,235,0.25);border-radius:var(--radius);padding:10px 14px;margin-bottom:12px;}
+    .howto-tip p{font-size:12px;color:#93C5FD;line-height:1.75;margin:0;}
+    .howto-warn{background:rgba(217,119,6,0.08);border:1px solid rgba(217,119,6,0.25);border-radius:var(--radius);padding:10px 14px;margin-bottom:12px;}
+    .howto-warn p{font-size:12px;color:#FCD34D;line-height:1.75;margin:0;}
+    .howto-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;}
+    .howto-table th{padding:8px 10px;background:var(--bg-elevated);color:var(--text-secondary);font-weight:600;text-align:left;border:1px solid var(--border);}
+    .howto-table td{padding:8px 10px;color:var(--text-secondary);border:1px solid var(--border);line-height:1.6;}
+    .howto-table td:first-child{color:var(--text-primary);font-weight:500;white-space:nowrap;}
+    .howto-lv{display:flex;align-items:flex-start;gap:12px;padding:10px 14px;background:var(--bg-elevated);border-radius:var(--radius);margin-bottom:8px;}
+    .howto-lv-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(124,58,237,0.3);color:#C4B5FD;flex-shrink:0;margin-top:2px;}
+    .howto-lv-text h4{font-size:13px;font-weight:600;margin:0 0 2px;color:var(--text-primary);}
+    .howto-lv-text p{font-size:12px;color:var(--text-secondary);margin:0;line-height:1.65;}
+    .howto-faq{margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border-subtle);}
+    .howto-faq:last-child{border-bottom:none;margin-bottom:0;}
+    .howto-faq-q{font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:6px;padding-left:22px;position:relative;}
+    .howto-faq-q::before{content:'Q';position:absolute;left:0;color:var(--accent-purple);font-weight:700;}
+    .howto-faq-a{font-size:12px;color:var(--text-secondary);line-height:1.75;padding-left:22px;position:relative;}
+    .howto-faq-a::before{content:'A';position:absolute;left:0;color:#60A5FA;font-weight:700;}
+    .howto-ul{list-style:none;margin:0 0 12px;padding:0;display:flex;flex-direction:column;gap:6px;}
+    .howto-ul li{font-size:12px;color:var(--text-secondary);padding-left:16px;position:relative;line-height:1.65;}
+    .howto-ul li::before{content:'›';position:absolute;left:0;color:var(--accent-purple);font-weight:700;}
+    #howToBtn{font-size:11px;padding:5px 10px;}
+    @media(max-width:768px){
+      .howto-modal-header{padding:14px 16px 0;}
+      .howto-tabs{padding:0 10px;}
+      .howto-tab{padding:8px 10px;font-size:11px;}
+      .howto-body{padding:16px;}
+      .howto-table{font-size:11px;}
+      .howto-table th,.howto-table td{padding:6px 8px;}
+    }
   </style>
 </head>
 <body>
@@ -375,6 +427,7 @@
     <div class="logo">AI<span>-</span>PERSONA<span> 会議室</span></div>
   </div>
   <div class="header-right">
+    <button class="btn" id="howToBtn" onclick="openHowToModal()">📖 使い方</button>
     <button class="btn btn-plan" id="planBtn" onclick="openPricingModal()">料金プラン</button>
     <div id="authArea">
       <button class="btn" id="loginBtnHeader">🔑 ログイン</button>
@@ -679,6 +732,300 @@
 </script>
 
 <script src="app.js"></script>
+
+<!-- ===== 使い方モーダル ===== -->
+<div class="modal-overlay hidden" id="howToModal" onclick="if(event.target===this)closeHowToModal()">
+  <div class="howto-modal">
+    <div class="howto-modal-header">
+      <h2>📖 使い方ガイド</h2>
+      <button class="howto-close" onclick="closeHowToModal()">✕</button>
+    </div>
+    <div class="howto-tabs" id="howToTabs">
+      <button class="howto-tab active" onclick="switchHowToTab(0)">① 概要</button>
+      <button class="howto-tab" onclick="switchHowToTab(1)">② はじめ方</button>
+      <button class="howto-tab" onclick="switchHowToTab(2)">③ ペルソナ</button>
+      <button class="howto-tab" onclick="switchHowToTab(3)">④ 会議の進め方</button>
+      <button class="howto-tab" onclick="switchHowToTab(4)">⑤ 音声モード</button>
+      <button class="howto-tab" onclick="switchHowToTab(5)">⑥ 成熟度 Lv</button>
+      <button class="howto-tab" onclick="switchHowToTab(6)">⑦ 料金プラン</button>
+      <button class="howto-tab" onclick="switchHowToTab(7)">⑧ よくある質問</button>
+    </div>
+    <div class="howto-body">
+
+      <!-- ① 概要 -->
+      <div class="howto-section active">
+        <h3 class="howto-h3">🏛️ AI-PERSONA会議室とは</h3>
+        <p class="howto-p">複数のAIペルソナ（人物キャラクター）を会議に参加させ、特定のテーマについて多角的な意見を引き出すシミュレーターです。ペルソナはそれぞれ固有の性格・専門知識・話し方を持ち、リアルな議論を再現します。</p>
+        <p class="howto-p">学習データ（テキスト・PDF・音声・YouTube等）を与えることでペルソナの知識が深まり、フィードバックを重ねることで「成熟度（Lv）」が上がり、より深い発言ができるようになります。</p>
+        <h3 class="howto-h3">✨ こんな場面で活躍します</h3>
+        <ul class="howto-ul">
+          <li>新規事業アイデアを多角的に検証したい</li>
+          <li>意思決定の前に反論・リスクを洗い出したい</li>
+          <li>歴史上の人物や専門家の視点を会議に取り込みたい</li>
+          <li>プレゼン・企画書のブラッシュアップに活用したい</li>
+          <li>一人では見えなかった盲点を発見したい</li>
+        </ul>
+        <h3 class="howto-h3">🔑 主な機能</h3>
+        <ul class="howto-ul">
+          <li>ペルソナの新規作成・編集・削除</li>
+          <li>テキスト・PDF・画像・音声・動画・URL・YouTubeで知識を学習</li>
+          <li>会議のストリーミング表示（リアルタイム生成）</li>
+          <li>ファシリテーター介入・議論のまとめ機能</li>
+          <li>OpenAI TTS音声読み上げ＆マイク入力</li>
+          <li>議事録のPDFダウンロード</li>
+          <li>フィードバックによるペルソナの成長（Lvシステム）</li>
+        </ul>
+      </div>
+
+      <!-- ② はじめ方 -->
+      <div class="howto-section">
+        <h3 class="howto-h3">🚀 はじめての会議を開くまで 3ステップ</h3>
+        <div class="howto-step">
+          <div class="howto-step-num">1</div>
+          <div class="howto-step-body">
+            <h4>参加ペルソナを選ぶ</h4>
+            <p>左のメンバーリストに表示されているペルソナが会議に参加します。カードをクリックで選択／解除できます。初期状態では全員が選択されています。<br>「＋ 追加」ボタンから自分だけのオリジナルペルソナも作れます。</p>
+          </div>
+        </div>
+        <div class="howto-step">
+          <div class="howto-step-num">2</div>
+          <div class="howto-step-body">
+            <h4>議題を入力して「会議開始」</h4>
+            <p>画面上部のテキストボックスに議題を入力し、「▶ 会議開始」をクリックします。参加メンバーの確認画面が表示されるので「会議を開始する」を押すとスタートです。</p>
+          </div>
+        </div>
+        <div class="howto-step">
+          <div class="howto-step-num">3</div>
+          <div class="howto-step-body">
+            <h4>議論してまとめ・議事録をダウンロード</h4>
+            <p>チャット欄でメッセージを送るとAIが応答します。「🤔 議論のまとめ」で全体を要約し、「📄 議事録をダウンロード（PDF）」で議事録を保存できます。</p>
+          </div>
+        </div>
+        <div class="howto-tip">
+          <p>💡 <strong>ゲストでも利用可能！</strong> ログインせずにそのまま会議を始められます。ログインするとペルソナや学習データがアカウントに紐付けられ、次回も引き続き使えます。</p>
+        </div>
+        <h3 class="howto-h3">📋 画面の見方</h3>
+        <table class="howto-table">
+          <tr><th>エリア</th><th>機能</th></tr>
+          <tr><td>左パネル</td><td>参加メンバー一覧。カードクリックで選択、⚙で編集、🗑で削除</td></tr>
+          <tr><td>中央チャット</td><td>AIの発言・ユーザーのメッセージが流れるメインエリア</td></tr>
+          <tr><td>上部バー</td><td>議題入力・会議開始・音声モード切り替え</td></tr>
+          <tr><td>下部入力欄</td><td>メッセージ送信。話しかけるメンバーをボタンで指定可</td></tr>
+        </table>
+      </div>
+
+      <!-- ③ ペルソナ -->
+      <div class="howto-section">
+        <h3 class="howto-h3">🧑 ペルソナの作り方</h3>
+        <p class="howto-p">左パネル上部の「＋ 追加」から新規ペルソナを作成できます。以下の項目を設定してください。</p>
+        <table class="howto-table">
+          <tr><th>項目</th><th>説明</th></tr>
+          <tr><td>名前 *</td><td>ペルソナの名前（例：山田太郎、孔明）</td></tr>
+          <tr><td>説明・肩書き *</td><td>ペルソナの専門分野や立場（例：元商社マン・財務と海外展開に詳しい）</td></tr>
+          <tr><td>性格・思考スタイル *</td><td>考え方の癖や価値観（例：慎重で保守的。リスク管理を最優先）</td></tr>
+          <tr><td>話し方の特徴 *</td><td>発言の語尾・口癖など（例：「リスクを考えると〜」という表現が多い）</td></tr>
+          <tr><td>バックグラウンド</td><td>経歴・年齢などの背景情報</td></tr>
+          <tr><td>音声設定</td><td>音声モード時に使うOpenAI TTS音声（任意）</td></tr>
+        </table>
+        <h3 class="howto-h3">📚 学習データの種類と追加方法</h3>
+        <p class="howto-p">ペルソナ追加・編集モーダルの下部から学習データを登録できます。登録した内容がペルソナの知識ベースになります。</p>
+        <table class="howto-table">
+          <tr><th>種類</th><th>対応形式</th><th>ポイント</th></tr>
+          <tr><td>📄 テキスト/PDF</td><td>.txt .md .pdf</td><td>論文・マニュアル・書籍のOCRなどに</td></tr>
+          <tr><td>🖼️ 画像</td><td>jpg/png等</td><td>図表・スクショ等をAIが認識</td></tr>
+          <tr><td>🎵 音声</td><td>mp3/wav等 200MB以下</td><td>インタビュー・講演の文字起こし</td></tr>
+          <tr><td>🎬 動画</td><td>mp4/mov等 200MB以下</td><td>音声を抽出して文字起こし</td></tr>
+          <tr><td>🌐 Web URL</td><td>https://…</td><td>ページのテキストを自動取得</td></tr>
+          <tr><td>▶ YouTube</td><td>youtube.com/… youtu.be/…</td><td>字幕→音声変換の順で取得。Bot制限時はmp3/mp4を直接アップロード</td></tr>
+        </table>
+        <div class="howto-tip">
+          <p>💡 学習データは「保存する」ボタンを押した時点でDBに保存されます。編集モーダルの「保存済み学習データ」から確認・削除できます。</p>
+        </div>
+      </div>
+
+      <!-- ④ 会議の進め方 -->
+      <div class="howto-section">
+        <h3 class="howto-h3">▶ 会議の開始から終了まで</h3>
+        <div class="howto-step">
+          <div class="howto-step-num">1</div>
+          <div class="howto-step-body">
+            <h4>議題を入力して会議開始</h4>
+            <p>上部の入力欄に議題を入力し「▶ 会議開始」をクリック。参加メンバー確認画面でチェックを調整して「会議を開始する」を押します。</p>
+          </div>
+        </div>
+        <div class="howto-step">
+          <div class="howto-step-num">2</div>
+          <div class="howto-step-body">
+            <h4>メッセージを送って議論を進める</h4>
+            <p>下部入力欄からメッセージを送信すると、ペルソナが返答します。入力欄上の「返答：」ボタンで話しかけるメンバーを指定できます。「全員」で全員が返答します。</p>
+          </div>
+        </div>
+        <div class="howto-step">
+          <div class="howto-step-num">3</div>
+          <div class="howto-step-body">
+            <h4>🤖 全員で議論させる</h4>
+            <p>左パネル下の「🤖 全員で議論する」ボタンを押すと、AIペルソナたちが自律的に議論を展開します。議題に関する意見・反論・提案が自動生成されます。</p>
+          </div>
+        </div>
+        <div class="howto-step">
+          <div class="howto-step-num">4</div>
+          <div class="howto-step-body">
+            <h4>🎯 ファシリテーター介入</h4>
+            <p>「🎯 ファシリテータ介入」を押すと、司会役のAIが議論を整理し、論点を明確にします。議論が発散したときに有効です。</p>
+          </div>
+        </div>
+        <div class="howto-step">
+          <div class="howto-step-num">5</div>
+          <div class="howto-step-body">
+            <h4>🤔 まとめ → 📄 議事録PDF</h4>
+            <p>「🤔 議論のまとめ」で結論・各人の意見・次のステップを要約します。その後「📄 議事録をダウンロード（PDF）」で議事録をファイル保存できます。</p>
+          </div>
+        </div>
+        <div class="howto-tip">
+          <p>💡 資料（PDF・Word）を添付して会議を始めることもできます。上部バーの「📎 資料添付」から選択してください（PC向け機能）。</p>
+        </div>
+        <div class="howto-warn">
+          <p>⚠️ 会議セッションはサーバーのメモリに保持されます。ページを閉じたりリロードすると会議が終了します。議事録は早めにダウンロードしてください。</p>
+        </div>
+      </div>
+
+      <!-- ⑤ 音声モード -->
+      <div class="howto-section">
+        <h3 class="howto-h3">🎙️ 音声モードとは</h3>
+        <p class="howto-p">「🎙️ 音声モード」ボタンをONにすると、AIペルソナの発言が自動で読み上げられます。ハンズフリーで会議を楽しめます。</p>
+        <h3 class="howto-h3">🔊 音声の種類</h3>
+        <table class="howto-table">
+          <tr><th>音声エンジン</th><th>条件</th><th>特徴</th></tr>
+          <tr><td>OpenAI TTS</td><td>ペルソナに音声設定あり</td><td>高品質・自然な読み上げ（有料API使用）</td></tr>
+          <tr><td>ブラウザ音声</td><td>音声設定なし</td><td>端末内蔵の音声合成。品質はブラウザ依存</td></tr>
+        </table>
+        <h3 class="howto-h3">🎤 マイク入力（音声入力）</h3>
+        <p class="howto-p">音声モードON時にマイクボタンが表示されます。クリック（またはタップ）して話すと、音声をテキストに変換してメッセージ送信できます。</p>
+        <div class="howto-tip">
+          <p>💡 ペルソナごとにOpenAI TTS音声（Alloy・Echo・Nova・Shimmer等）を設定できます。ペルソナ編集モーダルの「音声設定」から選んで「▶ 試聴する」でプレビューできます。</p>
+        </div>
+        <h3 class="howto-h3">⑦ 音声読み上げを止めたいとき</h3>
+        <ul class="howto-ul">
+          <li>「⏹ 読み上げ停止」ボタンで現在の読み上げを止められます</li>
+          <li>音声モードをOFFにすると以降の読み上げが停止します</li>
+          <li>iOSでは初回タップ後に音声が有効になります</li>
+        </ul>
+        <div class="howto-warn">
+          <p>⚠️ OpenAI TTS音声の読み上げはAPI利用料が発生します（テキスト量に応じた従量課金）。OpenAI APIキーが設定されている場合のみ動作します。</p>
+        </div>
+      </div>
+
+      <!-- ⑥ 成熟度 Lv -->
+      <div class="howto-section">
+        <h3 class="howto-h3">🌱 ペルソナの成熟度（Lvシステム）とは</h3>
+        <p class="howto-p">ペルソナは会議への参加・学習データの追加・フィードバックを重ねることで「成熟度スコア」が上がり、レベルが上がります。高レベルのペルソナはより深い洞察や独自の視点を持った発言をするようになります。</p>
+        <h3 class="howto-h3">📊 レベル一覧</h3>
+        <div class="howto-lv">
+          <div class="howto-lv-badge">Lv 0</div>
+          <div class="howto-lv-text"><h4>初回</h4><p>初期状態。基本設定のみで動作します。</p></div>
+        </div>
+        <div class="howto-lv">
+          <div class="howto-lv-badge">Lv 1</div>
+          <div class="howto-lv-text"><h4>見習い</h4><p>少し会議に慣れてきた段階。設定した性格がより自然に出るようになります。</p></div>
+        </div>
+        <div class="howto-lv">
+          <div class="howto-lv-badge">Lv 2</div>
+          <div class="howto-lv-text"><h4>熟練</h4><p>経験が積まれた状態。議論の流れを意識した発言や深い専門意見が増えます。</p></div>
+        </div>
+        <div class="howto-lv">
+          <div class="howto-lv-badge">Lv 3</div>
+          <div class="howto-lv-text"><h4>達人</h4><p>最高レベル。鋭い洞察・独自の切り口で議論をリードします。</p></div>
+        </div>
+        <h3 class="howto-h3">📈 スコアを上げるには</h3>
+        <ul class="howto-ul">
+          <li><strong>会議に参加させる：</strong>会議回数が増えるごとに参加スコアが加算されます</li>
+          <li><strong>学習データを追加する：</strong>登録した知識量に応じて知識スコアが上がります</li>
+          <li><strong>フィードバックを送る：</strong>議事録ダウンロード後のフィードバックで評価スコアが変動します</li>
+        </ul>
+        <div class="howto-tip">
+          <p>💡 現在のスコアとレベルはペルソナ編集モーダルの下部「現在の成熟度」欄で確認できます。メンバーカードにも「Lv●」バッジが表示されます（Lv1以上）。</p>
+        </div>
+      </div>
+
+      <!-- ⑦ 料金プラン -->
+      <div class="howto-section">
+        <h3 class="howto-h3">💳 プラン比較</h3>
+        <table class="howto-table">
+          <tr><th>プラン</th><th>価格</th><th>会議回数</th><th>その他</th></tr>
+          <tr><td>無料</td><td>¥0</td><td>月5回</td><td>全機能利用可、PDF議事録無制限</td></tr>
+          <tr><td>スタンダード</td><td>¥480 / 50チケット</td><td>50回分（有効期限なし）</td><td>単発購入・使い切り型</td></tr>
+          <tr><td>プロ</td><td>¥980 / 月</td><td>無制限</td><td>ヘビーユーザー向けサブスク</td></tr>
+        </table>
+        <div class="howto-tip">
+          <p>💡 <strong>ゲスト（未ログイン）は会議回数カウントなし</strong>で利用できます。ただしペルソナ・学習データはブラウザを閉じると消えます。</p>
+        </div>
+        <h3 class="howto-h3">🛒 チケット・プランの購入方法</h3>
+        <div class="howto-step">
+          <div class="howto-step-num">1</div>
+          <div class="howto-step-body">
+            <h4>ログインまたは新規登録</h4>
+            <p>ヘッダーの「🔑 ログイン」からアカウントを作成・ログインします。</p>
+          </div>
+        </div>
+        <div class="howto-step">
+          <div class="howto-step-num">2</div>
+          <div class="howto-step-body">
+            <h4>「料金プラン」を開く</h4>
+            <p>ヘッダーの「料金プラン」ボタンからプラン選択画面を開きます。</p>
+          </div>
+        </div>
+        <div class="howto-step">
+          <div class="howto-step-num">3</div>
+          <div class="howto-step-body">
+            <h4>Stripeで決済</h4>
+            <p>「チケットを購入」または「プロプランに登録」をクリックするとStripeの安全な決済画面に進みます。</p>
+          </div>
+        </div>
+        <div class="howto-warn">
+          <p>⚠️ 決済完了後、画面が自動で更新されない場合は「料金プラン」ボタンを一度閉じて再度開くと最新の状態が反映されます。</p>
+        </div>
+      </div>
+
+      <!-- ⑧ よくある質問 -->
+      <div class="howto-section">
+        <h3 class="howto-h3">❓ よくある質問</h3>
+        <div class="howto-faq">
+          <p class="howto-faq-q">ログインしなくても使えますか？</p>
+          <p class="howto-faq-a">はい、ゲストとして会議・ペルソナ作成・学習データ登録が利用できます。ただしページをリロードするとデータが失われます。アカウント登録すると学習データが保存され、次回から引き続き使えます。</p>
+        </div>
+        <div class="howto-faq">
+          <p class="howto-faq-q">会議が始まりません。</p>
+          <p class="howto-faq-a">議題の入力とペルソナの選択が必要です。左パネルに参加ペルソナが1名以上選択（青枠）されているか確認してください。無料プランの月5回上限に達した場合は「料金プラン」からアップグレードしてください。</p>
+        </div>
+        <div class="howto-faq">
+          <p class="howto-faq-q">YouTube動画の内容を学習させようとしたら失敗します。</p>
+          <p class="howto-faq-a">YouTubeのBot検知制限により字幕・音声取得が失敗する場合があります。動画をmp3またはmp4ファイルでダウンロードし、「🎵 音声」または「🎬 動画」ボタンから直接アップロードしてください（200MB以下）。</p>
+        </div>
+        <div class="howto-faq">
+          <p class="howto-faq-q">音声が読み上げられません。</p>
+          <p class="howto-faq-a">① 音声モードがONになっているか確認してください。② iOSの場合、初回は画面をタップしてから音声が有効になります。③ ブラウザの音声合成（speechSynthesis）が日本語に対応しているか確認してください（Chrome推奨）。</p>
+        </div>
+        <div class="howto-faq">
+          <p class="howto-faq-q">ペルソナを編集したのに反映されません。</p>
+          <p class="howto-faq-a">「保存する」ボタンを押した後、次の会議から変更が反映されます。現在進行中の会議セッションには影響しません。</p>
+        </div>
+        <div class="howto-faq">
+          <p class="howto-faq-q">議事録PDFが文字化けします。</p>
+          <p class="howto-faq-a">PDFには日本語フォント（HeiseiKakuGo-W5）を使用しています。通常は文字化けしませんが、環境によっては発生する場合があります。その場合はブラウザの印刷機能（Ctrl+P）でPDF保存をお試しください。</p>
+        </div>
+        <div class="howto-faq">
+          <p class="howto-faq-q">スマートフォンで使えますか？</p>
+          <p class="howto-faq-a">はい、iPhoneを含むスマートフォンに最適化されています。左のメンバーパネルは「👥」ボタンで開閉できます。「まとめる」「ファシリ介入」はモバイル専用のアクションバーから操作できます。</p>
+        </div>
+        <div class="howto-faq">
+          <p class="howto-faq-q">システムデフォルトのペルソナを削除できますか？</p>
+          <p class="howto-faq-a">初期収録のペルソナは削除できませんが、「＋ 追加」から自分用のペルソナを作成して追加できます。自分で作成したペルソナは削除可能です。</p>
+        </div>
+      </div>
+
+    </div><!-- /.howto-body -->
+  </div><!-- /.howto-modal -->
+</div><!-- /#howToModal -->
 
 <!-- ===== はじめ方ガイドモーダル ===== -->
 <div class="modal-overlay hidden" id="guideModal">
