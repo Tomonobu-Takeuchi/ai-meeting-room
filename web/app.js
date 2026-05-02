@@ -552,7 +552,7 @@ async function handleLearnFiles(e, mode, type) {
           const formData = new FormData();
           formData.append('pdf', file);
           const res = await fetch('/api/learn/extract-pdf', { method: 'POST', body: formData });
-          const data = await res.json();
+          let data; try { data = await res.json(); } catch { data = {}; }
           if (!res.ok) throw new Error(data.error || 'PDF抽出失敗');
           content = data.text;
           fileType = 'pdf';

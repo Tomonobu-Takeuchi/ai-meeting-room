@@ -512,6 +512,30 @@ def transcribe_video():
         return jsonify({"error": f"動画文字起こしエラー: {str(e)}"}), 500
 
 
+@app.route("/api/learn/extract-pdf", methods=["POST"])
+def extract_pdf():
+    pdf_file = request.files.get("pdf")
+    if not pdf_file:
+        return jsonify({"error": "PDFファイルが見つかりません"}), 400
+    try:
+        import pdfplumber
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
+            pdf_file.save(f.name)
+            tmp_path = f.name
+        text = ""
+        with pdfplumber.open(tmp_path) as pdf:
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n"
+        os.unlink(tmp_path)
+        text = text.strip()[:8000]
+        return jsonify({"text": text, "chars": len(text)})
+    except Exception as e:
+        return jsonify({"error": f"PDF抽出エラー: {str(e)}"}), 500
+
+
 # ===== 会議API =====
 
 @app.route("/api/meeting/start", methods=["POST"])
