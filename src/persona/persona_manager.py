@@ -383,7 +383,7 @@ class PersonaManager:
                     return '\n\n'.join([r['content'] for r in results])
             except Exception as e:
                 print(f"RAG検索失敗: {e}")
-        results = get_learn_data_simple(persona_id, user_id or 0, limit=3)
+        results = get_learn_data_simple(persona_id, user_id, limit=3)
         return '\n\n'.join([r['content'] for r in results]) if results else ''
 
     def get_all_learn_data(self, persona_id, user_id=None):
