@@ -27,6 +27,7 @@ const State = {
   selectedMemberIds: [], isStreaming: false, attachedFiles: [], streamingMessages: {},
   avatarImages: {}, addAvatarDataUrl: null, editAvatarDataUrl: null,
   addLearnFiles: [], editLearnFiles: [], deletePendingId: null,
+  editSubmitting: false, addSubmitting: false,
   voiceMode: false, isSpeaking: false, isRecognizing: false,
   recognition: null, jaVoices: [],
   speakEndResolve: null,
@@ -774,13 +775,23 @@ async function deleteSavedLearnData(personaId, learnId) {
 function closeEditModal() { DOM.editPersonaModal.classList.add('hidden'); State.editAvatarDataUrl = null; State.editLearnFiles = []; }
 
 async function submitEditPersona() {
+  if (State.editSubmitting) return;
+  State.editSubmitting = true;
+  DOM.confirmEditPersona.disabled = true;
+  DOM.confirmEditPersona.textContent = '保存中...';
   const memberId = $('editPersonaId').value;
   const name = $('eName').value.trim(), avatar = $('eAvatar').value.trim() || '👤';
   const description = $('eDescription').value.trim(), personality = $('ePersonality').value.trim();
   const speakingStyle = $('eSpeakingStyle').value.trim(), color = $('eColor').value;
   let background = buildBackgroundFromLearnData($('eBackground').value.trim(), State.editLearnFiles);
   const voiceId = $('eVoiceId')?.value || 'none';
-  if (!name || !description || !personality || !speakingStyle) { showToast('必須項目を入力してください', 'error'); return; }
+  if (!name || !description || !personality || !speakingStyle) {
+    showToast('必須項目を入力してください', 'error');
+    State.editSubmitting = false;
+    DOM.confirmEditPersona.disabled = false;
+    DOM.confirmEditPersona.textContent = '保存する';
+    return;
+  }
   if (State.editAvatarDataUrl) State.avatarImages[memberId] = State.editAvatarDataUrl;
   try {
     const data = await API.put(`/api/personas/${memberId}`, { name, avatar, description, personality, speaking_style: speakingStyle, background, color, voice_id: voiceId === 'none' ? null : voiceId });
@@ -799,6 +810,11 @@ async function submitEditPersona() {
     const learnCount = textFiles.length;
     showToast(`${name} の設定を保存しました${learnCount > 0 ? `（学習データ${learnCount}件追加）` : ''}`, 'success');
   } catch (e) { showToast(translateApiError(e.message, 'ペルソナの保存'), 'error'); }
+  finally {
+    State.editSubmitting = false;
+    DOM.confirmEditPersona.disabled = false;
+    DOM.confirmEditPersona.textContent = '保存する';
+  }
 }
 
 function openDeleteConfirm(memberId) {
@@ -990,12 +1006,22 @@ function waitForStreamEnd() {
 }
 
 async function submitAddPersona() {
+  if (State.addSubmitting) return;
+  State.addSubmitting = true;
+  DOM.confirmAddPersona.disabled = true;
+  DOM.confirmAddPersona.textContent = '保存中...';
   const name = $('pName').value.trim(), avatar = $('pAvatar').value.trim() || '👤';
   const description = $('pDescription').value.trim(), personality = $('pPersonality').value.trim();
   const speakingStyle = $('pSpeakingStyle').value.trim(), color = $('pColor').value;
   let background = buildBackgroundFromLearnData($('pBackground').value.trim(), State.addLearnFiles);
   const voiceId = $('pVoiceId')?.value || 'none';
-  if (!name || !description || !personality || !speakingStyle) { showToast('必須項目を入力してください', 'error'); return; }
+  if (!name || !description || !personality || !speakingStyle) {
+    showToast('必須項目を入力してください', 'error');
+    State.addSubmitting = false;
+    DOM.confirmAddPersona.disabled = false;
+    DOM.confirmAddPersona.textContent = '追加する';
+    return;
+  }
   try {
     const data = await API.post('/api/personas/add', { name, avatar, description, personality, speaking_style: speakingStyle, background, role: 'member', color, voice_id: voiceId === 'none' ? null : voiceId });
     if (State.addAvatarDataUrl) State.avatarImages[data.persona.id] = State.addAvatarDataUrl;
@@ -1013,6 +1039,11 @@ async function submitAddPersona() {
     const learnCount = textFiles.length;
     showToast(`${name} を追加しました${learnCount > 0 ? `（学習データ${learnCount}件保存）` : ''}`, 'success');
   } catch (e) { showToast(translateApiError(e.message, 'ペルソナの追加'), 'error'); }
+  finally {
+    State.addSubmitting = false;
+    DOM.confirmAddPersona.disabled = false;
+    DOM.confirmAddPersona.textContent = '追加する';
+  }
 }
 
 function handleFileAttach(e) {

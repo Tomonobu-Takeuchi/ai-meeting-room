@@ -463,6 +463,14 @@ def get_user_by_stripe_customer(stripe_customer_id):
 
 def save_learn_data(persona_id, user_id, content, source, embedding_vector=None):
     conn = get_connection()
+    existing = conn.run("""
+        SELECT 1 FROM persona_learn
+        WHERE persona_id=:pid AND user_id IS NOT DISTINCT FROM :uid AND content=:content
+        LIMIT 1
+    """, pid=persona_id, uid=user_id, content=content)
+    if existing:
+        conn.close()
+        return
     if embedding_vector:
         vec_str = '[' + ','.join(str(v) for v in embedding_vector) + ']'
         conn.run("""
@@ -506,7 +514,7 @@ def get_learn_data_simple(persona_id, user_id, limit=5):
 
 def get_learn_data_count(persona_id, user_id=None):
     conn = get_connection()
-    if user_id:
+    if user_id is not None:
         rows = conn.run("""
             SELECT COUNT(*) FROM persona_learn
             WHERE persona_id=:persona_id AND (user_id=:user_id OR user_id IS NULL)
@@ -521,17 +529,21 @@ def get_learn_data_count(persona_id, user_id=None):
 
 def get_all_learn_data(persona_id, user_id):
     conn = get_connection()
-    if user_id:
+    if user_id is not None:
         rows = conn.run("""
-            SELECT id, content, source, created_at FROM persona_learn
+            SELECT DISTINCT ON (content, source) id, content, source, created_at
+            FROM persona_learn
             WHERE persona_id=:persona_id AND (user_id=:user_id OR user_id IS NULL)
-            ORDER BY created_at DESC
+            ORDER BY content, source, created_at DESC
+            LIMIT 100
         """, persona_id=persona_id, user_id=user_id)
     else:
         rows = conn.run("""
-            SELECT id, content, source, created_at FROM persona_learn
+            SELECT DISTINCT ON (content, source) id, content, source, created_at
+            FROM persona_learn
             WHERE persona_id=:persona_id AND user_id IS NULL
-            ORDER BY created_at DESC
+            ORDER BY content, source, created_at DESC
+            LIMIT 100
         """, persona_id=persona_id)
     conn.close()
     return [{'id': r[0],

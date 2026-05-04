@@ -387,10 +387,10 @@ class PersonaManager:
         return '\n\n'.join([r['content'] for r in results]) if results else ''
 
     def get_all_learn_data(self, persona_id, user_id=None):
-        return get_all_learn_data(persona_id, user_id or 0)
+        return get_all_learn_data(persona_id, user_id)
 
     def delete_learn_data(self, persona_id, learn_id, user_id=None):
-        delete_learn_data(persona_id, user_id or 0, learn_id)
+        delete_learn_data(persona_id, user_id, learn_id)
 
     # ===== プロンプト生成 =====
 
