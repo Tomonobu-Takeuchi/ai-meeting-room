@@ -553,10 +553,18 @@ async function downloadMinutes() {
 }
 
 async function handleLearnFiles(e, mode, type) {
+  // モーダル切替によるペルソナ混入を防ぐため、開始時点のペルソナIDを固定する
+  const capturedPersonaId = mode === 'edit' ? $('editPersonaId').value : null;
   const files = Array.from(e.target.files);
   const listKey = mode === 'add' ? 'addLearnFiles' : 'editLearnFiles';
   const statusEl = mode === 'add' ? DOM.learnStatus : DOM.editLearnStatus;
   for (const file of files) {
+    // async 処理の途中でペルソナが切り替わっていたら即中断（混入防止）
+    if (mode === 'edit' && $('editPersonaId').value !== capturedPersonaId) {
+      console.warn('handleLearnFiles: ペルソナが切り替わったため中断', capturedPersonaId, '->', $('editPersonaId').value);
+      statusEl.textContent = '';
+      break;
+    }
     if (State[listKey].find(f => f.name === file.name)) continue;
     statusEl.textContent = `${file.name} を読み込み中...`;
     let content = '', fileType = type;
@@ -579,6 +587,12 @@ async function handleLearnFiles(e, mode, type) {
           statusEl.style.color = 'var(--accent-red)';
           statusEl.style.whiteSpace = 'pre-line';
           continue;
+        }
+        // PDF抽出完了後にも再チェック（抽出自体に数秒かかるため）
+        if (mode === 'edit' && $('editPersonaId').value !== capturedPersonaId) {
+          console.warn('handleLearnFiles: PDF抽出後にペルソナが切り替わったため中断');
+          statusEl.textContent = '';
+          break;
         }
       } else { content = await readFileAsText(file); }
     } else if (type === 'image') { content = await readFileAsDataUrl(file); fileType = 'image'; }
@@ -751,13 +765,17 @@ async function openEditModal(memberId) {
   }
 }
 
+let _savedLearnSeq = 0;
 async function loadSavedLearnData(personaId) {
+  const mySeq = ++_savedLearnSeq;
   const listEl = $('savedLearnList');
   const countEl = $('savedLearnCount');
   if (!listEl) return;
   listEl.innerHTML = '<span style="font-size:11px;color:var(--text-muted);">読み込み中...</span>';
   try {
     const data = await API.get(`/api/personas/${personaId}/learn`);
+    // 新しいリクエストが来ていたら古い結果を破棄（表示競合防止）
+    if (mySeq !== _savedLearnSeq) return;
     const items = data.learn_data || [];
     countEl.textContent = `（${items.length}件）`;
     if (items.length === 0) {
@@ -774,6 +792,7 @@ async function loadSavedLearnData(personaId) {
       </div>
     `).join('');
   } catch (e) {
+    if (mySeq !== _savedLearnSeq) return;
     listEl.innerHTML = `<span style="font-size:11px;color:var(--accent-red);">読み込みエラー: ${e.message}</span>`;
   }
 }

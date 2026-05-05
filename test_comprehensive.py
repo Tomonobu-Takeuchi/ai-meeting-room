@@ -341,6 +341,93 @@ def test4b_learn_async_save(client):
             os.environ['OPENAI_API_KEY'] = original_key
 
 
+# ─── 機能試験 4c: ペルソナ間のデータ非混入テスト ──────────────
+
+def test4c_persona_isolation(client):
+    section("機能試験4c: ペルソナ間の学習データ非混入")
+
+    pid_a = state.get('main_persona_id')
+    if not pid_a:
+        skip("ペルソナ作成失敗のためスキップ")
+        return
+
+    # 2つ目のペルソナを作成
+    r = client.post('/api/personas/add', json={
+        "name": "隔離テスト用ペルソナB",
+        "description": "自動テスト用",
+        "personality": "冷静",
+        "speaking_style": "丁寧語",
+        "background": "",
+        "avatar": "🔵",
+        "color": "#3B82F6",
+        "role": "member",
+    })
+    check_code(r, 200, "ペルソナB 追加 200 OK")
+    pid_b = (r.get_json() or {}).get('persona', {}).get('id')
+    if not pid_b:
+        skip("ペルソナB作成失敗のためスキップ")
+        return
+    info(f"ペルソナA={pid_a} ペルソナB={pid_b}")
+
+    # ── A と B に異なるデータを保存 ──
+    content_a = f"__ISOLATION_A_{UNIQUE}__ ペルソナA専用の学習データ。孔明の兵法。"
+    content_b = f"__ISOLATION_B_{UNIQUE}__ ペルソナB専用の学習データ。秀吉の太閤記。"
+
+    r_a = client.post(f'/api/personas/{pid_a}/learn',
+                      json={'content': content_a, 'source': 'isolation_test_A'})
+    check_code(r_a, 200, "ペルソナAにデータ保存 200 OK")
+
+    r_b = client.post(f'/api/personas/{pid_b}/learn',
+                      json={'content': content_b, 'source': 'isolation_test_B'})
+    check_code(r_b, 200, "ペルソナBにデータ保存 200 OK")
+
+    # ── A のデータを取得してBのデータが混入していないか確認 ──
+    r_get_a = client.get(f'/api/personas/{pid_a}/learn')
+    check_code(r_get_a, 200, "ペルソナA 学習データ GET 200 OK")
+    items_a = (r_get_a.get_json() or {}).get('learn_data', [])
+    contents_a = {d['content'] for d in items_a}
+    check(content_a[:50] in ' '.join(contents_a), f"Aのデータ: Aの内容が含まれる")
+    check(not any(content_b[:30] in c for c in contents_a),
+          f"Aのデータ: Bの内容が混入していない")
+
+    # ── B のデータを取得してAのデータが混入していないか確認 ──
+    r_get_b = client.get(f'/api/personas/{pid_b}/learn')
+    check_code(r_get_b, 200, "ペルソナB 学習データ GET 200 OK")
+    items_b = (r_get_b.get_json() or {}).get('learn_data', [])
+    contents_b = {d['content'] for d in items_b}
+    check(content_b[:50] in ' '.join(contents_b), f"Bのデータ: Bの内容が含まれる")
+    check(not any(content_a[:30] in c for c in contents_b),
+          f"Bのデータ: Aの内容が混入していない")
+
+    # ── DB直接確認: persona_idが正しく分離されているか ──
+    conn = db_conn()
+    try:
+        row_a = conn.run("""
+            SELECT COUNT(*) FROM persona_learn
+            WHERE persona_id=:pid AND content=:c
+        """, pid=pid_a, c=content_a)[0][0]
+        check(row_a == 1, f"DBでAのデータがAのpersona_idに保存されている (count={row_a})")
+
+        row_b_in_a = conn.run("""
+            SELECT COUNT(*) FROM persona_learn
+            WHERE persona_id=:pid AND content=:c
+        """, pid=pid_a, c=content_b)[0][0]
+        check(row_b_in_a == 0,
+              f"DBでBのデータがAのpersona_idに混入していない (count={row_b_in_a})")
+
+        row_a_in_b = conn.run("""
+            SELECT COUNT(*) FROM persona_learn
+            WHERE persona_id=:pid AND content=:c
+        """, pid=pid_b, c=content_a)[0][0]
+        check(row_a_in_b == 0,
+              f"DBでAのデータがBのpersona_idに混入していない (count={row_a_in_b})")
+    finally:
+        conn.close()
+
+    # ── ペルソナBを削除（後片付け） ──
+    client.delete(f'/api/personas/{pid_b}')
+
+
 # ─── 機能試験 5: 会議開始・メッセージ送信 ────────────────────
 
 def test5_meeting(client):
@@ -764,6 +851,7 @@ if __name__ == '__main__':
             safe_run("機能試験3: ペルソナCRUD",      test3_persona_crud,     client)
             safe_run("機能試験4: 学習データ冪等性",  test4_learn_idempotency, client)
             safe_run("機能試験4b: 学習データ非同期保存", test4b_learn_async_save, client)
+            safe_run("機能試験4c: ペルソナ間非混入",    test4c_persona_isolation, client)
             safe_run("機能試験5: 会議開始・メッセージ", test5_meeting,        client)
             safe_run("機能試験6: フィードバック",    test6_feedback,         client)
             safe_run("機能試験7: プラン制限",        test7_plan_limits,      client)
