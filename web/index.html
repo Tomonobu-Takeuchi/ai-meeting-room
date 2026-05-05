@@ -22,11 +22,21 @@
     }
     *{box-sizing:border-box;margin:0;padding:0;}
     body{font-family:'Noto Sans JP',sans-serif;background:var(--bg-base);color:var(--text-primary);height:100vh;height:100svh;display:flex;flex-direction:column;overflow:hidden;}
-    header{background:var(--bg-surface);border-bottom:1px solid var(--border);padding:0 20px;padding-top:var(--sat);height:calc(56px + var(--sat));display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:12px;}
-    .header-left,.header-right{display:flex;align-items:center;gap:8px;}
-    .header-center{flex:1;text-align:center;}
-    .logo{font-family:'Space Mono',monospace;font-size:22px;font-weight:700;color:var(--text-primary);letter-spacing:0.5px;white-space:nowrap;}
-    .logo span{color:#7C3AED;}
+    header{background:var(--bg-surface);border-bottom:1px solid var(--border);padding-top:var(--sat);display:flex;flex-direction:column;flex-shrink:0;}
+    .header-row1{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;gap:12px;}
+    .header-nav{display:flex;align-items:center;gap:16px;flex:1;}
+    .nav-link{background:transparent;border:none;color:#fff;font-size:12px;font-family:'Noto Sans JP',sans-serif;cursor:pointer;padding:4px 2px;opacity:0.8;transition:opacity 0.15s,color 0.15s;white-space:nowrap;}
+    .nav-link:hover{opacity:1;}
+    #voiceModeBtn{color:#67E8F9;opacity:1;}
+    #voiceModeBtn.active{color:#67E8F9;font-weight:600;}
+    .header-logo{font-family:'Space Mono',monospace;font-size:20px;font-weight:700;color:#C4C0FF;letter-spacing:0.5px;white-space:nowrap;flex-shrink:0;}
+    .header-user{display:flex;align-items:center;gap:6px;flex:1;justify-content:flex-end;}
+    .header-row2{display:flex;align-items:center;gap:8px;padding:7px 20px;border-top:1px solid var(--border-subtle);}
+    .header-row2 #topicInput{flex:1;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius);padding:7px 12px;color:var(--text-primary);font-size:14px;font-family:'Noto Sans JP',sans-serif;outline:none;transition:border-color 0.15s;}
+    .header-row2 #topicInput:focus{border-color:var(--accent-blue);}
+    .header-row2 #topicInput::placeholder{color:var(--text-muted);}
+    .header-row2 #topicInput:disabled{opacity:0.6;}
+    .in-meeting-topic{flex:1;font-size:13px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px;min-width:0;}
     .btn{padding:7px 14px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-elevated);color:var(--text-primary);font-size:12px;font-family:'Noto Sans JP',sans-serif;cursor:pointer;transition:all 0.15s;white-space:nowrap;}
     .btn:hover{background:var(--bg-hover);border-color:#484F58;}
     .btn-primary{background:var(--accent-blue);border-color:var(--accent-blue);color:#fff;}
@@ -37,10 +47,8 @@
     .btn-green:hover{background:#15803D;}
     .btn-orange{background:var(--accent-orange);border-color:var(--accent-orange);color:#fff;}
     .btn-orange:hover{background:#B45309;}
-    .btn-voice{background:var(--bg-elevated);border-color:var(--accent-teal);color:var(--accent-teal);}
-    .btn-voice:hover{background:rgba(8,145,178,0.15);}
-    .btn-voice.active{background:var(--accent-teal);border-color:var(--accent-teal);color:#fff;animation:voicePulse 2s infinite;}
-    @keyframes voicePulse{0%,100%{box-shadow:0 0 0 0 rgba(8,145,178,0.4);}50%{box-shadow:0 0 0 6px rgba(8,145,178,0);}}
+    .btn-red{background:var(--accent-red);border-color:var(--accent-red);color:#fff;}
+    .btn-red:hover{background:#B91C1C;}
     .btn-mic{padding:7px 12px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-elevated);color:var(--text-secondary);font-size:16px;cursor:pointer;transition:all 0.15s;flex-shrink:0;line-height:1;}
     .btn-mic:hover{border-color:var(--accent-teal);color:var(--accent-teal);}
     .btn-mic.recording{background:var(--accent-red);border-color:var(--accent-red);color:#fff;animation:micPulse 0.8s infinite;}
@@ -50,10 +58,7 @@
     .btn-icon{width:26px;height:26px;border-radius:6px;border:1px solid transparent;background:transparent;color:var(--text-muted);font-size:13px;cursor:pointer;transition:all 0.15s;display:inline-flex;align-items:center;justify-content:center;}
     .btn-icon:hover{border-color:var(--border);background:var(--bg-hover);color:var(--text-secondary);}
     .btn-icon.danger:hover{border-color:var(--accent-red);color:var(--accent-red);}
-    .theme-bar{background:var(--bg-surface);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
-    .theme-bar input{flex:1;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius);padding:9px 14px;color:var(--text-primary);font-size:14px;font-family:'Noto Sans JP',sans-serif;outline:none;transition:border-color 0.15s;}
-    .theme-bar input:focus{border-color:var(--accent-blue);}
-    .theme-bar input::placeholder{color:var(--text-muted);}
+
     .attach-btn{display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:var(--radius);border:1px dashed var(--border);background:transparent;color:var(--text-secondary);font-size:12px;cursor:pointer;transition:all 0.15s;white-space:nowrap;}
     .attach-btn:hover{border-color:var(--accent-blue);color:var(--accent-blue);}
     .main-layout{display:flex;flex:1;overflow:hidden;position:relative;}
@@ -176,31 +181,6 @@
     ::-webkit-scrollbar{width:6px;height:6px;}
     ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
 
-    /* ===== アクションバー（まとめ・ファシリ介入）PC・モバイル共通 ===== */
-    .mobile-action-bar{
-      display:none;
-      background:var(--bg-surface);
-      border-top:1px solid var(--border-subtle);
-      padding:8px 16px;
-      gap:8px;
-      flex-shrink:0;
-      justify-content:flex-end;
-      align-items:center;
-    }
-    .mobile-action-bar.visible{display:flex;}
-    .mobile-action-bar .btn{font-size:12px;padding:7px 14px;}
-    /* モバイルのみfixed配置に上書き */
-    @media (max-width: 768px) {
-      .mobile-action-bar.visible{
-        display:flex;
-        position:fixed;bottom:0;left:0;right:0;
-        padding:8px 12px;
-        padding-bottom:calc(8px + var(--sab));
-        justify-content:center;
-        z-index:30;
-      }
-      .mobile-action-bar .btn{flex:1;max-width:160px;}
-    }
 
     /* ===== モバイル用パネルボタン（PC時は非表示） ===== */
     .mobile-panel-btn{display:none;}
@@ -210,23 +190,18 @@
     /* ===== スマホ対応 (768px以下) ===== */
     @media (max-width: 768px) {
       /* ヘッダー */
-      header{padding:0 10px;height:50px;gap:6px;}
-      .logo{font-size:15px;}
+      .header-row1{padding:0 10px;height:46px;gap:4px;}
+      .header-nav{gap:10px;}
+      .nav-link{font-size:11px;}
+      .header-logo{font-size:15px;}
       .btn{padding:6px 8px;font-size:11px;}
-      .header-right{gap:4px;}
-      /* ヘッダーの「まとめる」「ファシリテータ介入」をモバイルでは完全非表示 */
-      #summarizeBtn{display:none!important;}
-      #facilitatorBtn{display:none!important;}
-      /* モバイル用アクションバーを表示 */
-      /* mobile-action-barのfixed化はCSSブロック内で処理済み */
-
-      /* 議題バー */
-      .theme-bar{padding:8px 10px;gap:6px;flex-wrap:wrap;}
-      .theme-bar input{font-size:13px;padding:8px 10px;}
-      #startMeetingBtn{padding:8px 10px;font-size:12px;}
-      #voiceModeBtn{padding:8px 10px;font-size:11px;}
+      .header-row2{padding:6px 10px;gap:6px;flex-wrap:wrap;}
+      #startMeetingBtn{padding:6px 10px;font-size:12px;}
       /* 資料添付ボタンは非表示（スペース節約） */
       .attach-btn{display:none;}
+      /* 会議中：「新規会議」は幅が足りない場合非表示 */
+      #newMeetingBtn{display:none;}
+      .in-meeting-topic{font-size:12px;}
 
       /* 左パネルをオーバーレイ式に */
       .left-panel{
@@ -281,8 +256,8 @@
 
     /* ===== iPhone 16 Plus等の大型スマホ対応（430px前後） ===== */
     @media (max-width: 480px) {
-      .logo{font-size:14px;}
-      .header-right{gap:3px;}
+      .header-logo{font-size:14px;}
+      #voiceModeBtn{display:none;}
       #allRespondBtn{display:none;} /* 画面幅が足りない場合は非表示 */
       .member-trigger-btn{padding:6px 8px;font-size:11px;}
       .modal{padding:20px;max-height:92svh;}
@@ -323,8 +298,8 @@
     .lv-badge{position:absolute;top:5px;right:6px;background:rgba(124,58,237,0.85);color:#fff;font-size:9px;font-weight:700;padding:1px 4px;border-radius:10px;pointer-events:none;letter-spacing:0.3px;line-height:1.4;}
 
     /* ===== プランバッジ ===== */
-    #planBtn{font-size:11px;padding:5px 11px;border-color:rgba(124,58,237,0.5);color:#C4B5FD;}
-    #planBtn:hover{border-color:var(--accent-purple);background:rgba(124,58,237,0.1);color:#DDD6FE;}
+    #planBtn{color:#C4B5FD;}
+    #planBtn:hover{opacity:1;color:#DDD6FE;}
     .plan-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:0.3px;margin-left:4px;}
     .plan-badge.free{background:rgba(75,85,99,0.4);color:#9CA3AF;border:1px solid #374151;}
     .plan-badge.standard{background:rgba(37,99,235,0.2);color:#60A5FA;border:1px solid rgba(37,99,235,0.4);}
@@ -406,7 +381,6 @@
     .howto-ul{list-style:none;margin:0 0 12px;padding:0;display:flex;flex-direction:column;gap:6px;}
     .howto-ul li{font-size:12px;color:var(--text-secondary);padding-left:16px;position:relative;line-height:1.65;}
     .howto-ul li::before{content:'›';position:absolute;left:0;color:var(--accent-purple);font-weight:700;}
-    #howToBtn{font-size:11px;padding:5px 10px;}
     @media(max-width:768px){
       .howto-modal-header{padding:14px 16px 0;}
       .howto-tabs{padding:0 10px;}
@@ -420,20 +394,34 @@
 <body>
 
 <header>
-  <div class="header-left">
-    <button class="btn" id="newMeetingBtn">＋ 新規</button>
-  </div>
-  <div class="header-center">
-    <div class="logo">AI<span>-</span>PERSONA<span> 会議室</span></div>
-  </div>
-  <div class="header-right">
-    <button class="btn" id="howToBtn" onclick="openHowToModal()">📖 使い方</button>
-    <button class="btn btn-plan" id="planBtn" onclick="openPricingModal()">料金プラン</button>
-    <div id="authArea">
+  <!-- 第1行：常時表示 -->
+  <div class="header-row1">
+    <nav class="header-nav">
+      <button class="nav-link" id="howToBtn" onclick="openHowToModal()">📖 使い方</button>
+      <button class="nav-link" id="planBtn" onclick="openPricingModal()">料金プラン</button>
+      <button class="nav-link" id="voiceModeBtn">🎙️ 音声モード</button>
+    </nav>
+    <div class="header-logo">AI<span style="color:#7C3AED">-</span>PERSONA 会議室</div>
+    <div class="header-user" id="authArea">
       <button class="btn" id="loginBtnHeader">🔑 ログイン</button>
     </div>
-    <button class="btn btn-orange" id="summarizeBtn" disabled>🤔 議論のまとめ</button>
+  </div>
+  <!-- 第2行：会議前 -->
+  <div class="header-row2" id="headerRow2Pre">
+    <input type="text" id="topicInput" placeholder="📋 議題を入力してください" />
+    <button class="btn-mic hidden" id="topicMicBtn" title="議題を音声入力">🎤</button>
+    <label class="attach-btn" for="fileInput">📎 資料添付
+      <input type="file" id="fileInput" accept=".pdf,.docx,.doc" style="display:none" multiple />
+    </label>
+    <button class="btn btn-green" id="startMeetingBtn">▶ 会議開始</button>
+  </div>
+  <!-- 第2行：会議中 -->
+  <div class="header-row2 hidden" id="headerRow2In">
+    <span id="inMeetingTopic" class="in-meeting-topic"></span>
     <button class="btn btn-purple" id="facilitatorBtn" disabled>🎯 ファシリテータ介入</button>
+    <button class="btn btn-orange" id="summarizeBtn" disabled>🤔 議論のまとめ</button>
+    <button class="btn btn-primary" id="newMeetingBtn">＋ 新規会議</button>
+    <button class="btn btn-red" id="endMeetingBtn">✕ 会議を終了</button>
   </div>
 </header>
 
@@ -448,15 +436,6 @@
   <button class="btn" id="stopSpeakBtn" style="margin-left:auto;padding:3px 8px;font-size:11px;">⏹ 読み上げ停止</button>
 </div>
 
-<div class="theme-bar">
-  <input type="text" id="topicInput" placeholder="📋 議題を入力してください" />
-  <button class="btn-mic hidden" id="topicMicBtn" title="議題を音声入力">🎤</button>
-  <label class="attach-btn" for="fileInput">📎 資料添付
-    <input type="file" id="fileInput" accept=".pdf,.docx,.doc" style="display:none" multiple />
-  </label>
-  <button class="btn btn-green" id="startMeetingBtn">▶ 会議開始</button>
-  <button class="btn btn-voice" id="voiceModeBtn">🎙️ 音声モード</button>
-</div>
 
 <div id="attachmentsBar" class="attachments-bar" style="padding:6px 20px;background:var(--bg-surface);border-bottom:1px solid var(--border);display:none;"></div>
 
@@ -505,12 +484,6 @@
 
 <!-- モバイル用メンバーパネル開閉ボタン -->
 <button class="mobile-panel-btn" id="mobilePanelBtn">👥</button>
-
-<!-- モバイル用アクションバー（まとめ・ファシリテーター） -->
-<div class="mobile-action-bar hidden" id="mobileActionBar">
-  <button class="btn btn-orange" id="mobileSummarizeBtn" disabled>📝 まとめ</button>
-  <button class="btn btn-purple" id="mobileFacilitatorBtn" disabled>🎯 ファシリ介入</button>
-</div>
 
 <!-- メンバー選択モーダル -->
 <div class="modal-overlay hidden" id="memberSelectModal">

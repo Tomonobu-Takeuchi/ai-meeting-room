@@ -39,6 +39,8 @@ const State = {
 const $ = id => document.getElementById(id);
 const DOM = {
   newMeetingBtn: $('newMeetingBtn'), facilitatorBtn: $('facilitatorBtn'),
+  endMeetingBtn: $('endMeetingBtn'), inMeetingTopic: $('inMeetingTopic'),
+  headerRow2Pre: $('headerRow2Pre'), headerRow2In: $('headerRow2In'),
   topicInput: $('topicInput'), fileInput: $('fileInput'),
   startMeetingBtn: $('startMeetingBtn'), attachmentsBar: $('attachmentsBar'),
   memberList: $('memberList'), autoDiscussBtn: $('autoDiscussBtn'),
@@ -344,6 +346,7 @@ async function init() {
   } catch (e) { showToast(translateApiError(e.message, 'ペルソナの読み込み'), 'error'); }
 
   DOM.newMeetingBtn.addEventListener('click', resetMeeting);
+  DOM.endMeetingBtn.addEventListener('click', endMeeting);
   DOM.startMeetingBtn.addEventListener('click', showMemberSelectModal);
   DOM.facilitatorBtn.addEventListener('click', invokeFacilitator);
   DOM.autoDiscussBtn.addEventListener('click', autoDiscuss);
@@ -468,6 +471,16 @@ async function init() {
   DOM.chatInput.addEventListener('input', () => {
     DOM.chatInput.style.height = 'auto';
     DOM.chatInput.style.height = Math.min(DOM.chatInput.scrollHeight, 120) + 'px';
+  });
+
+  // 議題のsessionStorage永続化
+  const savedTopic = sessionStorage.getItem('ai_topic');
+  if (savedTopic) DOM.topicInput.value = savedTopic;
+  DOM.topicInput.addEventListener('input', () => sessionStorage.setItem('ai_topic', DOM.topicInput.value));
+
+  // 会議中タブ閉じ・リロード時の警告
+  window.addEventListener('beforeunload', e => {
+    if (State.sessionId) { e.preventDefault(); e.returnValue = ''; }
   });
 }
 
@@ -911,7 +924,10 @@ async function startMeeting() {
     DOM.sessionBar.classList.remove('hidden');
     DOM.sessionInfo.textContent = `会議ID: ${State.sessionId} ・ 議題: ${State.topic}`;
     DOM.facilitatorBtn.disabled = false; DOM.autoDiscussBtn.disabled = false; DOM.summarizeBtn.disabled = false;
+    DOM.endMeetingBtn.disabled = false;
     DOM.topicInput.disabled = true; DOM.startMeetingBtn.disabled = true;
+    DOM.inMeetingTopic.textContent = `📋 ${State.topic}`;
+    DOM.headerRow2Pre.classList.add('hidden'); DOM.headerRow2In.classList.remove('hidden');
     if (State.voiceMode) DOM.micBtn.classList.remove('hidden');
     renderMemberList(); renderMemberTriggers();
     addSystemMessage(`会議を開始しました。議題：${State.topic}`);
@@ -942,14 +958,37 @@ function resetMeeting() {
   DOM.welcomeScreen.classList.remove('hidden'); DOM.sessionBar.classList.add('hidden');
   DOM.minutesBar.classList.add('hidden'); DOM.micBtn.classList.add('hidden');
   DOM.topicInput.disabled = false; DOM.topicInput.value = '';
+  sessionStorage.removeItem('ai_topic');
+  DOM.inMeetingTopic.textContent = '';
   DOM.startMeetingBtn.disabled = false; DOM.facilitatorBtn.disabled = true;
-  DOM.autoDiscussBtn.disabled = true; DOM.summarizeBtn.disabled = true;
+  DOM.autoDiscussBtn.disabled = true; DOM.summarizeBtn.disabled = true; DOM.endMeetingBtn.disabled = true;
+  DOM.headerRow2In.classList.add('hidden'); DOM.headerRow2Pre.classList.remove('hidden');
   State.selectedMemberIds = State.members.map(m => m.id);
   // モバイルアクションバーを非表示
   if (DOM.mobileActionBar) { DOM.mobileActionBar.classList.remove('visible'); }
   if (DOM.mobileSummarizeBtn) DOM.mobileSummarizeBtn.disabled = true;
   if (DOM.mobileFacilitatorBtn) DOM.mobileFacilitatorBtn.disabled = true;
   renderMemberList();
+}
+
+function endMeeting() {
+  if (!State.sessionId) return;
+  if (!confirm('会議を終了しますか？トランスクリプトを残したまま終了します。')) return;
+  stopSpeaking();
+  if (State.isRecognizing && State.recognition) State.recognition.stop();
+  State.sessionId = null; State.isStreaming = false; State.streamingMessages = {};
+  DOM.chatInputArea.classList.add('hidden');
+  DOM.sessionBar.classList.add('hidden');
+  DOM.minutesBar.classList.remove('hidden');
+  DOM.micBtn.classList.add('hidden');
+  DOM.inMeetingTopic.textContent = '';
+  DOM.startMeetingBtn.disabled = false; DOM.facilitatorBtn.disabled = true;
+  DOM.autoDiscussBtn.disabled = true; DOM.summarizeBtn.disabled = true; DOM.endMeetingBtn.disabled = true;
+  DOM.headerRow2In.classList.add('hidden'); DOM.headerRow2Pre.classList.remove('hidden');
+  DOM.topicInput.disabled = false;
+  if (DOM.mobileActionBar) DOM.mobileActionBar.classList.remove('visible');
+  if (DOM.mobileSummarizeBtn) DOM.mobileSummarizeBtn.disabled = true;
+  if (DOM.mobileFacilitatorBtn) DOM.mobileFacilitatorBtn.disabled = true;
 }
 
 async function sendUserMessage() {
@@ -1203,6 +1242,7 @@ function setMemberSpeaking(personaId, isSpeaking) {
 function setStreamingButtons(isStreaming) {
   DOM.sendBtn.disabled = isStreaming; DOM.allRespondBtn.disabled = isStreaming;
   DOM.autoDiscussBtn.disabled = isStreaming; DOM.facilitatorBtn.disabled = isStreaming;
+  DOM.endMeetingBtn.disabled = isStreaming;
   DOM.memberTriggers.querySelectorAll('.member-trigger-btn').forEach(btn => btn.disabled = isStreaming);
   // モバイルボタンも連動
   if (DOM.mobileSummarizeBtn) DOM.mobileSummarizeBtn.disabled = isStreaming || !State.sessionId;
