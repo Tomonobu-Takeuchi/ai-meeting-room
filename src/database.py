@@ -485,6 +485,19 @@ def save_learn_data(persona_id, user_id, content, source, embedding_vector=None)
         """, persona_id=persona_id, user_id=user_id, content=content, source=source)
     conn.close()
 
+def update_learn_data_embedding(persona_id, user_id, content, embedding_vector):
+    """バックグラウンドスレッドから呼ばれる: 既存レコードのembeddingを更新"""
+    conn = get_connection()
+    vec_str = '[' + ','.join(str(v) for v in embedding_vector) + ']'
+    conn.run("""
+        UPDATE persona_learn SET embedding = :emb::vector
+        WHERE persona_id = :pid
+          AND user_id IS NOT DISTINCT FROM :uid
+          AND content = :content
+          AND embedding IS NULL
+    """, emb=vec_str, pid=persona_id, uid=user_id, content=content)
+    conn.close()
+
 def search_learn_data(persona_id, user_id, query_embedding, limit=3):
     conn = get_connection()
     vec_str = '[' + ','.join(str(v) for v in query_embedding) + ']'

@@ -3,9 +3,11 @@ persona_manager.py - ペルソナ管理（ユーザー認証 + RAG対応版）
 """
 import uuid
 import os
+import threading
 from src.database import (
     get_connection, rows_to_dicts, row_to_dict,
-    save_learn_data, search_learn_data, get_learn_data_simple,
+    save_learn_data, update_learn_data_embedding,
+    search_learn_data, get_learn_data_simple,
     get_learn_data_count, get_learn_data_counts_batch, get_all_learn_data, delete_learn_data,
     save_persona_pattern, get_persona_patterns,
     increment_meeting_count, get_meeting_count,
@@ -373,20 +375,31 @@ class PersonaManager:
     # ===== RAG学習データ =====
 
     def add_learn_data(self, persona_id, content, source='', user_id=None):
-        embedding = None
+        # テキストをDBに即時保存（embedding=NULL）
+        save_learn_data(persona_id, user_id, content, source, embedding_vector=None)
+
+        # Embedding生成はバックグラウンドスレッドで非同期実行
         openai_key = os.environ.get('OPENAI_API_KEY', '')
         if openai_key:
-            try:
-                import openai
-                client = openai.OpenAI(api_key=openai_key)
-                res = client.embeddings.create(
-                    model="text-embedding-3-small",
-                    input=content[:8000]
-                )
-                embedding = res.data[0].embedding
-            except Exception as e:
-                print(f"Embedding失敗: {e}")
-        save_learn_data(persona_id, user_id, content, source, embedding)
+            def _generate_embedding(pid, uid, text, src):
+                try:
+                    import openai
+                    client = openai.OpenAI(api_key=openai_key, timeout=30.0)
+                    res = client.embeddings.create(
+                        model="text-embedding-3-small",
+                        input=text[:8000],
+                    )
+                    update_learn_data_embedding(pid, uid, text, res.data[0].embedding)
+                except Exception as e:
+                    print(f"Embedding非同期生成失敗（テキストは保存済）: {e}")
+
+            t = threading.Thread(
+                target=_generate_embedding,
+                args=(persona_id, user_id, content, source),
+                daemon=True,
+            )
+            t.start()
+
         return get_learn_data_count(persona_id, user_id)
 
     def get_relevant_learn_data(self, persona_id, topic, user_id=None):

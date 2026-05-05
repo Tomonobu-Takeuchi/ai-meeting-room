@@ -81,26 +81,40 @@ const API = {
     if (!res.ok) throw new Error(await res.text());
     return res.json();
   },
-  async post(path, body) {
-    const res = await fetch(path, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      const e = await res.json().catch(() => ({ error: res.statusText }));
-      const err = new Error(e.error || res.statusText);
-      err.code = e.code;
-      throw err;
+  async post(path, body, timeoutMs = 30000) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(path, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: ctrl.signal,
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({ error: res.statusText }));
+        const err = new Error(e.error || res.statusText);
+        err.code = e.code;
+        throw err;
+      }
+      return res.json();
+    } finally {
+      clearTimeout(timer);
     }
-    return res.json();
   },
-  async put(path, body) {
-    const res = await fetch(path, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) { const e = await res.json().catch(() => ({ error: res.statusText })); throw new Error(e.error || res.statusText); }
-    return res.json();
+  async put(path, body, timeoutMs = 30000) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(path, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: ctrl.signal,
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({ error: res.statusText })); throw new Error(e.error || res.statusText); }
+      return res.json();
+    } finally {
+      clearTimeout(timer);
+    }
   },
   async delete(path) {
     const res = await fetch(path, { method: 'DELETE' });
@@ -798,17 +812,19 @@ async function submitEditPersona() {
     const idx = State.members.findIndex(m => m.id === memberId);
     if (idx >= 0) State.members[idx] = { ...State.members[idx], ...data.persona };
 
-    // ★ 学習データをpersona_learnテーブルにDB保存
+    // ★ 学習データをpersona_learnテーブルにDB保存（並列・1件失敗でも続行）
     const textFiles = State.editLearnFiles.filter(f => f.type === 'text' || f.type === 'pdf');
-    for (const f of textFiles) {
-      try {
-        await API.post(`/api/personas/${memberId}/learn`, { content: f.content, source: f.name });
-      } catch (le) { console.warn('学習データ保存スキップ:', le.message); }
-    }
+    const learnResults = await Promise.allSettled(
+      textFiles.map(f => API.post(`/api/personas/${memberId}/learn`, { content: f.content, source: f.name }))
+    );
+    const savedCount = learnResults.filter(r => r.status === 'fulfilled').length;
+    learnResults.forEach((r, i) => {
+      if (r.status === 'rejected') console.warn('学習データ保存スキップ:', r.reason?.message, textFiles[i]?.name);
+    });
 
     renderMemberList(); closeEditModal();
-    const learnCount = textFiles.length;
-    showToast(`${name} の設定を保存しました${learnCount > 0 ? `（学習データ${learnCount}件追加）` : ''}`, 'success');
+    const learnMsg = textFiles.length > 0 ? `（学習データ${savedCount}/${textFiles.length}件追加）` : '';
+    showToast(`${name} の設定を保存しました${learnMsg}`, 'success');
   } catch (e) { showToast(translateApiError(e.message, 'ペルソナの保存'), 'error'); }
   finally {
     State.editSubmitting = false;
@@ -1026,18 +1042,20 @@ async function submitAddPersona() {
     const data = await API.post('/api/personas/add', { name, avatar, description, personality, speaking_style: speakingStyle, background, role: 'member', color, voice_id: voiceId === 'none' ? null : voiceId });
     if (State.addAvatarDataUrl) State.avatarImages[data.persona.id] = State.addAvatarDataUrl;
 
-    // ★ 学習データをpersona_learnテーブルにDB保存
+    // ★ 学習データをpersona_learnテーブルにDB保存（並列・1件失敗でも続行）
     const textFiles = State.addLearnFiles.filter(f => f.type === 'text' || f.type === 'pdf');
-    for (const f of textFiles) {
-      try {
-        await API.post(`/api/personas/${data.persona.id}/learn`, { content: f.content, source: f.name });
-      } catch (le) { console.warn('学習データ保存スキップ:', le.message); }
-    }
+    const learnResults = await Promise.allSettled(
+      textFiles.map(f => API.post(`/api/personas/${data.persona.id}/learn`, { content: f.content, source: f.name }))
+    );
+    const savedCount = learnResults.filter(r => r.status === 'fulfilled').length;
+    learnResults.forEach((r, i) => {
+      if (r.status === 'rejected') console.warn('学習データ保存スキップ:', r.reason?.message, textFiles[i]?.name);
+    });
 
     State.members.push(data.persona); State.selectedMemberIds.push(data.persona.id);
     renderMemberList(); closeAddModal();
-    const learnCount = textFiles.length;
-    showToast(`${name} を追加しました${learnCount > 0 ? `（学習データ${learnCount}件保存）` : ''}`, 'success');
+    const learnMsg = textFiles.length > 0 ? `（学習データ${savedCount}/${textFiles.length}件追加）` : '';
+    showToast(`${name} を追加しました${learnMsg}`, 'success');
   } catch (e) { showToast(translateApiError(e.message, 'ペルソナの追加'), 'error'); }
   finally {
     State.addSubmitting = false;

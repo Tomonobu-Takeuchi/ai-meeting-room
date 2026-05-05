@@ -278,6 +278,69 @@ def test4_learn_idempotency(client):
         state['learn_data_id'] = data4['learn_data'][0]['id']
 
 
+# ─── 機能試験 4b: 学習データ非同期保存（10件一括・Embedding失敗耐性） ──
+
+def test4b_learn_async_save(client):
+    section("機能試験4b: 学習データ非同期保存（10件一括・Embedding失敗耐性）")
+
+    pid = state.get('main_persona_id')
+    if not pid:
+        skip("ペルソナ作成失敗のためスキップ")
+        return
+
+    # ── 4b-1: 10件を連続POSTして全件DBに保存されるか ──────────
+    info("── 10件一括保存テスト ──")
+    saved_ids = []
+    for i in range(10):
+        content = f"__BULK_{UNIQUE}_{i:02d}__ バルクテスト学習データ {i} 番目。非同期Embedding確認用。"
+        r = client.post(f'/api/personas/{pid}/learn',
+                        json={'content': content, 'source': f'bulk_test_{i}'})
+        check_code(r, 200, f"  bulk POST {i+1:02d}/10 → 200 OK")
+        saved_ids.append(content)
+
+    # 全件がDBに入っているか確認（Embeddingはバックグラウンドなので不問）
+    r_get = client.get(f'/api/personas/{pid}/learn')
+    check_code(r_get, 200, "learn GET 200 OK（10件保存後）")
+    learn_data = (r_get.get_json() or {}).get('learn_data', [])
+    db_contents = {d['content'] for d in learn_data}
+    matched = sum(1 for c in saved_ids if c in db_contents)
+    check(matched == 10, f"10件全てDBに保存されている (matched={matched}/10)")
+
+    # ── 4b-2: POSTレスポンスが即時返る（サーバーが詰まらない）──
+    # しきい値注意: テスト環境→Railway DBのリモートレイテンシは~2.5s/クエリ。
+    # learn POST は save + count + growth (3クエリ) = 計~5クエリ相当。
+    # OpenAI Embedding (~30s) が同期なら 35s+ になるはずなので、
+    # 非同期化の確認には 30s 以内を基準とする。
+    info("── レスポンス即時性テスト ──")
+    import time as _time
+    content_quick = f"__QUICK_{UNIQUE}__ 即時レスポンス確認用データ。"
+    t0 = _time.time()
+    r_q = client.post(f'/api/personas/{pid}/learn',
+                      json={'content': content_quick, 'source': 'quick_test'})
+    elapsed = _time.time() - t0
+    check_code(r_q, 200, "learn POST → 200 OK")
+    check(elapsed < 30.0, f"Embedding非同期化: OpenAI待ちなくレスポンス ({elapsed*1000:.0f}ms / 30000ms)")
+    info(f"レスポンス時間: {elapsed*1000:.0f}ms")
+
+    # ── 4b-3: OPENAI_API_KEY 未設定でもテキスト保存は成功するか ──
+    info("── Embedding失敗耐性テスト（API_KEY一時退避）──")
+    original_key = os.environ.pop('OPENAI_API_KEY', None)
+    try:
+        content_nokey = f"__NOKEY_{UNIQUE}__ APIキーなしでも保存できるか確認。"
+        r_nk = client.post(f'/api/personas/{pid}/learn',
+                           json={'content': content_nokey, 'source': 'nokey_test'})
+        check_code(r_nk, 200, "OPENAI_API_KEY なしでも learn POST → 200 OK")
+
+        # DBにテキストが保存されているか
+        r_nk_get = client.get(f'/api/personas/{pid}/learn')
+        nk_data = (r_nk_get.get_json() or {}).get('learn_data', [])
+        nk_contents = {d['content'] for d in nk_data}
+        check(content_nokey in nk_contents, "EmbeddingなしでもテキストはDBに保存済み")
+    finally:
+        if original_key:
+            os.environ['OPENAI_API_KEY'] = original_key
+
+
 # ─── 機能試験 5: 会議開始・メッセージ送信 ────────────────────
 
 def test5_meeting(client):
@@ -700,6 +763,7 @@ if __name__ == '__main__':
             safe_run("機能試験2: ゲスト会議",        test2_guest_meeting)
             safe_run("機能試験3: ペルソナCRUD",      test3_persona_crud,     client)
             safe_run("機能試験4: 学習データ冪等性",  test4_learn_idempotency, client)
+            safe_run("機能試験4b: 学習データ非同期保存", test4b_learn_async_save, client)
             safe_run("機能試験5: 会議開始・メッセージ", test5_meeting,        client)
             safe_run("機能試験6: フィードバック",    test6_feedback,         client)
             safe_run("機能試験7: プラン制限",        test7_plan_limits,      client)
