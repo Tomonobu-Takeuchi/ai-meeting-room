@@ -517,23 +517,44 @@ def extract_pdf():
     pdf_file = request.files.get("pdf")
     if not pdf_file:
         return jsonify({"error": "PDFファイルが見つかりません"}), 400
+    tmp_path = None
     try:
         import pdfplumber
         import tempfile
         with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
             pdf_file.save(f.name)
             tmp_path = f.name
+        MAX_PAGES = 50
         text = ""
+        total_pages = 0
         with pdfplumber.open(tmp_path) as pdf:
-            for page in pdf.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    text += page_text + "\n"
-        os.unlink(tmp_path)
+            total_pages = len(pdf.pages)
+            for page in pdf.pages[:MAX_PAGES]:
+                try:
+                    page_text = page.extract_text()
+                    if page_text:
+                        text += page_text + "\n"
+                except Exception:
+                    continue  # ページ単位の失敗はスキップして続行
         text = text.strip()[:8000]
-        return jsonify({"text": text, "chars": len(text)})
+        if not text:
+            return jsonify({"error": "このPDFからテキストを抽出できませんでした。スキャン画像のPDFはテキスト抽出に対応していません。手動でテキストを入力してください。"}), 422
+        pages_extracted = min(total_pages, MAX_PAGES)
+        return jsonify({"text": text, "chars": len(text), "pages": pages_extracted,
+                        "truncated": total_pages > MAX_PAGES})
     except Exception as e:
-        return jsonify({"error": f"PDF抽出エラー: {str(e)}"}), 500
+        err_str = str(e).lower()
+        if "password" in err_str or "encrypted" in err_str:
+            return jsonify({"error": "このPDFはパスワード保護されているため抽出できません。パスワードを解除してから再試行してください。"}), 422
+        if "invalid" in err_str or "damaged" in err_str or "cannot open" in err_str or "unexpected" in err_str:
+            return jsonify({"error": "PDFファイルが破損しているか、無効な形式です。別のPDFをお試しください。"}), 422
+        return jsonify({"error": f"PDFの処理中にエラーが発生しました: {str(e)[:120]}"}), 500
+    finally:
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
 
 
 # ===== 会議API =====

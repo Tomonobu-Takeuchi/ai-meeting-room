@@ -788,6 +788,16 @@ async function deleteSavedLearnData(personaId, learnId) {
 }
 function closeEditModal() { DOM.editPersonaModal.classList.add('hidden'); State.editAvatarDataUrl = null; State.editLearnFiles = []; }
 
+async function batchSettled(items, fn, batchSize = 3) {
+  const results = [];
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    const batchResults = await Promise.allSettled(batch.map(fn));
+    results.push(...batchResults);
+  }
+  return results;
+}
+
 async function submitEditPersona() {
   if (State.editSubmitting) return;
   State.editSubmitting = true;
@@ -812,10 +822,12 @@ async function submitEditPersona() {
     const idx = State.members.findIndex(m => m.id === memberId);
     if (idx >= 0) State.members[idx] = { ...State.members[idx], ...data.persona };
 
-    // ★ 学習データをpersona_learnテーブルにDB保存（並列・1件失敗でも続行）
+    // ★ 学習データをpersona_learnテーブルにDB保存（3件バッチ並列・1件失敗でも続行）
     const textFiles = State.editLearnFiles.filter(f => f.type === 'text' || f.type === 'pdf');
-    const learnResults = await Promise.allSettled(
-      textFiles.map(f => API.post(`/api/personas/${memberId}/learn`, { content: f.content, source: f.name }))
+    const learnResults = await batchSettled(
+      textFiles,
+      f => API.post(`/api/personas/${memberId}/learn`, { content: f.content, source: f.name }, 120000),
+      3
     );
     const savedCount = learnResults.filter(r => r.status === 'fulfilled').length;
     learnResults.forEach((r, i) => {
@@ -1042,10 +1054,12 @@ async function submitAddPersona() {
     const data = await API.post('/api/personas/add', { name, avatar, description, personality, speaking_style: speakingStyle, background, role: 'member', color, voice_id: voiceId === 'none' ? null : voiceId });
     if (State.addAvatarDataUrl) State.avatarImages[data.persona.id] = State.addAvatarDataUrl;
 
-    // ★ 学習データをpersona_learnテーブルにDB保存（並列・1件失敗でも続行）
+    // ★ 学習データをpersona_learnテーブルにDB保存（3件バッチ並列・1件失敗でも続行）
     const textFiles = State.addLearnFiles.filter(f => f.type === 'text' || f.type === 'pdf');
-    const learnResults = await Promise.allSettled(
-      textFiles.map(f => API.post(`/api/personas/${data.persona.id}/learn`, { content: f.content, source: f.name }))
+    const learnResults = await batchSettled(
+      textFiles,
+      f => API.post(`/api/personas/${data.persona.id}/learn`, { content: f.content, source: f.name }, 120000),
+      3
     );
     const savedCount = learnResults.filter(r => r.status === 'fulfilled').length;
     learnResults.forEach((r, i) => {
@@ -1488,8 +1502,17 @@ function translateLearnError(errorMsg, type) {
   }
 
   // ── PDF ──
-  if (msg.includes('スキャン') || (msg.includes('pdf') && msg.includes('text'))) {
-    return '❌ このPDFはスキャン画像のためテキスト抽出できません\n手動でテキストを入力してください';
+  if (msg.includes('スキャン') || msg.includes('テキストを抽出できませんでした') || (msg.includes('pdf') && msg.includes('text'))) {
+    return '❌ このPDFはテキスト抽出できませんでした\nスキャン画像のPDFは対応していません\n手動でテキストを入力してください';
+  }
+  if (msg.includes('パスワード') || msg.includes('encrypted') || msg.includes('password')) {
+    return '❌ このPDFはパスワード保護されています\nパスワードを解除してから再試行してください';
+  }
+  if (msg.includes('破損') || msg.includes('無効な形式') || msg.includes('invalid pdf') || msg.includes('damaged')) {
+    return '❌ PDFファイルが破損しているか、無効な形式です\n別のPDFをお試しください';
+  }
+  if (msg.includes('pdf') && (msg.includes('エラー') || msg.includes('error') || msg.includes('失敗'))) {
+    return '❌ PDFの処理中にエラーが発生しました\n別のPDFをお試しいただくか、手動でテキストを入力してください';
   }
 
   // ── デフォルト ──
