@@ -527,6 +527,31 @@ def get_learn_data_count(persona_id, user_id=None):
     conn.close()
     return rows[0][0] if rows else 0
 
+
+def get_learn_data_counts_batch(persona_ids, user_id=None):
+    """複数ペルソナのlearn_data件数を1クエリで取得（N+1解消）"""
+    if not persona_ids:
+        return {}
+    conn = get_connection()
+    if user_id is not None:
+        rows = conn.run("""
+            SELECT persona_id, COUNT(*)
+            FROM persona_learn
+            WHERE persona_id = ANY(:pids)
+              AND (user_id=:user_id OR user_id IS NULL)
+            GROUP BY persona_id
+        """, pids=list(persona_ids), user_id=user_id)
+    else:
+        rows = conn.run("""
+            SELECT persona_id, COUNT(*)
+            FROM persona_learn
+            WHERE persona_id = ANY(:pids)
+              AND user_id IS NULL
+            GROUP BY persona_id
+        """, pids=list(persona_ids))
+    conn.close()
+    return {r[0]: r[1] for r in rows}
+
 def get_all_learn_data(persona_id, user_id):
     conn = get_connection()
     if user_id is not None:

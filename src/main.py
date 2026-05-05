@@ -550,9 +550,11 @@ def start_meeting():
         ok, reason = check_and_use_meeting(user_id)
         if not ok:
             return jsonify({"error": reason, "code": "PLAN_LIMIT"}), 403
+    prefetched_members = None
     if not member_ids:
-        member_ids = [p["id"] for p in persona_manager.get_members_only(user_id)]
-    session_data = meeting_room.create_session(topic, member_ids, user_id)
+        prefetched_members = persona_manager.get_members_only(user_id)
+        member_ids = [p["id"] for p in prefetched_members]
+    session_data = meeting_room.create_session(topic, member_ids, user_id, prefetched_members=prefetched_members)
     return jsonify({
         "session_id": session_data["session_id"],
         "topic": session_data["topic"],

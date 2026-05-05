@@ -6,7 +6,7 @@ import os
 from src.database import (
     get_connection, rows_to_dicts, row_to_dict,
     save_learn_data, search_learn_data, get_learn_data_simple,
-    get_learn_data_count, get_all_learn_data, delete_learn_data,
+    get_learn_data_count, get_learn_data_counts_batch, get_all_learn_data, delete_learn_data,
     save_persona_pattern, get_persona_patterns,
     increment_meeting_count, get_meeting_count,
     ensure_growth_record, update_growth_conversation,
@@ -48,8 +48,10 @@ class PersonaManager:
             """)
         conn.close()
         result = [serialize_persona(row_to_dict(COLUMNS, r)) for r in rows]
-        for p in result:
-            p['learn_count'] = get_learn_data_count(p['id'], user_id)
+        if result:
+            counts = get_learn_data_counts_batch([p['id'] for p in result], user_id)
+            for p in result:
+                p['learn_count'] = counts.get(p['id'], 0)
         return result
 
     def get_facilitator(self, user_id=None):
@@ -104,7 +106,26 @@ class PersonaManager:
         return self.get_persona_by_id(persona_id, user_id)
 
     def get_personas_by_ids(self, ids, user_id=None):
-        return [p for p in [self.get_persona_by_id(pid, user_id) for pid in ids] if p]
+        if not ids:
+            return []
+        conn = get_connection()
+        if user_id:
+            rows = conn.run("""
+                SELECT id, user_id, name, avatar, description, personality,
+                       speaking_style, background, color, role, is_default, created_at, voice_id
+                FROM personas
+                WHERE id = ANY(:ids) AND (user_id=:user_id OR user_id IS NULL)
+            """, ids=list(ids), user_id=user_id)
+        else:
+            rows = conn.run("""
+                SELECT id, user_id, name, avatar, description, personality,
+                       speaking_style, background, color, role, is_default, created_at, voice_id
+                FROM personas
+                WHERE id = ANY(:ids)
+            """, ids=list(ids))
+        conn.close()
+        by_id = {r[0]: serialize_persona(row_to_dict(COLUMNS, r)) for r in rows}
+        return [by_id[i] for i in ids if i in by_id]
 
     # ===== ペルソナ追加・更新・削除 =====
 
