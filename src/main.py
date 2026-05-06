@@ -769,21 +769,21 @@ def stream_member(session_id, persona_id):
     def generate():
         yield from meeting_room.generate_member_response_stream(session_id, persona_id, trigger)
     return Response(generate(), mimetype="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"})
 
 @app.route("/api/stream/facilitator/<session_id>")
 def stream_facilitator(session_id):
     def generate():
         yield from meeting_room.generate_facilitator_response_stream(session_id)
     return Response(generate(), mimetype="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"})
 
 @app.route("/api/stream/auto/<session_id>")
 def stream_auto(session_id):
     def generate():
         yield from meeting_room.generate_auto_discussion_stream(session_id)
     return Response(generate(), mimetype="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"})
 
 
 # ===== ヘルスチェック =====

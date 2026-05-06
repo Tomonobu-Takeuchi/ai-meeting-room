@@ -168,12 +168,15 @@ function speakText(text, personaId, targetEl = null) {
   return new Promise((resolve) => {
     if (State.speakEndResolve) { State.speakEndResolve(); State.speakEndResolve = null; }
     State.speakEndResolve = resolve;
+    const estimatedMs = Math.min(Math.max(speakStr.length * 100 + 3000, 5000), 25000);
+    const speakTimer = setTimeout(() => { done(); }, estimatedMs);
 
     utterance.onstart = () => {
       State.isSpeaking = true;
       if (targetEl) targetEl.classList.add('voice-speaking');
     };
     const done = () => {
+      clearTimeout(speakTimer);
       State.isSpeaking = false;
       if (targetEl) targetEl.classList.remove('voice-speaking');
       if (State.speakEndResolve) { State.speakEndResolve(); State.speakEndResolve = null; }
@@ -209,12 +212,15 @@ async function speakWithTTS(text, voiceId, targetEl = null) {
     if (targetEl) targetEl.classList.add('voice-speaking');
     State.isSpeaking = true;
     return new Promise(resolve => {
+      const estimatedMs = Math.min(Math.max(text.length * 80 + 3000, 5000), 30000);
       const done = () => {
+        clearTimeout(ttsTimer);
         State.isSpeaking = false;
         if (targetEl) targetEl.classList.remove('voice-speaking');
         URL.revokeObjectURL(url);
         resolve();
       };
+      const ttsTimer = setTimeout(done, estimatedMs);
       audio.onended = done;
       audio.onerror = done;
       audio.play().catch(done);
@@ -1039,10 +1045,22 @@ async function triggerMemberResponse(personaId, trigger = null) {
         resolve();
       }
     };
-    evtSource.onerror = () => {
+    evtSource.onerror = async () => {
       typingEl?.remove(); evtSource.close();
       State.isStreaming = false; setStreamingButtons(false); setMemberSpeaking(personaId, false);
-      showToast('AIとの接続が切断されました。再試行してください。', 'error');
+      if (fullText.trim().length > 0) {
+        streamEl?.querySelector('.msg-bubble')?.classList.remove('streaming');
+        scrollToBottom();
+        if (State.voiceMode && fullText) {
+          if (persona.voice_id) {
+            await speakWithTTS(fullText, persona.voice_id, streamEl?.querySelector('.msg-bubble'));
+          } else {
+            await speakText(fullText, personaId, streamEl?.querySelector('.msg-bubble'));
+          }
+        }
+      } else {
+        showToast('AIとの接続が切断されました。再試行してください。', 'error');
+      }
       resolve();
     };
   });
