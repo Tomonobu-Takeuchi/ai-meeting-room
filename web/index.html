@@ -258,7 +258,10 @@
     /* ===== iPhone 16 Plus等の大型スマホ対応（430px前後） ===== */
     @media (max-width: 480px) {
       .header-logo{font-size:14px;}
+      .user-badge{padding:3px 6px;gap:4px;}
+      .plan-badge{display:none;}
       .voice-text{display:none;}
+      #voiceModeBtn::after{content:'音声';font-size:9px;display:block;line-height:1;}
       #allRespondBtn{display:none;} /* 画面幅が足りない場合は非表示 */
       .member-trigger-btn{padding:6px 8px;font-size:11px;}
       .modal{padding:20px;max-height:92svh;}
@@ -290,8 +293,10 @@
     .auth-guest a{color:var(--text-muted);cursor:pointer;text-decoration:underline;}
     /* ヘッダーのユーザー表示 */
     .user-badge{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);padding:4px 10px;background:var(--bg-elevated);border-radius:20px;border:1px solid var(--border);}
-    .user-badge .user-name{max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-    #logoutBtn{font-size:11px;padding:4px 8px;}
+    .header-user{gap:4px;}
+    .user-badge .user-name{max-width:50px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .btn-upgrade{display:none;}
+    #logoutBtn{font-size:10px;padding:4px 6px;}
     #loginBtnHeader{font-size:12px;padding:6px 12px;}
 
     /* ===== Lvバッジ ===== */
