@@ -206,11 +206,15 @@ class PersonaManager:
             return False, 'デフォルトペルソナは削除できません'
         conn = get_connection()
         if user_id:
-            conn.run("DELETE FROM personas WHERE id=:id AND user_id=:user_id",
-                     id=persona_id, user_id=user_id)
+            rows = conn.run(
+                "DELETE FROM personas WHERE id=:id AND user_id=:user_id RETURNING id",
+                id=persona_id, user_id=user_id)
+            conn.close()
+            if not rows:
+                return False, '該当するペルソナが見つかりません'
         else:
             conn.run("DELETE FROM personas WHERE id=:id", id=persona_id)
-        conn.close()
+            conn.close()
         return True, '削除しました'
 
     def to_dict_list(self, user_id=None):

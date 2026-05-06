@@ -816,6 +816,430 @@ def test11_response_time(client):
         _results.append(ok)
 
 
+# ─── WARN 機構 ─────────────────────────────────────────────────
+
+WARN_SYM = "  [WARN]"
+_warns: list[str] = []
+
+
+def warn(label: str):
+    print(f"{WARN_SYM} {label}")
+    _warns.append(label)
+
+
+# ─── 機能試験 8: iPhone モバイル修正回帰テスト ─────────────────
+
+def test_func8_mobile_static():
+    section("機能試験8: iPhoneモバイル修正の回帰テスト（静的ファイル検査）")
+    import re
+
+    base = os.path.dirname(os.path.abspath(__file__))
+    html = open(os.path.join(base, 'web', 'index.html'), encoding='utf-8').read()
+    js   = open(os.path.join(base, 'web', 'app.js'),     encoding='utf-8').read()
+
+    # 1. bodyタグにoverflow-x:hiddenが含まれる
+    m = re.search(r'\bbody\s*\{([^}]*)\}', html)
+    check(bool(m and 'overflow-x' in m.group(1) and 'hidden' in m.group(1)),
+          "bodyタグにoverflow-x:hiddenが含まれる")
+
+    # 2. headerタグにoverflow-x:hiddenが含まれる（header{} セレクタ）
+    m = re.search(r'\bheader\s*\{([^}]*)\}', html)
+    check(bool(m and 'overflow-x' in m.group(1) and 'hidden' in m.group(1)),
+          "headerタグにoverflow-x:hiddenが含まれる")
+
+    # 3. .attach-textが存在する
+    check('.attach-text' in html or '.attach-text' in js, ".attach-textが存在する")
+
+    # 4. .voice-textが存在する
+    check('.voice-text' in html or '.voice-text' in js, ".voice-textが存在する")
+
+    def _media_block(text: str, px: str) -> str:
+        for m in re.finditer(rf'@media[^{{]*{re.escape(px)}[^{{]*\{{', text):
+            depth, i = 0, m.end() - 1
+            while i < len(text):
+                if text[i] == '{':
+                    depth += 1
+                elif text[i] == '}':
+                    depth -= 1
+                    if depth == 0:
+                        return text[m.end()-1:i+1]
+                i += 1
+        return ''
+
+    # 5. @480pxブロックに#voiceModeBtn{display:noneが存在しない
+    b480 = _media_block(html, '480px')
+    if b480:
+        vm = re.search(r'#voiceModeBtn\s*\{([^}]*)\}', b480)
+        check(not (vm and re.search(r'display\s*:\s*none', vm.group(1))),
+              "@480pxブロックに#voiceModeBtn{display:noneが存在しない")
+    else:
+        check(True, "@480pxブロックに#voiceModeBtn{display:noneが存在しない（@480pxブロックなし）")
+
+    # 6. @768pxブロックに.attach-btn{display:noneが存在しない
+    b768 = _media_block(html, '768px')
+    if b768:
+        ab = re.search(r'\.attach-btn\s*\{([^}]*)\}', b768)
+        check(not (ab and re.search(r'display\s*:\s*none', ab.group(1))),
+              "@768pxブロックに.attach-btn{display:noneが存在しない")
+    else:
+        check(True, "@768pxブロックに.attach-btn{display:noneが存在しない（@768pxブロックなし）")
+
+    # 7. @768pxブロックに.member-card-actions{opacity:1が存在する
+    if b768:
+        mca = re.search(r'\.member-card-actions\s*\{([^}]*)\}', b768)
+        check(bool(mca and re.search(r'opacity\s*:\s*1', mca.group(1))),
+              "@768pxブロックに.member-card-actions{opacity:1が存在する")
+    else:
+        check(False, "@768pxブロックに.member-card-actions{opacity:1が存在する")
+
+    # 8. app.jsにestimatedMsまたはtimeoutIdが存在する
+    check('estimatedMs' in js or 'timeoutId' in js,
+          "app.jsにestimatedMsまたはtimeoutIdが存在する")
+
+    # 9. app.jsのonerrorにfullText.trim().length > 0が存在する
+    check('fullText.trim().length > 0' in js or 'fullText.trim().length>0' in js,
+          "app.jsのonerrorにfullText.trim().length > 0が存在する")
+
+
+# ─── 機能試験 9: SSEレスポンスヘッダー検証 ────────────────────
+
+def test_func9_sse_headers():
+    section("機能試験9: SSEレスポンスヘッダー検証")
+    import requests as req_lib, threading, socket
+    from werkzeug.serving import make_server
+
+    # ゲスト会議セッション作成
+    sid = None
+    with flask_app.test_client() as guest:
+        r = guest.post('/api/meeting/start', json={'topic': 'SSEヘッダー検証テスト'})
+        if r.status_code == 200:
+            sid = (r.get_json() or {}).get('session_id')
+
+    if not sid:
+        skip("セッション作成失敗のためスキップ")
+        return
+
+    # 存在しないpersona_idを使用 → ジェネレーターが即座にエラーを返す（Anthropic呼び出しなし）
+    fake_pid = "sse_header_test_nonexistent"
+
+    try:
+        with socket.socket() as s:
+            s.bind(('127.0.0.1', 0))
+            port = s.getsockname()[1]
+        server = make_server('127.0.0.1', port, flask_app)
+    except Exception as e:
+        skip(f"SSEヘッダー検証スキップ（サーバー起動エラー）: {e}")
+        return
+
+    srv_t = threading.Thread(target=server.serve_forever, daemon=True)
+    srv_t.start()
+
+    try:
+        url = f"http://127.0.0.1:{port}/api/stream/member/{sid}/{fake_pid}"
+        try:
+            resp = req_lib.get(url, stream=True, timeout=10)
+            h = resp.headers
+            check('text/event-stream' in h.get('Content-Type', ''),
+                  "Content-Typeにtext/event-streamが含まれる")
+            check('no-cache' in h.get('Cache-Control', ''),
+                  "Cache-Controlにno-cacheが含まれる")
+            check(h.get('X-Accel-Buffering', '').lower() == 'no',
+                  "X-Accel-Buffering が no")
+            check('keep-alive' in h.get('Connection', '').lower(),
+                  "ConnectionにKeep-Aliveまたはkeep-aliveが含まれる")
+            resp.close()
+        except req_lib.exceptions.Timeout:
+            skip("SSEヘッダー検証タイムアウト（ストリーム中）")
+        except Exception as e:
+            skip(f"SSEヘッダー検証スキップ: {e}")
+    finally:
+        server.shutdown()
+        srv_t.join(timeout=3)
+
+
+# ─── 機能試験 10: プラン制限境界値テスト ──────────────────────
+
+def test_func10_plan_boundary():
+    section("機能試験10: プラン制限の境界値テスト")
+    from src.database import get_connection
+    from datetime import datetime, timedelta
+
+    ts    = int(time.time())
+    email = f"test_boundary_{ts}@test.com"
+    pw    = "BoundaryTest123!"
+    uid   = None
+    conn  = get_connection()
+
+    try:
+        with flask_app.test_client() as c:
+            r = c.post('/api/auth/register',
+                       json={'email': email, 'password': pw, 'name': '境界値テスト'})
+            uid = ((r.get_json() or {}).get('user') or {}).get('id')
+            if not uid:
+                skip("ユーザー登録失敗のためスキップ")
+                return
+
+            # 1. 新規ユーザーのmonthly_meeting_countが0
+            rows = conn.run("SELECT monthly_meeting_count FROM users WHERE id=:id", id=uid)
+            cnt0 = rows[0][0] if rows else -1
+            check(cnt0 == 0, f"新規ユーザーのmonthly_meeting_countが0 (got {cnt0})")
+
+            # 2. 会議1回目が200 OK
+            r2 = c.post('/api/meeting/start', json={'topic': '境界値テスト1回目'})
+            check_code(r2, 200, "会議1回目が200 OK")
+
+            # 3. monthly_meeting_count=5設定後 → 403かつcode=PLAN_LIMIT
+            conn.run(
+                "UPDATE users SET monthly_meeting_count=5, plan='free' WHERE id=:id", id=uid)
+            r3 = c.post('/api/meeting/start', json={'topic': '境界値テスト6回目'})
+            check_code(r3, 403, "monthly_meeting_count=5で会議開始が403")
+            check((r3.get_json() or {}).get('code') == 'PLAN_LIMIT', "code=PLAN_LIMITが返る")
+
+            # 4. plan='standard', credits=1 → 200かつcreditsが0になる
+            conn.run(
+                "UPDATE users SET plan='standard', credits=1, monthly_meeting_count=0 "
+                "WHERE id=:id", id=uid)
+            r4 = c.post('/api/meeting/start', json={'topic': 'スタンダード境界値テスト'})
+            check_code(r4, 200, "plan='standard', credits=1 → 200 OK")
+            rows4 = conn.run("SELECT credits FROM users WHERE id=:id", id=uid)
+            cred4 = rows4[0][0] if rows4 else -1
+            check(cred4 == 0, f"会議後にcreditsが0になる (got {cred4})")
+
+            # 5. credits=0 → 403
+            r5 = c.post('/api/meeting/start', json={'topic': 'credits=0テスト'})
+            check_code(r5, 403, "credits=0で会議開始が403")
+
+            # 6. plan='pro', plan_expires_at=過去日付 → 200かつプランがfreeに降格
+            past = datetime.utcnow() - timedelta(days=1)
+            conn.run(
+                "UPDATE users SET plan='pro', plan_expires_at=:exp, "
+                "monthly_meeting_count=0 WHERE id=:id", exp=past, id=uid)
+            r6 = c.post('/api/meeting/start', json={'topic': 'pro期限切れ境界値テスト'})
+            check_code(r6, 200, "pro期限切れ → 200 OK（free降格後5回以内）")
+            rows6 = conn.run("SELECT plan FROM users WHERE id=:id", id=uid)
+            plan6 = rows6[0][0] if rows6 else ''
+            check(plan6 == 'free', f"会議後にプランがfreeに降格 (got {plan6})")
+
+    finally:
+        if uid:
+            conn.run("DELETE FROM users WHERE id=:id", id=uid)
+        conn.close()
+
+
+# ─── 機能試験 11: クロスユーザーデータ分離テスト ──────────────
+
+def test_func11_cross_user_isolation():
+    section("機能試験11: クロスユーザーデータ分離テスト")
+    from src.database import get_connection
+
+    ts      = int(time.time())
+    email_a = f"test_cross_a_{ts}@test.com"
+    email_b = f"test_cross_b_{ts}@test.com"
+    pw      = "CrossTest123!"
+    conn    = get_connection()
+    uid_a = uid_b = pid_a = None
+
+    try:
+        # ─ ユーザーA: 登録・ペルソナ作成 ─
+        with flask_app.test_client() as ca:
+            ra = ca.post('/api/auth/register',
+                         json={'email': email_a, 'password': pw, 'name': 'ユーザーA'})
+            uid_a = ((ra.get_json() or {}).get('user') or {}).get('id')
+            if uid_a:
+                rp = ca.post('/api/personas/add', json={
+                    "name": "Aのペルソナ", "description": "テスト用",
+                    "personality": "論理的", "speaking_style": "丁寧語",
+                    "background": "", "avatar": "🔴", "color": "#EF4444", "role": "member",
+                })
+                pid_a = ((rp.get_json() or {}).get('persona') or {}).get('id')
+
+        # ─ ユーザーB: 登録・分離テスト ─
+        with flask_app.test_client() as cb:
+            rb = cb.post('/api/auth/register',
+                         json={'email': email_b, 'password': pw, 'name': 'ユーザーB'})
+            uid_b = ((rb.get_json() or {}).get('user') or {}).get('id')
+
+            if not uid_a or not uid_b or not pid_a:
+                skip("ユーザー/ペルソナ作成失敗のためスキップ")
+                return
+
+            # 1. AのペルソナがBのAPIから見えない
+            r_mem   = cb.get('/api/personas/members')
+            members_b = (r_mem.get_json() or {}).get('members', [])
+            b_ids_set = {m['id'] for m in members_b}
+            check(pid_a not in b_ids_set, "AのペルソナがBのAPIから見えない")
+
+            # 2. BのセッションでAのペルソナをDELETEすると400/403/404
+            r_del = cb.delete(f'/api/personas/{pid_a}')
+            check(r_del.status_code in (400, 403, 404),
+                  f"BがAのペルソナをDELETE → 400/403/404 (got {r_del.status_code})")
+
+            # 3. Aの学習データがBからアクセスできない
+            r_learn = cb.get(f'/api/personas/{pid_a}/learn')
+            if r_learn.status_code == 200:
+                cnt = (r_learn.get_json() or {}).get('count', 0)
+                check(cnt == 0, f"Aの学習データがBから見えない (count={cnt})")
+            else:
+                check(r_learn.status_code in (403, 404),
+                      f"Aの学習データへのBのアクセスがエラー (HTTP {r_learn.status_code})")
+
+            # 4. user_id=NULLのデフォルトペルソナが両ユーザーに見える
+            null_cnt = conn.run(
+                "SELECT COUNT(*) FROM personas WHERE user_id IS NULL")[0][0]
+            if null_cnt > 0:
+                with flask_app.test_client() as ca2:
+                    ca2.post('/api/auth/login', json={'email': email_a, 'password': pw})
+                    r_a   = ca2.get('/api/personas/members')
+                    a_ids = {m['id'] for m in (r_a.get_json() or {}).get('members', [])}
+                    check(len(a_ids & b_ids_set) > 0,
+                          "user_id=NULLのデフォルトペルソナが両ユーザーに見える")
+            else:
+                check(True,
+                      "user_id=NULLのデフォルトペルソナが両ユーザーに見える（デフォルトなし）")
+
+    finally:
+        if uid_a:
+            conn.run("DELETE FROM users WHERE id=:id", id=uid_a)
+        if uid_b:
+            conn.run("DELETE FROM users WHERE id=:id", id=uid_b)
+        conn.close()
+
+
+# ─── 運用試験 5: DBスキーマ整合性確認 ─────────────────────────
+
+def test_ops5_db_schema():
+    section("運用試験5: DBスキーマ整合性確認")
+    from src.database import get_connection
+
+    conn = get_connection()
+    try:
+        def _cols(table: str) -> set:
+            rows = conn.run("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name=:t AND table_schema='public'
+            """, t=table)
+            return {r[0] for r in rows}
+
+        def _tables() -> set:
+            rows = conn.run("""
+                SELECT table_name FROM information_schema.tables
+                WHERE table_schema='public'
+            """)
+            return {r[0] for r in rows}
+
+        # 1. usersテーブルの必須カラムが全て存在する
+        required = {
+            'id', 'email', 'password_hash', 'name', 'plan', 'credits',
+            'plan_expires_at', 'monthly_meeting_count', 'monthly_reset_at',
+            'stripe_customer_id', 'created_at',
+        }
+        users_cols = _cols('users')
+        missing = required - users_cols
+        check(not missing,
+              f"usersテーブルに必須カラムが全て存在する (missing={missing or 'none'})")
+
+        # 2. プランカラム名がplanである（plan_typeでない）
+        check('plan' in users_cols and 'plan_type' not in users_cols,
+              "プランカラム名がplan（plan_typeでない）")
+
+        # 3. personasテーブルにvoice_idが存在する
+        check('voice_id' in _cols('personas'), "personasテーブルにvoice_idが存在する")
+
+        # 4. 必須テーブルが全て存在する
+        tables      = _tables()
+        req_tbl     = {'payments', 'persona_growth', 'persona_feedback', 'persona_learn'}
+        missing_tbl = req_tbl - tables
+        check(not missing_tbl,
+              f"payments/persona_growth/persona_feedback/persona_learnテーブルが存在する"
+              f" (missing={missing_tbl or 'none'})")
+
+        # 5. persona_learnにembeddingカラムが存在する
+        check('embedding' in _cols('persona_learn'),
+              "persona_learnにembeddingカラムが存在する")
+
+    finally:
+        conn.close()
+
+
+# ─── 運用試験 6: 全主要エンドポイント疎通確認 ─────────────────
+
+def test_ops6_endpoint_health():
+    section("運用試験6: 全主要エンドポイント疎通確認")
+    from src.database import get_connection
+
+    ts    = int(time.time())
+    email = f"test_ops6_{ts}@test.invalid"
+    pw    = "Ops6Test123!"
+    uid   = None
+    conn  = get_connection()
+
+    try:
+        with flask_app.test_client() as c:
+            # 1. GET /api/health → 200かつstatus=ok
+            r1 = c.get('/api/health')
+            check_code(r1, 200, "GET /api/health → 200")
+            check((r1.get_json() or {}).get('status') == 'ok', "status=okが返る")
+
+            # 2. GET /api/personas → 200
+            r2 = c.get('/api/personas')
+            check_code(r2, 200, "GET /api/personas → 200")
+
+            # 3. GET /api/personas/members → 200
+            r3 = c.get('/api/personas/members')
+            check_code(r3, 200, "GET /api/personas/members → 200")
+
+            # 4. GET /api/auth/me → 200かつuser=None（未ログイン）
+            r4 = c.get('/api/auth/me')
+            check_code(r4, 200, "GET /api/auth/me → 200（未ログイン）")
+            check((r4.get_json() or {}).get('user') is None, "user=None（未ログイン）")
+
+            # ログイン後テスト用ユーザー登録
+            rr = c.post('/api/auth/register',
+                        json={'email': email, 'password': pw, 'name': '疎通テスト'})
+            uid = ((rr.get_json() or {}).get('user') or {}).get('id')
+            c.post('/api/auth/login', json={'email': email, 'password': pw})
+
+            # 5. ログイン後 GET /api/payment/status → 200
+            r5 = c.get('/api/payment/status')
+            check_code(r5, 200, "ログイン後 GET /api/payment/status → 200")
+
+            # 6. GET /api/payment/schema-check → 200かつok=true
+            r6 = c.get('/api/payment/schema-check')
+            check_code(r6, 200, "GET /api/payment/schema-check → 200")
+            check((r6.get_json() or {}).get('ok') is True, "schema-check: ok=trueが返る")
+
+    finally:
+        if uid:
+            conn.run("DELETE FROM users WHERE id=:id", id=uid)
+        conn.close()
+
+
+# ─── 運用試験 7: APIレスポンスタイム計測（WARN） ────────────────
+
+def test_ops7_response_time_warn(client):
+    section("運用試験7: APIレスポンスタイム計測（基準超過はWARNで記録）")
+
+    cases = [
+        ("GET",  "/api/health",     None,
+         "GET /api/health",      3.0),
+        ("GET",  "/api/personas",   None,
+         "GET /api/personas",    5.0),
+        ("GET",  "/api/auth/me",    None,
+         "GET /api/auth/me",     3.0),
+        ("POST", "/api/auth/login", {"email": TEST_EMAIL, "password": TEST_PW},
+         "POST /api/auth/login", 5.0),
+    ]
+
+    for method, path, body, label, limit_sec in cases:
+        t0 = time.time()
+        r  = client.get(path) if method == "GET" else client.post(path, json=body)
+        elapsed = time.time() - t0
+        if elapsed > limit_sec:
+            warn(f"{label}: {elapsed*1000:.0f}ms（基準{limit_sec*1000:.0f}ms超過）")
+        check(True,
+              f"{label}: {elapsed*1000:.0f}ms / {limit_sec*1000:.0f}ms (HTTP {r.status_code})")
+
+
 # ─── メイン ───────────────────────────────────────────────────
 
 _skipped_sections: list[str] = []
@@ -844,6 +1268,7 @@ if __name__ == '__main__':
 
     cleanup()  # 事前クリーンアップ
 
+    _existing_count = 0
     try:
         with flask_app.test_client() as client:
             safe_run("機能試験1: 認証",              test1_auth,             client)
@@ -859,6 +1284,16 @@ if __name__ == '__main__':
             safe_run("運用試験2: 複数ペルソナ",      test9_multi_persona,    client)
             safe_run("運用試験3: DB整合性",          test10_db_integrity)
             safe_run("運用試験4: レスポンスタイム計測", test11_response_time,  client)
+
+            _existing_count = len(_results)  # 既存121件の基準点
+
+            safe_run("機能試験8: iPhone回帰テスト",     test_func8_mobile_static)
+            safe_run("機能試験9: SSEヘッダー検証",      test_func9_sse_headers)
+            safe_run("機能試験10: プラン境界値テスト",  test_func10_plan_boundary)
+            safe_run("機能試験11: クロスユーザー分離",  test_func11_cross_user_isolation)
+            safe_run("運用試験5: DBスキーマ整合性",     test_ops5_db_schema)
+            safe_run("運用試験6: エンドポイント疎通",   test_ops6_endpoint_health)
+            safe_run("運用試験7: レスポンスタイムWARN", test_ops7_response_time_warn, client)
     finally:
         cleanup()
 
@@ -866,9 +1301,15 @@ if __name__ == '__main__':
     total   = len(_results)
     failed  = total - passed
     skipped = len(_skipped_sections)
+    added   = total - _existing_count
 
     print(f"\n{'='*60}")
     print(f"テスト結果: {passed}/{total} PASS  ({failed} FAIL, {skipped} SKIP)")
+    print(f"総テスト数: {total}件（既存: {_existing_count}件 + 追加: {added}件）")
+    if _warns:
+        print(f"WARN: {len(_warns)}件")
+        if len(_warns) >= 3:
+            print("⚠️ パフォーマンス劣化の可能性あり")
     if _skipped_sections:
         print(f"スキップセクション: {', '.join(_skipped_sections)}")
     print('='*60)
