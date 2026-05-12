@@ -84,6 +84,11 @@ def register():
     if len(password) < 6:
         return jsonify({"error": "パスワードは6文字以上にしてください"}), 400
 
+    # T-01: 利用規約同意確認
+    tos_agreed = data.get("tos_agreed", False)
+    if not tos_agreed:
+        return jsonify({"error": "利用規約およびプライバシーポリシーへの同意が必要です", "code": "TOS_REQUIRED"}), 400
+
     existing = get_user_by_email(email)
     if existing:
         return jsonify({"error": "このメールアドレスはすでに登録されています"}), 400
@@ -153,6 +158,9 @@ def add_persona():
     data = request.json
     if not data:
         return jsonify({"error": "データがありません"}), 400
+    # T-04: 生存者禁止 — is_fictional=False が明示された場合は拒否
+    if data.get("is_fictional") is False:
+        return jsonify({"error": "実在する生存者を模したペルソナの作成は禁止されています", "code": "REAL_PERSON_PROHIBITED"}), 400
     data.setdefault("role", "member")
     data.setdefault("avatar", "👤")
     data.setdefault("color", "#6B7280")

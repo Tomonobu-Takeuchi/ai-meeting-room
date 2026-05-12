@@ -33,13 +33,13 @@ class PersonaManager:
     # ===== ペルソナ取得（user_id対応） =====
 
     def get_members_only(self, user_id=None):
-        """memberロールのペルソナ取得（デフォルト＋ユーザー固有）"""
+        """memberロールのペルソナ取得（ユーザー固有のみ。T-02: デフォルト共有廃止）"""
         conn = get_connection()
         if user_id:
             rows = conn.run("""
                 SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id FROM personas
                 WHERE role='member'
-                  AND (user_id=:user_id OR user_id IS NULL)
+                  AND user_id=:user_id
                 ORDER BY is_default DESC, created_at ASC
             """, user_id=user_id)
         else:
@@ -57,13 +57,13 @@ class PersonaManager:
         return result
 
     def get_facilitator(self, user_id=None):
-        """ファシリテータ取得"""
+        """ファシリテータ取得（T-02: user_id指定時はユーザー固有のみ）"""
         conn = get_connection()
         if user_id:
             rows = conn.run("""
                 SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id FROM personas
                 WHERE role='facilitator'
-                  AND (user_id=:user_id OR user_id IS NULL)
+                  AND user_id=:user_id
                 ORDER BY is_default DESC, created_at ASC LIMIT 1
             """, user_id=user_id)
         else:
@@ -80,7 +80,7 @@ class PersonaManager:
         if user_id:
             rows = conn.run("""
                 SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id FROM personas
-                WHERE user_id=:user_id OR user_id IS NULL
+                WHERE user_id=:user_id
                 ORDER BY role DESC, is_default DESC, created_at ASC
             """, user_id=user_id)
         else:
@@ -96,7 +96,7 @@ class PersonaManager:
         if user_id:
             rows = conn.run("""
                 SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id FROM personas
-                WHERE id=:id AND (user_id=:user_id OR user_id IS NULL)
+                WHERE id=:id AND user_id=:user_id
             """, id=persona_id, user_id=user_id)
         else:
             rows = conn.run("SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id FROM personas WHERE id=:id", id=persona_id)
@@ -116,7 +116,7 @@ class PersonaManager:
                 SELECT id, user_id, name, avatar, description, personality,
                        speaking_style, background, color, role, is_default, created_at, voice_id
                 FROM personas
-                WHERE id = ANY(:ids) AND (user_id=:user_id OR user_id IS NULL)
+                WHERE id = ANY(:ids) AND user_id=:user_id
             """, ids=list(ids), user_id=user_id)
         else:
             rows = conn.run("""
@@ -133,6 +133,9 @@ class PersonaManager:
 
     def add_persona(self, data, user_id=None):
         persona_id = data.get('id') or str(uuid.uuid4())[:8]
+        # T-03: アバターは絵文字のみ（最大4文字）
+        avatar_raw = data.get('avatar', '👤').strip() or '👤'
+        avatar_val = avatar_raw[:4]
         conn = get_connection()
         conn.run("""
             INSERT INTO personas (id, user_id, name, avatar, description, personality,
@@ -143,7 +146,7 @@ class PersonaManager:
         """,
         id=persona_id, user_id=user_id,
         name=data.get('name','').strip(),
-        avatar=data.get('avatar','👤').strip() or '👤',
+        avatar=avatar_val,
         description=data.get('description','').strip(),
         personality=data.get('personality','').strip(),
         speaking_style=data.get('speaking_style','').strip(),
@@ -152,12 +155,15 @@ class PersonaManager:
         role=data.get('role','member'),
         voice_id=data.get('voice_id') or None)
         rows = conn.run("""
-            SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id FROM personas WHERE id=:id AND (user_id=:user_id OR user_id IS NULL)
+            SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id FROM personas WHERE id=:id AND user_id=:user_id
         """, id=persona_id, user_id=user_id)
         conn.close()
         return serialize_persona(row_to_dict(COLUMNS, rows[0])) if rows else None
 
     def update_persona(self, persona_id, data, user_id=None):
+        # T-03: アバターは絵文字のみ（最大4文字）
+        avatar_raw = data.get('avatar', '👤').strip() or '👤'
+        avatar_val = avatar_raw[:4]
         conn = get_connection()
         if user_id:
             conn.run("""
@@ -165,11 +171,11 @@ class PersonaManager:
                     name=:name, avatar=:avatar, description=:description,
                     personality=:personality, speaking_style=:speaking_style,
                     background=:background, color=:color, voice_id=:voice_id
-                WHERE id=:id AND (user_id=:user_id OR user_id IS NULL)
+                WHERE id=:id AND user_id=:user_id
             """,
             id=persona_id, user_id=user_id,
             name=data.get('name','').strip(),
-            avatar=data.get('avatar','👤').strip() or '👤',
+            avatar=avatar_val,
             description=data.get('description','').strip(),
             personality=data.get('personality','').strip(),
             speaking_style=data.get('speaking_style','').strip(),
@@ -177,7 +183,7 @@ class PersonaManager:
             color=data.get('color','#8B5CF6'),
             voice_id=data.get('voice_id') or None)
             rows = conn.run("""
-                SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id FROM personas WHERE id=:id AND (user_id=:user_id OR user_id IS NULL)
+                SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id FROM personas WHERE id=:id AND user_id=:user_id
             """, id=persona_id, user_id=user_id)
         else:
             conn.run("""
@@ -189,7 +195,7 @@ class PersonaManager:
             """,
             id=persona_id,
             name=data.get('name','').strip(),
-            avatar=data.get('avatar','👤').strip() or '👤',
+            avatar=avatar_val,
             description=data.get('description','').strip(),
             personality=data.get('personality','').strip(),
             speaking_style=data.get('speaking_style','').strip(),

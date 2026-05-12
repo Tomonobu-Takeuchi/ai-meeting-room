@@ -112,9 +112,9 @@ def cleanup():
 def test1_auth(client):
     section("機能試験1: ユーザー登録・ログイン・ログアウト")
 
-    # 登録
+    # 登録（T-01: tos_agreed=True が必須）
     r = client.post('/api/auth/register',
-                    json={'email': TEST_EMAIL, 'password': TEST_PW, 'name': TEST_NAME})
+                    json={'email': TEST_EMAIL, 'password': TEST_PW, 'name': TEST_NAME, 'tos_agreed': True})
     check_code(r, 200, "register 200 OK")
     data = r.get_json() or {}
     check('user' in data, "register レスポンスに user が含まれる")
@@ -122,7 +122,7 @@ def test1_auth(client):
 
     # 重複登録
     r2 = client.post('/api/auth/register',
-                     json={'email': TEST_EMAIL, 'password': TEST_PW, 'name': TEST_NAME})
+                     json={'email': TEST_EMAIL, 'password': TEST_PW, 'name': TEST_NAME, 'tos_agreed': True})
     check_code(r2, 400, "重複登録 → 400")
 
     # ログアウト
@@ -678,6 +678,20 @@ def test8_persistence(client):
 def test9_multi_persona(client):
     section("運用試験2: 複数ペルソナ同時参加での会議安定性")
 
+    # T-02後: デフォルトペルソナは非公開のため、テスト専用ペルソナを追加作成
+    extra_pids = []
+    for i in range(2):
+        r_tmp = client.post('/api/personas/add', json={
+            "name": f"マルチ用ペルソナ{i+1}", "description": "複数ペルソナテスト用",
+            "personality": "協調的", "speaking_style": "標準語",
+            "background": "", "avatar": ("🟡" if i == 0 else "🟠"),
+            "color": "#F59E0B", "role": "member",
+        })
+        if r_tmp.status_code == 200:
+            pid_tmp = (r_tmp.get_json() or {}).get('persona', {}).get('id')
+            if pid_tmp:
+                extra_pids.append(pid_tmp)
+
     r = client.get('/api/personas/members')
     members = (r.get_json() or {}).get('members', [])
 
@@ -686,6 +700,8 @@ def test9_multi_persona(client):
 
     if len(available) < 2:
         skip(f"ペルソナ数 {len(available)} < 2: スキップ")
+        for pid in extra_pids:
+            client.delete(f'/api/personas/{pid}')
         return
 
     ids_3 = available[:3]  # 最大3名
@@ -713,6 +729,10 @@ def test9_multi_persona(client):
         r4 = client.post(f'/api/meeting/{sid2}/message',
                          json={'content': '複数ペルソナ会議テストメッセージ'})
         check_code(r4, 200, "複数ペルソナ会議へのメッセージ送信 200 OK")
+
+    # テスト用ペルソナをクリーンアップ
+    for pid in extra_pids:
+        client.delete(f'/api/personas/{pid}')
 
 
 # ─── 運用試験 3: DB整合性 ─────────────────────────────────────
@@ -973,7 +993,7 @@ def test_func10_plan_boundary():
     try:
         with flask_app.test_client() as c:
             r = c.post('/api/auth/register',
-                       json={'email': email, 'password': pw, 'name': '境界値テスト'})
+                       json={'email': email, 'password': pw, 'name': '境界値テスト', 'tos_agreed': True})
             uid = ((r.get_json() or {}).get('user') or {}).get('id')
             if not uid:
                 skip("ユーザー登録失敗のためスキップ")
@@ -1043,7 +1063,7 @@ def test_func11_cross_user_isolation():
         # ─ ユーザーA: 登録・ペルソナ作成 ─
         with flask_app.test_client() as ca:
             ra = ca.post('/api/auth/register',
-                         json={'email': email_a, 'password': pw, 'name': 'ユーザーA'})
+                         json={'email': email_a, 'password': pw, 'name': 'ユーザーA', 'tos_agreed': True})
             uid_a = ((ra.get_json() or {}).get('user') or {}).get('id')
             if uid_a:
                 rp = ca.post('/api/personas/add', json={
@@ -1056,7 +1076,7 @@ def test_func11_cross_user_isolation():
         # ─ ユーザーB: 登録・分離テスト ─
         with flask_app.test_client() as cb:
             rb = cb.post('/api/auth/register',
-                         json={'email': email_b, 'password': pw, 'name': 'ユーザーB'})
+                         json={'email': email_b, 'password': pw, 'name': 'ユーザーB', 'tos_agreed': True})
             uid_b = ((rb.get_json() or {}).get('user') or {}).get('id')
 
             if not uid_a or not uid_b or not pid_a:
@@ -1083,19 +1103,21 @@ def test_func11_cross_user_isolation():
                 check(r_learn.status_code in (403, 404),
                       f"Aの学習データへのBのアクセスがエラー (HTTP {r_learn.status_code})")
 
-            # 4. user_id=NULLのデフォルトペルソナが両ユーザーに見える
+            # 4. T-02: user_id=NULLのデフォルトペルソナはAPIから非公開（プライバシー強化）
             null_cnt = conn.run(
                 "SELECT COUNT(*) FROM personas WHERE user_id IS NULL")[0][0]
             if null_cnt > 0:
+                null_ids = {r[0] for r in conn.run(
+                    "SELECT id FROM personas WHERE user_id IS NULL")}
                 with flask_app.test_client() as ca2:
                     ca2.post('/api/auth/login', json={'email': email_a, 'password': pw})
                     r_a   = ca2.get('/api/personas/members')
                     a_ids = {m['id'] for m in (r_a.get_json() or {}).get('members', [])}
-                    check(len(a_ids & b_ids_set) > 0,
-                          "user_id=NULLのデフォルトペルソナが両ユーザーに見える")
+                    check(len(a_ids & null_ids) == 0,
+                          "T-02: user_id=NULLのデフォルトペルソナがAPIから非公開（プライバシー強化）")
             else:
                 check(True,
-                      "user_id=NULLのデフォルトペルソナが両ユーザーに見える（デフォルトなし）")
+                      "T-02: user_id=NULLのデフォルトペルソナが存在しない（対応済み）")
 
     finally:
         if uid_a:
@@ -1195,7 +1217,7 @@ def test_ops6_endpoint_health():
 
             # ログイン後テスト用ユーザー登録
             rr = c.post('/api/auth/register',
-                        json={'email': email, 'password': pw, 'name': '疎通テスト'})
+                        json={'email': email, 'password': pw, 'name': '疎通テスト', 'tos_agreed': True})
             uid = ((rr.get_json() or {}).get('user') or {}).get('id')
             c.post('/api/auth/login', json={'email': email, 'password': pw})
 

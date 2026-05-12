@@ -1119,6 +1119,8 @@ async function submitAddPersona() {
   const speakingStyle = $('pSpeakingStyle').value.trim(), color = $('pColor').value;
   let background = buildBackgroundFromLearnData($('pBackground').value.trim(), State.addLearnFiles);
   const voiceId = $('pVoiceId')?.value || 'none';
+  // T-04: 生存者禁止チェック
+  const isFictional = $('pIsFictional')?.checked !== false;
   if (!name || !description || !personality || !speakingStyle) {
     showToast('必須項目を入力してください', 'error');
     State.addSubmitting = false;
@@ -1126,8 +1128,15 @@ async function submitAddPersona() {
     DOM.confirmAddPersona.textContent = '追加する';
     return;
   }
+  if (!isFictional) {
+    showToast('実在する生存者を模したペルソナは作成できません', 'error');
+    State.addSubmitting = false;
+    DOM.confirmAddPersona.disabled = false;
+    DOM.confirmAddPersona.textContent = '追加する';
+    return;
+  }
   try {
-    const data = await API.post('/api/personas/add', { name, avatar, description, personality, speaking_style: speakingStyle, background, role: 'member', color, voice_id: voiceId === 'none' ? null : voiceId });
+    const data = await API.post('/api/personas/add', { name, avatar, description, personality, speaking_style: speakingStyle, background, role: 'member', color, voice_id: voiceId === 'none' ? null : voiceId, is_fictional: true });
     if (State.addAvatarDataUrl) State.avatarImages[data.persona.id] = State.addAvatarDataUrl;
 
     // ★ 学習データをpersona_learnテーブルにDB保存（3件バッチ並列・1件失敗でも続行）
@@ -1800,10 +1809,13 @@ async function submitRegister() {
   const errEl = $('registerError');
   if (!email || !password) { errEl.textContent = 'メールアドレスとパスワードを入力してください'; return; }
   if (password.length < 6) { errEl.textContent = 'パスワードは6文字以上にしてください'; return; }
+  // T-01: 利用規約同意確認
+  const tosAgreed = $('registerTosAgreed')?.checked;
+  if (!tosAgreed) { errEl.textContent = '利用規約およびプライバシーポリシーへの同意が必要です'; return; }
   try {
     const btn = $('registerSubmitBtn');
     btn.textContent = '登録中...'; btn.disabled = true;
-    const data = await API.post('/api/auth/register', { email, password, name });
+    const data = await API.post('/api/auth/register', { email, password, name, tos_agreed: true });
     State.currentUser = data.user;
     renderAuthArea();
     closeAuthModal();
