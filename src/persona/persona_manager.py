@@ -80,7 +80,7 @@ class PersonaManager:
         if user_id:
             rows = conn.run("""
                 SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id FROM personas
-                WHERE user_id=:user_id
+                WHERE user_id=:user_id OR user_id IS NULL
                 ORDER BY role DESC, is_default DESC, created_at ASC
             """, user_id=user_id)
         else:
