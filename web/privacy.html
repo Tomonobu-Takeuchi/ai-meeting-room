@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>プライバシーポリシー | AI-PERSONA会議室</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-base:#0D1117;--bg-surface:#161B22;--bg-elevated:#1C2333;
+      --border:#30363D;--border-subtle:#21262D;
+      --text-primary:#E6EDF3;--text-secondary:#8B949E;--text-muted:#484F58;
+      --accent-blue:#2563EB;--accent-purple:#7C3AED;--accent-teal:#0891B2;
+      --radius:10px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Noto Sans JP', sans-serif;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      min-height: 100vh;
+      line-height: 1.8;
+    }
+    header {
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-logo {
+      font-family: 'Space Mono', monospace;
+      font-size: 16px;
+      font-weight: 700;
+      color: #C4C0FF;
+      letter-spacing: 0.5px;
+      text-decoration: none;
+    }
+    .back-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text-secondary);
+      font-family: 'Noto Sans JP', sans-serif;
+      font-size: 12px;
+      padding: 5px 12px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.15s;
+    }
+    .back-btn:hover { color: var(--text-primary); border-color: #484F58; }
+
+    main {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 48px 24px 80px;
+    }
+    .doc-header {
+      margin-bottom: 40px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    .doc-badge {
+      display: inline-block;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 11px;
+      color: var(--text-muted);
+      padding: 3px 10px;
+      margin-bottom: 16px;
+      font-family: 'Space Mono', monospace;
+    }
+    .doc-title {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+    .doc-subtitle {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+    .notice-box {
+      background: var(--bg-elevated);
+      border: 1px solid var(--accent-teal);
+      border-left: 3px solid var(--accent-teal);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      margin-bottom: 36px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.7;
+    }
+    .notice-box strong { color: #67E8F9; }
+    .pending-note {
+      background: rgba(217, 119, 6, 0.08);
+      border: 1px solid rgba(217, 119, 6, 0.3);
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 12px;
+      color: #FCD34D;
+      margin-top: 10px;
+    }
+    .pending-note::before { content: '⚠ '; }
+
+    article { margin-bottom: 36px; }
+    .article-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #67E8F9;
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .article-title::before {
+      content: '';
+      display: inline-block;
+      width: 3px;
+      height: 16px;
+      background: var(--accent-teal);
+      border-radius: 2px;
+    }
+    .article-body {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.9;
+    }
+    .article-body p { margin-bottom: 10px; }
+    .article-body ul, .article-body ol {
+      padding-left: 20px;
+      margin: 8px 0 12px;
+    }
+    .article-body li { margin-bottom: 6px; }
+    .highlight-box {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin: 12px 0;
+      font-size: 13px;
+    }
+    .highlight-box .label {
+      font-weight: 700;
+      color: var(--accent-teal);
+      margin-bottom: 8px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .table-wrap { overflow-x: auto; margin: 12px 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th {
+      background: var(--bg-elevated);
+      color: var(--text-secondary);
+      font-weight: 500;
+      padding: 10px 14px;
+      text-align: left;
+      border: 1px solid var(--border);
+    }
+    td {
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      vertical-align: top;
+    }
+    tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+
+    .data-category {
+      display: inline-block;
+      background: rgba(8, 145, 178, 0.1);
+      border: 1px solid rgba(8, 145, 178, 0.3);
+      border-radius: 4px;
+      font-size: 11px;
+      color: #67E8F9;
+      padding: 2px 8px;
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+
+    .rights-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .rights-item {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 13px;
+    }
+    .rights-item .rights-title {
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+      font-size: 13px;
+    }
+    .rights-item .rights-desc {
+      color: var(--text-muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .doc-footer {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: center;
+      line-height: 1.8;
+    }
+
+    @media (max-width: 600px) {
+      main { padding: 32px 16px 60px; }
+      .doc-title { font-size: 22px; }
+      .rights-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="/" class="header-logo">AI-PERSONA 会議室</a>
+  <a href="/" class="back-btn">← トップへ戻る</a>
+</header>
+
+<main>
+  <div class="doc-header">
+    <div class="doc-badge">ドラフト v1.0 ／ 5/14 弁護士確認予定</div>
+    <h1 class="doc-title">プライバシーポリシー</h1>
+    <p class="doc-subtitle">AI-Paradise（AI-Persona会議室・Digital-Persona相談室）</p>
+  </div>
+
+  <div class="notice-box">
+    <strong>【重要】</strong> 本書はドラフトv1.0です。2026年5月14日の弁護士確認後に正式版として確定します。
+    音声・映像データの個人情報該当性については確認中であり、内容が変更される場合があります。
+  </div>
+
+  <!-- 基本方針 -->
+  <article>
+    <h2 class="article-title">基本方針</h2>
+    <div class="article-body">
+      <p>竹内智信（以下「当社」といいます）は、AI-Paradise（AI-Persona会議室・Digital-Persona相談室。以下「本サービス」といいます）の運営にあたり、ユーザーの個人情報を適切に保護することを重要な責務と考えています。本プライバシーポリシーは、当社が収集する情報の種類、利用目的、および管理方法を説明するものです。</p>
+      <p>本サービスをご利用いただくことにより、本プライバシーポリシーに同意したものとみなします。</p>
+    </div>
+  </article>
+
+  <!-- 第1条 収集する情報 -->
+  <article>
+    <h2 class="article-title">第1条（収集する情報）</h2>
+    <div class="article-body">
+      <p>当社は、以下の情報を収集することがあります。</p>
+
+      <div class="highlight-box" style="margin-top:12px;">
+        <div class="label">アカウント情報</div>
+        <ul>
+          <li>メールアドレス（登録・ログイン・お問い合わせ対応に使用）</li>
+          <li>パスワード（bcryptによりハッシュ化して保存。平文では保存しません）</li>
+          <li>表示名（任意）</li>
+        </ul>
+      </div>
+
+      <div class="highlight-box">
+        <div class="label">利用情報</div>
+        <ul>
+          <li>ペルソナデータ（名前・説明・性格設定等、ユーザーが入力した情報）</li>
+          <li>学習データ（テキスト・URL・音声・動画・PDFなど、ユーザーが提供したデータ）</li>
+          <li>会議・会話の記録（会議ログ・PDF議事録）</li>
+          <li>利用プラン・会議回数・クレジット残数</li>
+        </ul>
+      </div>
+
+      <div class="highlight-box">
+        <div class="label">決済情報</div>
+        <ul>
+          <li>決済処理はStripe, Inc.が行います。クレジットカード番号等の決済情報は当社のサーバーには保存されません。</li>
+          <li>当社が保持するのは、StripeのカスタマーID・決済セッションID・プラン情報のみです。</li>
+        </ul>
+      </div>
+
+      <div class="highlight-box">
+        <div class="label">自動収集情報</div>
+        <ul>
+          <li>アクセスログ（IPアドレス・ブラウザ情報・アクセス日時）※サーバーログとして一定期間保持</li>
+          <li>セッション情報（Flaskセッション。ログイン状態の維持に使用）</li>
+        </ul>
+      </div>
+
+      <p style="margin-top:12px;"><strong>収集しない情報：</strong>当社は、氏名・住所・電話番号・マイナンバー等の個人識別情報をサービス利用に際して収集しません。会話・学習データへのこれら情報の入力はお控えください。</p>
+    </div>
+  </article>
+
+  <!-- 第2条 利用目的 -->
+  <article>
+    <h2 class="article-title">第2条（情報の利用目的）</h2>
+    <div class="article-body">
+      <p>収集した情報は、以下の目的にのみ利用します。</p>
+      <div class="table-wrap" style="margin-top:12px;">
+        <table>
+          <thead>
+            <tr><th>情報の種類</th><th>利用目的</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>メールアドレス</td><td>ログイン認証・重要なお知らせの送付</td></tr>
+            <tr><td>ペルソナ・学習データ</td><td>AIペルソナの生成・会議機能の提供</td></tr>
+            <tr><td>会議ログ</td><td>PDF議事録の生成・過去会議の参照</td></tr>
+            <tr><td>利用状況データ</td><td>プラン管理・利用制限の適用・サービス改善</td></tr>
+            <tr><td>アクセスログ</td><td>セキュリティ監視・障害対応</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:12px;">上記以外の目的での利用は行いません。利用目的を変更する場合は、ユーザーへ事前に通知します。</p>
+    </div>
+  </article>
+
+  <!-- 第3条 外部APIへのデータ送信 -->
+  <article>
+    <h2 class="article-title">第3条（外部サービスへのデータ送信）</h2>
+    <div class="article-body">
+      <p>本サービスは、機能提供のために以下の外部サービスにデータを送信します。各サービスのプライバシーポリシーも合わせてご確認ください。</p>
+      <div class="table-wrap" style="margin-top:12px;">
+        <table>
+          <thead>
+            <tr><th>サービス</th><th>運営会社・所在地</th><th>送信データ</th><th>用途</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Claude API</td>
+              <td>Anthropic, PBC（米国）</td>
+              <td>会話テキスト・ペルソナ設定</td>
+              <td>AI会話の生成</td>
+            </tr>
+            <tr>
+              <td>OpenAI API</td>
+              <td>OpenAI, Inc.（米国）</td>
+              <td>テキスト・音声データ</td>
+              <td>文字起こし（Whisper）・Embedding生成</td>
+            </tr>
+            <tr>
+              <td>ElevenLabs</td>
+              <td>ElevenLabs, Inc.（米国）</td>
+              <td>テキスト・音声サンプル</td>
+              <td>音声生成（Premiumプラン）</td>
+            </tr>
+            <tr>
+              <td>HeyGen</td>
+              <td>HeyGen Inc.（米国）</td>
+              <td>写真・テキスト</td>
+              <td>アバター動画生成（Phase2以降）</td>
+            </tr>
+            <tr>
+              <td>Stripe</td>
+              <td>Stripe, Inc.（米国）</td>
+              <td>決済情報</td>
+              <td>課金処理</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:12px;">音声データまたは画像・動画データを外部APIに送信する際には、送信前に同意確認画面を表示します。同意しない場合、当該機能はご利用いただけません。</p>
+      <div class="pending-note">音声・映像データの個人情報・要配慮個人情報への該当可否については5/14弁護士相談で確認予定です。</div>
+    </div>
+  </article>
+
+  <!-- 第4条 データの保管・管理 -->
+  <article>
+    <h2 class="article-title">第4条（データの保管・管理）</h2>
+    <div class="article-body">
+      <ol>
+        <li>ユーザーデータはRailway（米国）が提供するPostgreSQLデータベースに保存されます。</li>
+        <li>パスワードはbcryptにより不可逆なハッシュ値として保存し、平文では保存しません。</li>
+        <li>秘密モードでのセッションデータは暗号化して保存し、デフォルトで30日後に自動削除します。</li>
+        <li>当社は、不正アクセス・データ漏洩・改ざんを防止するための適切なセキュリティ対策を講じます。ただし、インターネット上での完全な安全性を保証することはできません。</li>
+        <li>当社はユーザーデータを第三者（上記外部APIを除く）に販売・提供しません。</li>
+      </ol>
+    </div>
+  </article>
+
+  <!-- 第5条 データの保持期間 -->
+  <article>
+    <h2 class="article-title">第5条（データの保持期間）</h2>
+    <div class="article-body">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>データの種類</th><th>保持期間</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>アカウント情報</td><td>アカウント削除まで</td></tr>
+            <tr><td>ペルソナ・学習データ</td><td>アカウント削除まで（または手動削除）</td></tr>
+            <tr><td>会議ログ</td><td>アカウント削除まで（または手動削除）</td></tr>
+            <tr><td>秘密モードデータ</td><td>デフォルト30日（設定変更可）</td></tr>
+            <tr><td>アクセスログ</td><td>最大90日</td></tr>
+            <tr><td>決済履歴</td><td>法令に基づき7年間保持</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </article>
+
+  <!-- 第6条 ユーザーの権利 -->
+  <article>
+    <h2 class="article-title">第6条（ユーザーの権利）</h2>
+    <div class="article-body">
+      <p>ユーザーは、自身のデータについて以下の権利を行使できます。</p>
+      <div class="rights-grid" style="margin-top:12px;">
+        <div class="rights-item">
+          <div class="rights-title">📋 開示請求</div>
+          <div class="rights-desc">当社が保持するご自身のデータの開示を請求できます。</div>
+        </div>
+        <div class="rights-item">
+          <div class="rights-title">✏️ 訂正・削除</div>
+          <div class="rights-desc">不正確なデータの訂正、または特定データの削除を依頼できます。</div>
+        </div>
+        <div class="rights-item">
+          <div class="rights-title">🗑️ アカウント削除</div>
+          <div class="rights-desc">アカウント削除時は、関連するすべてのペルソナ・学習データも削除されます。</div>
+        </div>
+        <div class="rights-item">
+          <div class="rights-title">📤 データエクスポート</div>
+          <div class="rights-desc">サービス終了時は、ペルソナ・学習データのエクスポート機能を提供するよう努めます。</div>
+        </div>
+      </div>
+      <p style="margin-top:12px;">権利行使のご依頼は、お問い合わせフォームよりご連絡ください。合理的な期間内に対応します。</p>
+    </div>
+  </article>
+
+  <!-- 第7条 Cookieについて -->
+  <article>
+    <h2 class="article-title">第7条（Cookieについて）</h2>
+    <div class="article-body">
+      <ol>
+        <li>本サービスは、ログイン状態の維持のためにFlaskセッションクッキーを使用します。このクッキーは本サービスの基本機能に必要であり、無効化するとログイン機能が利用できません。</li>
+        <li>本サービスは、広告目的のトラッキングクッキーや第三者広告クッキーを使用しません。</li>
+        <li>Stripe Inc.が決済処理のためにクッキーを使用する場合があります。詳細はStripeのプライバシーポリシーをご確認ください。</li>
+      </ol>
+    </div>
+  </article>
+
+  <!-- 第8条 未成年者について -->
+  <article>
+    <h2 class="article-title">第8条（未成年者について）</h2>
+    <div class="article-body">
+      <ol>
+        <li>本サービスは、13歳未満の方を対象としていません。</li>
+        <li>18歳未満の方がご利用の場合は、保護者の同意を得た上でご利用ください。</li>
+        <li>13歳未満の方が誤って登録した場合、保護者からの申し出によりデータを削除します。</li>
+      </ol>
+    </div>
+  </article>
+
+  <!-- 第9条 プライバシーポリシーの変更 -->
+  <article>
+    <h2 class="article-title">第9条（プライバシーポリシーの変更）</h2>
+    <div class="article-body">
+      <ol>
+        <li>当社は、必要に応じて本プライバシーポリシーを変更することができます。</li>
+        <li>重要な変更がある場合は、サービス上での掲示またはメールにより事前にユーザーへ通知します。</li>
+        <li>変更後のプライバシーポリシーは、本サービス上に掲示した時点から効力を生じます。</li>
+      </ol>
+    </div>
+  </article>
+
+  <!-- 第10条 お問い合わせ -->
+  <article>
+    <h2 class="article-title">第10条（お問い合わせ）</h2>
+    <div class="article-body">
+      <p>個人情報の取り扱いに関するご質問・ご要望・苦情は、本サービス上のお問い合わせフォームよりご連絡ください。遅滞なく対応いたします。</p>
+      <div class="highlight-box" style="margin-top:12px;">
+        <div class="label">運営者情報</div>
+        <p>運営者：竹内智信<br>
+        サービス名：AI-Paradise（AI-Persona会議室・Digital-Persona相談室）<br>
+        お問い合わせ：本サービス上のフォームよりご連絡ください</p>
+      </div>
+    </div>
+  </article>
+
+  <div class="doc-footer">
+    <p>制定日：2026年　月　日（5/14弁護士確認後に確定）</p>
+    <p style="margin-top:4px;">運営者：竹内智信　／　AI-Paradise プライバシーポリシー ドラフト v1.0</p>
+    <p style="margin-top:8px;">
+      <a href="/terms" style="color:#60A5FA;text-decoration:none;">利用規約</a>　|　
+      <a href="/" style="color:#60A5FA;text-decoration:none;">AI-PERSONA会議室 トップへ</a>
+    </p>
+  </div>
+</main>
+
+</body>
+</html>

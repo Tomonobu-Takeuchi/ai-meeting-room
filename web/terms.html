@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>利用規約 | AI-PERSONA会議室</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-base:#0D1117;--bg-surface:#161B22;--bg-elevated:#1C2333;
+      --border:#30363D;--border-subtle:#21262D;
+      --text-primary:#E6EDF3;--text-secondary:#8B949E;--text-muted:#484F58;
+      --accent-blue:#2563EB;--accent-purple:#7C3AED;
+      --radius:10px;--shadow:0 4px 24px rgba(0,0,0,0.4);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Noto Sans JP', sans-serif;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      min-height: 100vh;
+      line-height: 1.8;
+    }
+    header {
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-logo {
+      font-family: 'Space Mono', monospace;
+      font-size: 16px;
+      font-weight: 700;
+      color: #C4C0FF;
+      letter-spacing: 0.5px;
+      text-decoration: none;
+    }
+    .back-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text-secondary);
+      font-family: 'Noto Sans JP', sans-serif;
+      font-size: 12px;
+      padding: 5px 12px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.15s;
+    }
+    .back-btn:hover { color: var(--text-primary); border-color: #484F58; }
+
+    main {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 48px 24px 80px;
+    }
+    .doc-header {
+      margin-bottom: 40px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    .doc-badge {
+      display: inline-block;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 11px;
+      color: var(--text-muted);
+      padding: 3px 10px;
+      margin-bottom: 16px;
+      font-family: 'Space Mono', monospace;
+    }
+    .doc-title {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+    .doc-subtitle {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+    .notice-box {
+      background: var(--bg-elevated);
+      border: 1px solid var(--accent-purple);
+      border-left: 3px solid var(--accent-purple);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      margin-bottom: 36px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.7;
+    }
+    .notice-box strong { color: #A78BFA; }
+
+    .preamble {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.9;
+      margin-bottom: 40px;
+      padding: 20px;
+      background: var(--bg-surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border-subtle);
+    }
+
+    article { margin-bottom: 36px; }
+    .article-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #C4C0FF;
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .article-title::before {
+      content: '';
+      display: inline-block;
+      width: 3px;
+      height: 16px;
+      background: var(--accent-purple);
+      border-radius: 2px;
+    }
+    .article-body {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.9;
+    }
+    .article-body p { margin-bottom: 10px; }
+    .article-body ul, .article-body ol {
+      padding-left: 20px;
+      margin: 8px 0 12px;
+    }
+    .article-body li { margin-bottom: 6px; }
+    .article-body .sub-item {
+      padding-left: 16px;
+      margin: 4px 0;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+    .highlight-box {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin: 12px 0;
+      font-size: 13px;
+    }
+    .highlight-box .label {
+      font-weight: 700;
+      color: var(--accent-blue);
+      margin-bottom: 8px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .prohibited-item {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 8px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+    .prohibited-item .mark {
+      color: #F87171;
+      flex-shrink: 0;
+      font-weight: 700;
+    }
+    .pending-note {
+      background: rgba(217, 119, 6, 0.08);
+      border: 1px solid rgba(217, 119, 6, 0.3);
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 12px;
+      color: #FCD34D;
+      margin-top: 10px;
+    }
+    .pending-note::before { content: '⚠ '; }
+
+    .table-wrap {
+      overflow-x: auto;
+      margin: 12px 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th {
+      background: var(--bg-elevated);
+      color: var(--text-secondary);
+      font-weight: 500;
+      padding: 10px 14px;
+      text-align: left;
+      border: 1px solid var(--border);
+    }
+    td {
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      vertical-align: top;
+    }
+    tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+
+    .doc-footer {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: center;
+      line-height: 1.8;
+    }
+
+    @media (max-width: 600px) {
+      main { padding: 32px 16px 60px; }
+      .doc-title { font-size: 22px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="/" class="header-logo">AI-PERSONA 会議室</a>
+  <a href="/" class="back-btn">← トップへ戻る</a>
+</header>
+
+<main>
+  <div class="doc-header">
+    <div class="doc-badge">ドラフト v2.0 ／ 5/14 弁護士確認予定</div>
+    <h1 class="doc-title">利用規約</h1>
+    <p class="doc-subtitle">AI-Paradise（AI-Persona会議室・Digital-Persona相談室）</p>
+  </div>
+
+  <div class="notice-box">
+    <strong>【重要】</strong> 本書はドラフトv2.0（2026年5月7日法律相談結果を反映）です。
+    2026年5月14日の弁護士確認後に正式版として確定します。
+    現時点でいくつかの条項は確認中であり、内容が変更される場合があります。
+  </div>
+
+  <div class="preamble">
+    本利用規約（以下「本規約」といいます）は、竹内智信（以下「当社」といいます）が提供するAI-Paradiseおよびその関連サービス（AI-Persona会議室・Digital-Persona相談室。以下総称して「本サービス」といいます）の利用に関する条件を定めるものです。ユーザーの皆様（以下「ユーザー」といいます）には、本規約に同意した上で本サービスをご利用いただきます。
+  </div>
+
+  <!-- 第1条 -->
+  <article>
+    <h2 class="article-title">第1条（定義）</h2>
+    <div class="article-body">
+      <p>本規約において使用する主要な用語の定義は以下のとおりです。</p>
+      <ol>
+        <li>「本サービス」とは、当社が提供するAI-Paradise、AI-Persona会議室、Digital-Persona相談室、およびその関連機能の総称をいいます。</li>
+        <li>「ユーザー」とは、本規約に同意し、本サービスに登録・利用する個人をいいます。</li>
+        <li>「ペルソナ」とは、本サービス上でAIが生成する特定の人物・キャラクターを模した対話エージェントをいいます。すべてのペルソナはAIが生成したフィクションです。</li>
+        <li>「学習データ」とは、ユーザーがペルソナに学習させるために提供するテキスト・音声・画像等のデータをいいます。</li>
+        <li>「外部API」とは、本サービスが音声・映像生成等のために利用するElevenLabs Inc.、HeyGen Inc.等の第三者サービスをいいます。</li>
+      </ol>
+    </div>
+  </article>
+
+  <!-- 第2条 -->
+  <article>
+    <h2 class="article-title">第2条（利用規約への同意）</h2>
+    <div class="article-body">
+      <ol>
+        <li>ユーザーは、本サービスを利用することにより、本規約の全条項に同意したものとみなします。</li>
+        <li>ユーザーが未成年者の場合、法定代理人（保護者）の同意を得た上で本サービスをご利用ください。</li>
+        <li>当社は必要に応じて本規約を変更することができます。変更後の規約は本サービス上に掲示した時点から効力を生じるものとします。</li>
+      </ol>
+    </div>
+  </article>
+
+  <!-- 第3条 -->
+  <article>
+    <h2 class="article-title">第3条（アカウント登録）</h2>
+    <div class="article-body">
+      <ol>
+        <li>本サービスの利用には、メールアドレスおよびパスワードによるアカウント登録が必要です。</li>
+        <li>ユーザーは、登録情報を正確・最新の状態に保つものとします。</li>
+        <li>アカウントおよびパスワードの管理はユーザー自身の責任で行うものとし、第三者への譲渡・貸与は禁止します。</li>
+        <li>「秘密モード」として別のメールアドレスで独立したアカウントを作成することができます。通常アカウントと秘密モードアカウントのデータは相互にアクセスできません。</li>
+      </ol>
+    </div>
+  </article>
+
+  <!-- 第4条 -->
+  <article>
+    <h2 class="article-title">第4条（料金・決済）</h2>
+    <div class="article-body">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>プラン</th><th>料金</th><th>内容</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>無料プラン</td><td>¥0</td><td>月5会議（AI-Persona会議室）まで無料</td></tr>
+            <tr><td>Standardプラン</td><td>¥480/50会議</td><td>50チケット（都度購入・期限なし）</td></tr>
+            <tr><td>Premiumプラン</td><td>¥980/月</td><td>無制限（月額自動更新）</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ol style="margin-top:12px;">
+        <li>料金はStripe Inc.を通じてクレジットカードにより決済します。</li>
+        <li>月額プランは毎月自動更新されます。解約は次回更新日の前日までにマイページから手続きを行ってください。</li>
+        <li>解約後の返金は原則として行いません。ただし、当社の責に帰すべき事由による場合はこの限りではありません。</li>
+      </ol>
+      <div class="pending-note">特定商取引法の表示義務・返金規定の適法な設計については5/14弁護士相談で確認予定です。</div>
+    </div>
+  </article>
+
+  <!-- 第5条 -->
+  <article>
+    <h2 class="article-title">第5条（ペルソナに関する重要事項）</h2>
+    <div class="article-body">
+      <ol>
+        <li>本サービスのすべてのペルソナはAIが生成したフィクションです。実際の人物の発言・思想・意見を代表するものではありません。</li>
+        <li>本サービスが提供する著名人・歴史人物のペルソナはエンターテインメント・教育目的のみを目的としており、当該人物の公式見解や実際の発言を再現するものではありません。</li>
+        <li>ペルソナのアイコン画像は、AI生成画像または著作権フリーの画像のみを使用します。ユーザーが著作権のある画像をアップロードすることは禁止します。</li>
+        <li>ペルソナは本サービス内での個人利用のみを目的としており、外部への公開・共有機能は提供しません。</li>
+        <li>ユーザーが作成するカスタムペルソナについては、ユーザー自身の責任において作成・管理するものとします。</li>
+        <li>ユーザーは、ペルソナの発言内容をもって実際の人物の意見として第三者に提示することを禁止します。</li>
+      </ol>
+    </div>
+  </article>
+
+  <!-- 第6条 -->
+  <article>
+    <h2 class="article-title">第6条（禁止事項）</h2>
+    <div class="article-body">
+      <p>ユーザーは以下の行為を行ってはなりません。</p>
+      <ol style="margin-top:10px;">
+        <li><strong>生存者のペルソナを本人の明示的な同意なく作成すること（現時点では生存者ペルソナの作成は全面禁止とします）</strong></li>
+        <li>ペルソナを用いたストーキング・嫌がらせ・脅迫等の行為</li>
+        <li>ペルソナの発言を実際の人物の発言として第三者に提示すること</li>
+        <li>本サービスを医療行為・心理療法・法律相談・投資助言の代替として利用すること</li>
+        <li>本サービスを通じて収集した情報を商業目的で無断利用すること</li>
+        <li>本サービスのシステムに不正アクセスし、または過度な負荷をかける行為</li>
+        <li>公序良俗に反する内容・差別的内容・違法なコンテンツを含むペルソナを作成すること</li>
+        <li>18歳未満の者が成人向けコンテンツを利用すること</li>
+        <li>その他、当社が不適切と判断する行為</li>
+      </ol>
+
+      <div class="highlight-box" style="margin-top:16px;">
+        <div class="label">悪用行為の具体例（上記に該当）</div>
+        <div class="prohibited-item"><span class="mark">✕</span><span>会話内容・ペルソナの発言のスクリーンショットをSNS等に無断で拡散すること</span></div>
+        <div class="prohibited-item"><span class="mark">✕</span><span>ペルソナの発言を切り取り、実在する人物の発言として第三者に見せること</span></div>
+        <div class="prohibited-item"><span class="mark">✕</span><span>会話を録音・録画し、第三者に公開・配布すること</span></div>
+        <div class="prohibited-item"><span class="mark">✕</span><span>元交際相手・元配偶者・職場の同僚等のペルソナを本人の同意なく作成し接触に利用すること</span></div>
+        <div class="prohibited-item"><span class="mark">✕</span><span>上司・同僚等のペルソナを作成し、業務上の判断・意思決定に悪用すること</span></div>
+      </div>
+
+      <div class="highlight-box" style="margin-top:12px; border-color: #DC2626;">
+        <div class="label" style="color:#F87171;">情報公開禁止</div>
+        <p>ユーザーは、本サービス内で行われた会話の内容・ペルソナの発言・その他ユーザーに関する情報を、本サービス外で公開・共有・配布することを禁止します。違反した場合、当社は直ちにアカウントを停止し、法的措置を取る場合があります。</p>
+      </div>
+    </div>
+  </article>
+
+  <!-- 第7条 -->
+  <article>
+    <h2 class="article-title">第7条（故人ペルソナの作成に関する特別規定）</h2>
+    <div class="article-body">
+      <ol>
+        <li>ユーザーは、死去した人物のペルソナ（以下「故人ペルソナ」といいます）を作成することができます。ただし、以下の事項を遵守するものとします。
+          <ul style="margin-top:8px;">
+            <li>故人ペルソナの作成・内容・利用に関する責任はすべて作成者であるユーザーが負います。</li>
+            <li>逝去から1年以内の方の故人ペルソナを作成する場合、遺族等の関係者への事前承諾を取得することを推奨します（義務ではありません）。</li>
+            <li>故人を侮辱・中傷する内容のペルソナ作成は禁止します。</li>
+            <li>故人ペルソナを用いて第三者を欺く行為は禁止します。</li>
+            <li>遺族等から当該ペルソナに関する異議・削除請求があった場合、当社は当該ペルソナを削除することができます。</li>
+          </ul>
+        </li>
+        <li>故人ペルソナの作成開始前に、ユーザーは本条の内容に同意する旨を確認ボタンにより明示的に表明するものとします。</li>
+      </ol>
+    </div>
+  </article>
+
+  <!-- 第8条 -->
+  <article>
+    <h2 class="article-title">第8条（外部サービスの利用）</h2>
+    <div class="article-body">
+      <p>本サービスは以下の外部サービスを利用しています。各サービスへのデータ送信について同意した上でご利用ください。</p>
+      <div class="table-wrap" style="margin-top:12px;">
+        <table>
+          <thead>
+            <tr><th>用途</th><th>サービス</th><th>送信データ</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>AIエンジン（会話生成）</td><td>Anthropic, PBC（米国）</td><td>会話テキスト</td></tr>
+            <tr><td>音声文字起こし・Embedding</td><td>OpenAI, Inc.（米国）</td><td>音声データ・テキスト</td></tr>
+            <tr><td>音声生成</td><td>ElevenLabs, Inc.（米国）</td><td>テキスト・音声サンプル</td></tr>
+            <tr><td>映像生成（Phase2以降）</td><td>HeyGen Inc.（米国）</td><td>写真・テキスト</td></tr>
+            <tr><td>決済処理</td><td>Stripe, Inc.（米国）</td><td>決済情報</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ol style="margin-top:12px;">
+        <li>音声データまたは画像・動画データを外部APIに送信する際、ユーザーは送信前に表示される同意確認画面において明示的に同意するものとします。同意しない場合、当該機能はご利用いただけません。</li>
+        <li>外部サービスの品質・可用性・セキュリティについて、当社は責任を負いません。</li>
+        <li><strong>個人情報（氏名・住所・電話番号・マイナンバー・クレジットカード番号等）は本サービスの会話・学習データに入力しないでください。</strong></li>
+      </ol>
+    </div>
+  </article>
+
+  <!-- 第9条 -->
+  <article>
+    <h2 class="article-title">第9条（Digital-Persona相談室の利用に関する特別規定）</h2>
+    <div class="article-body">
+      <ol>
+        <li>Digital-Persona相談室（以下「相談室」といいます）はAIとの対話サービスです。医療行為・心理療法・カウンセリング・グリーフサポートの代替ではありません。</li>
+        <li>相談室の利用時、以下のタイミングでAIリマインダーを表示します。このリマインダーはユーザーの安全のために省略・非表示にすることができません。
+          <div class="highlight-box" style="margin-top:10px;">
+            <div class="label">AIリマインダーの表示タイミング</div>
+            <ul>
+              <li>【会話開始時】「このペルソナはAIです。医療・専門家の代替ではありません」への同意確認</li>
+              <li>【会話中】15分ごとに画面下部へ「この会話相手はAIです」を表示</li>
+              <li>【セッション終了時】「お気持ちがつらい場合は専門機関へのご相談もご検討ください」を表示</li>
+              <li>【連続5日以上利用時】信頼できる人への相談を促すメッセージを追加表示</li>
+            </ul>
+          </div>
+        </li>
+        <li>精神的に不安定な状態・危機的状態にある方は、本サービスの利用前に専門の医療機関・相談窓口にご相談ください。</li>
+        <li>当社は、危機的な発言（自傷・絶望に関する表現等）を検知した場合、専門機関の案内を表示します。</li>
+        <li>本サービスのペルソナは、ユーザーの感情的な状態を悪化させるようなネガティブな内容のアドバイスを提供しないよう設計されています。ただし、AIの性質上完全な制御は保証できません。</li>
+        <li>本サービスの利用による精神的・心理的影響について、当社は一切の責任を負いません。</li>
+      </ol>
+      <div class="pending-note">グリーフケアと医療行為の境界線・本条の免責条項の有効性については5/14弁護士相談で確認予定です。</div>
+    </div>
+  </article>
+
+  <!-- 第10条 -->
+  <article>
+    <h2 class="article-title">第10条（知的財産権）</h2>
+    <div class="article-body">
+      <ol>
+        <li>本サービスに関する知的財産権は当社または正当な権利者に帰属します。</li>
+        <li>ユーザーが作成・提供した学習データの著作権はユーザーに帰属します。ただし、ユーザーは当社に対し、本サービスの提供・改善のために必要な範囲で学習データを利用する権限を許諾するものとします。</li>
+        <li>ユーザーは、本サービスを通じて生成されたコンテンツを個人的な用途においてのみ利用できます。</li>
+      </ol>
+    </div>
+  </article>
+
+  <!-- 第11条 -->
+  <article>
+    <h2 class="article-title">第11条（個人情報の取り扱い）</h2>
+    <div class="article-body">
+      <ol>
+        <li>当社は、別途定める<a href="/privacy" style="color:#60A5FA;text-decoration:none;">プライバシーポリシー</a>に従い、ユーザーの個人情報を適切に管理します。</li>
+        <li>当社は、個人情報を本サービスの提供・改善の目的でのみ利用し、第三者（外部APIへの送信を除く）への提供は行いません。</li>
+        <li>秘密モードでのセッションデータは暗号化して保存し、デフォルトで30日後に自動削除します。</li>
+      </ol>
+    </div>
+  </article>
+
+  <!-- 第12条 -->
+  <article>
+    <h2 class="article-title">第12条（免責事項）</h2>
+    <div class="article-body">
+      <ol>
+        <li>当社は、本サービスの利用により生じたユーザーまたは第三者の損害について、当社の故意または重大な過失によるものを除き、一切の責任を負いません。</li>
+        <li>本サービスのペルソナが発言する内容はAIが生成したフィクションです。当社は発言内容の正確性・完全性・有用性について保証しません。</li>
+        <li>ユーザーが作成したペルソナにより第三者が損害を受けた場合、ユーザー自身が責任を負うものとします。当社は、当社が当該ペルソナの存在を知らなかった場合、または知り得なかった場合は責任を負いません。</li>
+        <li>当社は、以下の場合においてサービスの中断・停止について責任を負いません。
+          <ul>
+            <li>システムの保守・点検・更新のための一時停止</li>
+            <li>地震・火災・停電等の不可抗力によるもの</li>
+            <li>外部APIのサービス停止・仕様変更によるもの</li>
+          </ul>
+        </li>
+      </ol>
+      <div class="pending-note">プラットフォーム免責の範囲・本条の有効性については5/14弁護士相談で確認予定です。</div>
+    </div>
+  </article>
+
+  <!-- 第13条 -->
+  <article>
+    <h2 class="article-title">第13条（サービスの変更・終了）</h2>
+    <div class="article-body">
+      <ol>
+        <li>当社は、ユーザーへの事前通知をもって本サービスの内容を変更または終了することができます。</li>
+        <li>本サービスの終了に際しては、ユーザーが登録した学習データ・ペルソナデータのエクスポート機能を提供するよう努めます。</li>
+      </ol>
+    </div>
+  </article>
+
+  <!-- 第14条 -->
+  <article>
+    <h2 class="article-title">第14条（アカウントの停止・削除）</h2>
+    <div class="article-body">
+      <ol>
+        <li>当社は、ユーザーが以下の場合に事前通知なくアカウントを停止または削除することができます。
+          <ul>
+            <li>本規約の禁止事項に違反した場合</li>
+            <li>本サービスの運営を妨害した場合</li>
+            <li>その他当社が不適切と判断した場合</li>
+          </ul>
+        </li>
+        <li>アカウント停止・削除によりユーザーに生じた損害について、当社は責任を負いません。</li>
+      </ol>
+    </div>
+  </article>
+
+  <!-- 第15条 -->
+  <article>
+    <h2 class="article-title">第15条（準拠法・管轄）</h2>
+    <div class="article-body">
+      <ol>
+        <li>本規約は日本法に準拠し、日本法に従って解釈されます。</li>
+        <li>本規約に関する紛争については、東京地方裁判所を第一審の専属的合意管轄裁判所とします。</li>
+      </ol>
+    </div>
+  </article>
+
+  <!-- 第16条 -->
+  <article>
+    <h2 class="article-title">第16条（お問い合わせ）</h2>
+    <div class="article-body">
+      <p>本規約に関するお問い合わせは、本サービス上のお問い合わせフォームよりご連絡ください。</p>
+    </div>
+  </article>
+
+  <div class="doc-footer">
+    <p>制定日：2026年　月　日（5/14弁護士確認後に確定）</p>
+    <p style="margin-top:4px;">運営者：竹内智信　／　AI-Paradise 利用規約 ドラフト v2.0</p>
+    <p style="margin-top:8px;"><a href="/privacy" style="color:#60A5FA;text-decoration:none;">プライバシーポリシー</a>　|　<a href="/" style="color:#60A5FA;text-decoration:none;">AI-PERSONA会議室 トップへ</a></p>
+  </div>
+</main>
+
+</body>
+</html>

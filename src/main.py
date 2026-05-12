@@ -1255,6 +1255,16 @@ def payment_status():
     return jsonify(status)
 
 
+@app.route("/terms")
+def terms():
+    return send_from_directory(app.static_folder, "terms.html")
+
+
+@app.route("/privacy")
+def privacy():
+    return send_from_directory(app.static_folder, "privacy.html")
+
+
 @app.route("/api/health")
 def health():
     user_id = get_current_user_id()
