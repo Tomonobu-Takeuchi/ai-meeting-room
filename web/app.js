@@ -83,6 +83,7 @@ const DOM = {
   stopSpeakBtn: $('stopSpeakBtn'),
   micBtn: $('micBtn'),
   topicMicBtn: $('topicMicBtn'),
+  freeStartBtn: $('freeStartBtn'),
 };
 
 const API = {
@@ -383,6 +384,7 @@ async function init() {
   // 認証ボタンのイベント（動的生成されるため直接バインド）
   document.addEventListener('click', (e) => {
     if (e.target.id === 'loginBtnHeader') openAuthModal();
+    if (e.target.id === 'freeStartBtn') openAuthModal();
     if (e.target.id === 'loginSubmitBtn') submitLogin();
     if (e.target.id === 'registerSubmitBtn') submitRegister();
   });
@@ -870,6 +872,7 @@ async function submitEditPersona() {
 
     // ★ 学習データをpersona_learnテーブルにDB保存（3件バッチ並列・1件失敗でも続行）
     const textFiles = State.editLearnFiles.filter(f => f.type === 'text' || f.type === 'pdf');
+    if (textFiles.length > 0) showToast('学習データを読み込んでいます...しばらくお待ちください', 'info', 30000);
     const learnResults = await batchSettled(
       textFiles,
       f => API.post(`/api/personas/${memberId}/learn`, { content: f.content, source: f.name }, 120000),
@@ -1149,6 +1152,7 @@ async function submitAddPersona() {
 
     // ★ 学習データをpersona_learnテーブルにDB保存（3件バッチ並列・1件失敗でも続行）
     const textFiles = State.addLearnFiles.filter(f => f.type === 'text' || f.type === 'pdf');
+    if (textFiles.length > 0) showToast('学習データを読み込んでいます...しばらくお待ちください', 'info', 30000);
     const learnResults = await batchSettled(
       textFiles,
       f => API.post(`/api/personas/${data.persona.id}/learn`, { content: f.content, source: f.name }, 120000),
@@ -1761,7 +1765,7 @@ function renderAuthArea() {
       <button class="btn" id="logoutBtn" onclick="logout()">ログアウト</button>
     `;
   } else {
-    area.innerHTML = `<button class="btn" id="loginBtnHeader" onclick="openAuthModal()">🔑 ログイン</button>`;
+    area.innerHTML = `<button class="btn btn-green" id="freeStartBtn" onclick="openAuthModal()">🚀 無料で始める</button><button class="btn" id="loginBtnHeader" onclick="openAuthModal()">🔑 ログイン</button>`;
   }
 }
 
