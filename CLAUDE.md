@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **AI-PERSONA会議室** (AI-Persona Meeting Room) — A web app where users create AI personas that conduct real-time AI-powered discussions about user-specified topics, powered by Claude.
 
-**Current Version: v0.9.5**
+**Current Version: v0.9.6**
 
 ## Development Commands
 
@@ -96,12 +96,30 @@ data: {"type": "error", "message": "..."}
 - **Stripe SDK 7.x:** StripeObject fields must use dot notation or `getattr()` — `.get()` is not available
 - **Double-grant prevention:** `payments` table checks `stripe_session_id` uniqueness before granting credits
 
+## テストデータ管理ルール（本番DB汚染防止）
+
+- テスト用ペルソナは必ず `user_id` を持つ専用テストユーザーで作成する
+- `user_id=NULL`（デフォルトペルソナ枠）はテストに**使用禁止**
+- テスト実施前に、テストデータ削除用SQLをセットで用意してから開始する
+- テスト完了後は必ず削除SQLを実行し、本番DBにテストデータが残っていないことを確認する
+- 確認クエリ（正規5件のみであること）：
+
+```sql
+SELECT id, name, user_id FROM personas WHERE user_id IS NULL ORDER BY id;
+-- 期待値: elizabeth1 / facilitator / hideyoshi / koumei / professor の5件のみ
+```
+
 ## Utility Scripts (Untracked)
 - `check_db.py` — Database inspection
 - `add_growth_tables.py` — Migration for growth feature tables
 
 ## Roadmap
-1. 利用規約・プライバシーポリシー作成
-2. Stripe本番環境への切り替え（KYB・銀行口座登録）
-3. βテスト（5〜10名）
-4. v1.0正式リリース
+1. ✅ Stripe課金実装（v0.9.5）
+2. ✅ テスト強化・法律対応T-01〜T-04・iPhone修正（v0.9.6）
+3. 利用規約・プライバシーポリシー正式版更新（5/14弁護士相談前）
+4. iPhone Safari音声再生問題修正
+5. PC版UI残課題（ログイン前ボタン等）
+6. 法律対応T-05〜T-07
+7. Stripe本番環境への切り替え（KYB・銀行口座登録）
+8. βテスト（5〜10名）
+9. v1.0正式リリース
