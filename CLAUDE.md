@@ -109,6 +109,38 @@ SELECT id, name, user_id FROM personas WHERE user_id IS NULL ORDER BY id;
 -- 期待値: elizabeth1 / facilitator / hideyoshi / koumei / professor の5件のみ
 ```
 
+## テスト実行ルール（必ず守ること）
+
+### テスト実行コマンド（本番DB混入防止）
+```powershell
+# DATABASE_URLはそのまま使用。ガードが本番DB接続を自動検出して中止する
+python -X utf8 test_comprehensive.py 2>&1 | Out-File -Encoding utf8 "C:\Temp\test_result.txt"
+Get-Content "C:\Temp\test_result.txt" | Select-Object -Last 15
+```
+
+### テスト後の本番DB確認（必須）
+以下をRailwayのQueryタブで実行し 0 rows であることを確認：
+```sql
+SELECT id, name FROM personas
+WHERE user_id IS NULL
+AND id NOT IN ('koumei','hideyoshi','professor','elizabeth1','facilitator');
+```
+
+### Codeへのプロンプトテンプレート（必ず使うこと）
+```
+【実装内容】
+...
+【デグレード確認】
+$env:DATABASE_URL=""; python -X utf8 test_comprehensive.py 2>&1 | Out-File -Encoding utf8 "C:\Temp\test_result.txt"
+Get-Content "C:\Temp\test_result.txt" | Select-Object -Last 15
+→ 183件以上PASS確認
+【本番環境確認】
+・本番URLで動作確認（具体的な確認項目を列挙）
+・本番DBゴミデータ確認SQL実行→0 rows確認
+【完了条件】
+上記3つ全て確認できた場合のみcommit・push
+```
+
 ## Utility Scripts (Untracked)
 - `check_db.py` — Database inspection
 - `add_growth_tables.py` — Migration for growth feature tables

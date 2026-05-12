@@ -17,6 +17,16 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from dotenv import load_dotenv
 load_dotenv()
 
+_db_url = os.environ.get('DATABASE_URL', '')
+if 'railway.app' in _db_url or 'rlwy.net' in _db_url:
+    print('=' * 60)
+    print('【エラー】本番DBへの接続が検出されました。')
+    print('テストを中止します。')
+    print('DATABASE_URL環境変数を空にしてから再実行してください。')
+    print('例: $env:DATABASE_URL=""; python -X utf8 test_comprehensive.py')
+    print('=' * 60)
+    import sys; sys.exit(1)
+
 import pg8000.native
 from urllib.parse import urlparse
 
