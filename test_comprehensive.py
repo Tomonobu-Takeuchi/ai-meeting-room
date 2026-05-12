@@ -1113,8 +1113,8 @@ def test_func11_cross_user_isolation():
                     ca2.post('/api/auth/login', json={'email': email_a, 'password': pw})
                     r_a   = ca2.get('/api/personas/members')
                     a_ids = {m['id'] for m in (r_a.get_json() or {}).get('members', [])}
-                    check(len(a_ids & null_ids) == 0,
-                          "T-02: user_id=NULLのデフォルトペルソナがAPIから非公開（プライバシー強化）")
+                    check(len(a_ids & null_ids) > 0,
+                          "T-02: user_id=NULLのデフォルトペルソナがAPIから表示される（ログイン時表示修正）")
             else:
                 check(True,
                       "T-02: user_id=NULLのデフォルトペルソナが存在しない（対応済み）")
@@ -1343,6 +1343,34 @@ def test_ops8_new_columns():
         conn.close()
 
 
+# ─── 機能試験 14: ログイン時デフォルトペルソナ表示確認 ──────────
+
+def test_func14_default_persona_visibility(client):
+    section("機能試験14: ログイン時デフォルトペルソナ表示確認")
+
+    # ログイン状態で GET /api/personas/members
+    r = client.get('/api/personas/members')
+    check_code(r, 200, "GET /api/personas/members → 200 OK")
+    data = r.get_json() or {}
+    members = data.get('members', [])
+    member_ids = [m['id'] for m in members]
+
+    check('koumei' in member_ids,   "members に koumei（諸葛亮孔明）が含まれる")
+    check('hideyoshi' in member_ids, "members に hideyoshi（豊臣秀吉）が含まれる")
+
+    facilitator = data.get('facilitator')
+    check(facilitator is not None, "facilitator が返る")
+
+    # ゲスト状態でも GET /api/personas/members にデフォルトペルソナが含まれること
+    with flask_app.test_client() as guest:
+        r_g = guest.get('/api/personas/members')
+        check_code(r_g, 200, "ゲスト: GET /api/personas/members → 200 OK")
+        guest_data = r_g.get_json() or {}
+        guest_ids = [m['id'] for m in guest_data.get('members', [])]
+        check('koumei' in guest_ids or 'hideyoshi' in guest_ids,
+              "ゲスト: members にデフォルトペルソナが含まれる")
+
+
 # ─── メイン ───────────────────────────────────────────────────
 
 _skipped_sections: list[str] = []
@@ -1400,6 +1428,7 @@ if __name__ == '__main__':
             safe_run("機能試験12: 法律対応静的ファイル検査", test_func12_legal_static)
             safe_run("機能試験13: ToS同意チェック",         test_func13_tos_check)
             safe_run("運用試験8: 新規DBカラム整合性",        test_ops8_new_columns)
+            safe_run("機能試験14: デフォルトペルソナ表示",   test_func14_default_persona_visibility, client)
     finally:
         cleanup()
 

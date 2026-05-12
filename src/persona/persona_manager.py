@@ -39,7 +39,7 @@ class PersonaManager:
             rows = conn.run("""
                 SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id FROM personas
                 WHERE role='member'
-                  AND user_id=:user_id
+                  AND (user_id=:user_id OR user_id IS NULL)
                 ORDER BY is_default DESC, created_at ASC
             """, user_id=user_id)
         else:
@@ -63,7 +63,7 @@ class PersonaManager:
             rows = conn.run("""
                 SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id FROM personas
                 WHERE role='facilitator'
-                  AND user_id=:user_id
+                  AND (user_id=:user_id OR user_id IS NULL)
                 ORDER BY is_default DESC, created_at ASC LIMIT 1
             """, user_id=user_id)
         else:
