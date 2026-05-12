@@ -85,6 +85,18 @@ def init_db():
         conn.run("ALTER TABLE personas ADD COLUMN IF NOT EXISTS is_default BOOLEAN DEFAULT FALSE")
     except Exception:
         pass
+    try:
+        conn.run("ALTER TABLE users ADD COLUMN IF NOT EXISTS tos_agreed_at TIMESTAMP")
+    except Exception:
+        pass
+    try:
+        conn.run("ALTER TABLE personas ADD COLUMN IF NOT EXISTS tos_agreed_at TIMESTAMP")
+    except Exception:
+        pass
+    try:
+        conn.run("ALTER TABLE personas ADD COLUMN IF NOT EXISTS is_deceased_confirmed BOOLEAN DEFAULT FALSE")
+    except Exception:
+        pass
 
     # ===== persona_learnテーブル（user_id追加） =====
     conn.run("""

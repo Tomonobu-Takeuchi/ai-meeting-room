@@ -17,7 +17,7 @@ from src.persona.persona_manager import PersonaManager
 from src.meeting.meeting_room import MeetingRoom
 import stripe
 from src.database import (
-    init_db, get_user_by_email, get_user_by_id, create_user,
+    init_db, get_connection, get_user_by_email, get_user_by_id, create_user,
     get_user_payment_status, check_and_use_meeting,
     add_user_credits, update_user_plan, save_payment, complete_payment,
     get_user_by_stripe_customer,
@@ -96,6 +96,12 @@ def register():
     password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
     try:
         user = create_user(email, password_hash, name)
+        try:
+            _c = get_connection()
+            _c.run("UPDATE users SET tos_agreed_at=NOW() WHERE id=:id", id=user['id'])
+            _c.close()
+        except Exception:
+            pass
         session['user_id'] = user['id']
         session['user_email'] = user['email']
         session['user_name'] = user['name']

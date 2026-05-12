@@ -22,6 +22,14 @@ const VOICE_SETTINGS = {
 // ★ iOS判定
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
+const PERSONA_EMOJIS = ['👤','🧑','👩','👨','🧓','👴','👵','🧑‍💼','👩‍💼','👨‍💼',
+  '🧑‍🔬','👩‍🔬','👨‍🔬','🧑‍🎨','👩‍🎨','👨‍🎨','🧑‍🏫','👩‍🏫','👨‍🏫','🤖','🦸','🧙'];
+
+function openPersonaTosModal() {
+  const el = document.getElementById('personaTosModal');
+  if (el) el.style.display = 'flex';
+}
+
 const State = {
   sessionId: null, topic: '', members: [], facilitator: null,
   selectedMemberIds: [], isStreaming: false, attachedFiles: [], streamingMessages: {},
@@ -1810,7 +1818,7 @@ async function submitRegister() {
   if (!email || !password) { errEl.textContent = 'メールアドレスとパスワードを入力してください'; return; }
   if (password.length < 6) { errEl.textContent = 'パスワードは6文字以上にしてください'; return; }
   // T-01: 利用規約同意確認
-  const tosAgreed = $('registerTosAgreed')?.checked;
+  const tosAgreed = $('tosAgreeCheck')?.checked;
   if (!tosAgreed) { errEl.textContent = '利用規約およびプライバシーポリシーへの同意が必要です'; return; }
   try {
     const btn = $('registerSubmitBtn');

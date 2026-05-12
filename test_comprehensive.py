@@ -1262,6 +1262,87 @@ def test_ops7_response_time_warn(client):
               f"{label}: {elapsed*1000:.0f}ms / {limit_sec*1000:.0f}ms (HTTP {r.status_code})")
 
 
+# ─── 機能試験 12: 法律対応の回帰テスト（静的ファイル検査） ────────
+
+def test_func12_legal_static():
+    section("機能試験12: 法律対応の回帰テスト（静的ファイル検査）")
+
+    base = os.path.dirname(os.path.abspath(__file__))
+    html = open(os.path.join(base, 'web', 'index.html'), encoding='utf-8').read()
+    js   = open(os.path.join(base, 'web', 'app.js'),     encoding='utf-8').read()
+
+    check('tosAgreeCheck'      in html or 'tosAgreeCheck'      in js, "tosAgreeCheckが存在する")
+    check('/terms'             in html or '/terms'             in js, "/termsへのリンクが存在する")
+    check('/privacy'           in html or '/privacy'           in js, "/privacyへのリンクが存在する")
+    check('personaTosModal'    in html or 'personaTosModal'    in js, "personaTosModalが存在する")
+    check('openPersonaTosModal' in html or 'openPersonaTosModal' in js, "openPersonaTosModalが存在する")
+    check('PERSONA_EMOJIS'     in html or 'PERSONA_EMOJIS'     in js, "PERSONA_EMOJISが存在する")
+
+
+# ─── 機能試験 13: ToS同意チェックの動作確認 ──────────────────────
+
+def test_func13_tos_check():
+    section("機能試験13: ToS同意チェックの動作確認")
+
+    ts    = int(time.time())
+    email = f"test_tos_{ts}@test.com"
+    pw    = "testpass123"
+    name  = "TosTestUser"
+    uid   = None
+    conn  = db_conn()
+
+    try:
+        with flask_app.test_client() as c:
+            # 1. tos_agreed=False → 400
+            r1 = c.post('/api/auth/register',
+                        json={'email': email, 'password': pw, 'name': name, 'tos_agreed': False})
+            check_code(r1, 400, "tos_agreed=Falseで登録 → 400エラー")
+
+            # 2. tos_agreed=True → 200
+            r2 = c.post('/api/auth/register',
+                        json={'email': email, 'password': pw, 'name': name, 'tos_agreed': True})
+            check_code(r2, 200, "tos_agreed=Trueで登録 → 200 OK")
+            uid = ((r2.get_json() or {}).get('user') or {}).get('id')
+
+            # 3. tos_agreed_at が NULL でない
+            if uid:
+                rows = conn.run(
+                    "SELECT tos_agreed_at FROM users WHERE id=:id", id=uid)
+                val = rows[0][0] if rows else None
+                check(val is not None, "DBのtos_agreed_atがNULLでない")
+            else:
+                check(False, "DBのtos_agreed_atがNULLでない（ユーザー作成失敗）")
+    finally:
+        if uid:
+            conn.run("DELETE FROM users WHERE id=:id", id=uid)
+        conn.close()
+
+
+# ─── 運用試験 8: 新規DBカラム整合性確認 ──────────────────────────
+
+def test_ops8_new_columns():
+    section("運用試験8: 新規DBカラム整合性確認")
+    from src.database import get_connection
+
+    conn = get_connection()
+    try:
+        def _cols(table: str) -> set:
+            rows = conn.run("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name=:t AND table_schema='public'
+            """, t=table)
+            return {r[0] for r in rows}
+
+        users_cols    = _cols('users')
+        personas_cols = _cols('personas')
+
+        check('tos_agreed_at'        in users_cols,    "usersテーブルにtos_agreed_atが存在する")
+        check('tos_agreed_at'        in personas_cols, "personasテーブルにtos_agreed_atが存在する")
+        check('is_deceased_confirmed' in personas_cols, "personasテーブルにis_deceased_confirmedが存在する")
+    finally:
+        conn.close()
+
+
 # ─── メイン ───────────────────────────────────────────────────
 
 _skipped_sections: list[str] = []
@@ -1316,6 +1397,9 @@ if __name__ == '__main__':
             safe_run("運用試験5: DBスキーマ整合性",     test_ops5_db_schema)
             safe_run("運用試験6: エンドポイント疎通",   test_ops6_endpoint_health)
             safe_run("運用試験7: レスポンスタイムWARN", test_ops7_response_time_warn, client)
+            safe_run("機能試験12: 法律対応静的ファイル検査", test_func12_legal_static)
+            safe_run("機能試験13: ToS同意チェック",         test_func13_tos_check)
+            safe_run("運用試験8: 新規DBカラム整合性",        test_ops8_new_columns)
     finally:
         cleanup()
 
