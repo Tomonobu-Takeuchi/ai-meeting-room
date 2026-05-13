@@ -1934,6 +1934,7 @@ function showPurchaseConfirm(type) {
     openAuthModal();
     return;
   }
+  closePricingModal();
   const isStandard = type === 'standard';
   $('purchaseConfirmTitle').textContent = isStandard
     ? 'スタンダードプラン ¥480 を購入'
