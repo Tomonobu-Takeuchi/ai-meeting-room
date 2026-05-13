@@ -170,6 +170,29 @@ AND id NOT IN ('koumei','hideyoshi','professor','elizabeth1','facilitator');
 - `check_db.py` — Database inspection
 - `add_growth_tables.py` — Migration for growth feature tables
 
+## 2026/05/13 実施済み作業
+
+### 法律対応改修（5/15相談前対応）
+- terms.html / privacy.html：日付5/14→5/15修正・デプロイ済み
+- T-05：禁止事項・情報公開禁止モーダル実装済み（localStorage: prohibited_notice_agreed）
+- T-06：故人ペルソナ同意確認モーダル実装済み（is_deceased_confirmed カラム使用）
+
+### バグ修正
+- CSS: .form-group input の width:100% がcheckboxに適用されるバグ修正
+  → :not([type=checkbox]) を追加
+- JS: submitAddPersonaからdoCreatePersona呼び出し前のaddSubmittingリセット漏れ修正
+- API: /api/personas/add に @login_required 追加
+
+### フロントエンドデバッグの教訓
+- ClaudeCodeはブラウザ描画を確認できないため、フロントエンドのバグ調査は
+  このチャットにファイルをアップロードして直接解析する
+- Claude in Chrome (Beta) のClaudeCode連携は未確立（引き続き設定要）
+
+### 次回作業予定（5/14）
+- 要件定義書・機能設計書・運用手順書の作成
+- 本番環境の総合機能確認・運用試験
+- 5/15 14:00 法律相談の準備
+
 ## Roadmap
 1. ✅ Stripe課金実装（v0.9.5）
 2. ✅ テスト強化・法律対応T-01〜T-04・iPhone修正（v0.9.6）
