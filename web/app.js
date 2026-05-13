@@ -84,6 +84,10 @@ const DOM = {
   micBtn: $('micBtn'),
   topicMicBtn: $('topicMicBtn'),
   freeStartBtn: $('freeStartBtn'),
+  copyPersonaOverlay: $('copyPersonaOverlay'),
+  copyPersonaMessage: $('copyPersonaMessage'),
+  copyPersonaCancel: $('copyPersonaCancel'),
+  copyPersonaConfirm: $('copyPersonaConfirm'),
 };
 
 const API = {
@@ -398,6 +402,8 @@ async function init() {
   DOM.confirmEditPersona.addEventListener('click', submitEditPersona);
   DOM.cancelDeleteBtn.addEventListener('click', () => { DOM.deleteConfirmOverlay.classList.add('hidden'); State.deletePendingId = null; });
   DOM.confirmDeleteBtn.addEventListener('click', executeDeletion);
+  DOM.copyPersonaCancel.addEventListener('click', closeCopyPersonaModal);
+  DOM.copyPersonaConfirm.addEventListener('click', executeCopyPersona);
   DOM.fileInput.addEventListener('change', handleFileAttach);
 
   $('pAvatar').addEventListener('input', () => { if (!State.addAvatarDataUrl) DOM.addAvatarPreview.innerHTML = $('pAvatar').value || '👤'; });
@@ -667,11 +673,15 @@ function renderMemberList() {
     const card = document.createElement('div');
     card.className = `member-card ${isSelected ? 'selected' : ''}`; card.dataset.id = member.id;
     const avatarHtml = State.avatarImages[member.id] ? `<img src="${State.avatarImages[member.id]}" alt="${member.name}" />` : member.avatar;
+    const srcName = member.source_persona_id
+      ? (State.members.find(m => m.id === member.source_persona_id)?.name || member.source_persona_id)
+      : null;
+    const sourceBadgeHtml = srcName ? `<span class="source-badge">📋 ${srcName}ベース</span>` : '';
     card.innerHTML = `
       <div class="member-card-main">
         <div class="member-avatar" style="background:${member.color}22;border:2px solid ${member.color}44;">${avatarHtml}</div>
         <div class="member-info">
-          <div class="member-name">${member.name}</div>
+          <div class="member-name">${member.name}${sourceBadgeHtml}</div>
           <div class="member-role">${(member.description||'').slice(0,28)}${(member.description||'').length>28?'…':''}</div>
         </div>
         <div class="member-status ${State.sessionId ? 'online' : ''}"></div>
@@ -753,6 +763,13 @@ function closeAddModal() { DOM.addPersonaModal.classList.add('hidden'); }
 
 async function openEditModal(memberId) {
   const member = State.members.find(m => m.id === memberId); if (!member) return;
+  const isDefault = !member.user_id;
+  const isCopied = !!member.source_persona_id;
+  if (isDefault && !isCopied) {
+    if (!State.currentUser) { showToast('ログインするとペルソナをカスタマイズできます', 'info'); return; }
+    openCopyPersonaModal(memberId);
+    return;
+  }
   State.editAvatarDataUrl = State.avatarImages[memberId] || null; State.editLearnFiles = [];
   if (DOM.editLearnStatus) {
     DOM.editLearnStatus.textContent = '💡 音声・動画：200MB以下のmp3/mp4に対応。それ以上はYouTube URLをご利用ください。\nYouTube：Bot制限で取得できない場合は動画ファイルを直接アップロードしてください。';
@@ -834,6 +851,43 @@ async function deleteSavedLearnData(personaId, learnId) {
   } catch (e) { showToast(translateApiError(e.message, '学習データの削除'), 'error'); }
 }
 function closeEditModal() { DOM.editPersonaModal.classList.add('hidden'); State.editAvatarDataUrl = null; State.editLearnFiles = []; }
+
+let _copyTargetPersonaId = null;
+
+function openCopyPersonaModal(personaId) {
+  const member = State.members.find(m => m.id === personaId); if (!member) return;
+  _copyTargetPersonaId = personaId;
+  DOM.copyPersonaMessage.textContent = `「${member.name}」をあなた専用にコピーして編集します。コピーを作成しますか？`;
+  DOM.copyPersonaOverlay.classList.remove('hidden');
+}
+
+function closeCopyPersonaModal() {
+  DOM.copyPersonaOverlay.classList.add('hidden');
+  _copyTargetPersonaId = null;
+}
+
+async function executeCopyPersona() {
+  if (!_copyTargetPersonaId) return;
+  const personaId = _copyTargetPersonaId;
+  DOM.copyPersonaConfirm.disabled = true;
+  DOM.copyPersonaConfirm.textContent = '作成中...';
+  try {
+    const data = await API.post(`/api/personas/${personaId}/copy`, {});
+    closeCopyPersonaModal();
+    const membersData = await API.get('/api/personas/members');
+    State.members = membersData.members || [];
+    if (membersData.facilitator) State.facilitator = membersData.facilitator;
+    renderMemberList();
+    showToast('ペルソナのコピーを作成しました', 'success');
+    const newId = data.persona?.id;
+    if (newId && State.members.find(m => m.id === newId)) openEditModal(newId);
+  } catch (e) {
+    showToast(translateApiError(e.message, 'コピーの作成'), 'error');
+  } finally {
+    DOM.copyPersonaConfirm.disabled = false;
+    DOM.copyPersonaConfirm.textContent = '作成して編集する';
+  }
+}
 
 async function batchSettled(items, fn, batchSize = 3) {
   const results = [];

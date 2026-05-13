@@ -175,7 +175,17 @@ def add_persona():
     persona = persona_manager.add_persona(data, user_id)
     return jsonify({"persona": persona})
 
+@app.route("/api/personas/<persona_id>/copy", methods=["POST"])
+@login_required
+def copy_default_persona_endpoint(persona_id):
+    user_id = get_current_user_id()
+    result = persona_manager.copy_default_persona(persona_id, user_id)
+    if result is None:
+        return jsonify({"error": "デフォルトペルソナが見つかりません"}), 404
+    return jsonify({"success": True, "persona": result})
+
 @app.route("/api/personas/<persona_id>", methods=["PUT"])
+@login_required
 def update_persona(persona_id):
     user_id = get_current_user_id()
     data = request.json

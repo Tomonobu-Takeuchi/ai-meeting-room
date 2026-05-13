@@ -17,7 +17,8 @@ from src.database import (
 )
 
 COLUMNS = ['id','user_id','name','avatar','description','personality',
-           'speaking_style','background','color','role','is_default','created_at','voice_id']
+           'speaking_style','background','color','role','is_default','created_at','voice_id',
+           'source_persona_id']
 
 def serialize_persona(d):
     """datetimeをstrに変換・不要フィールドを整理"""
@@ -37,14 +38,14 @@ class PersonaManager:
         conn = get_connection()
         if user_id:
             rows = conn.run("""
-                SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id FROM personas
+                SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id, source_persona_id FROM personas
                 WHERE role='member'
                   AND (user_id=:user_id OR user_id IS NULL)
                 ORDER BY is_default DESC, created_at ASC
             """, user_id=user_id)
         else:
             rows = conn.run("""
-                SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id FROM personas
+                SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id, source_persona_id FROM personas
                 WHERE role='member' AND user_id IS NULL
                 ORDER BY created_at ASC
             """)
@@ -61,14 +62,14 @@ class PersonaManager:
         conn = get_connection()
         if user_id:
             rows = conn.run("""
-                SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id FROM personas
+                SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id, source_persona_id FROM personas
                 WHERE role='facilitator'
                   AND (user_id=:user_id OR user_id IS NULL)
                 ORDER BY is_default DESC, created_at ASC LIMIT 1
             """, user_id=user_id)
         else:
             rows = conn.run("""
-                SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id FROM personas
+                SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id, source_persona_id FROM personas
                 WHERE role='facilitator' AND user_id IS NULL
                 ORDER BY created_at ASC LIMIT 1
             """)
@@ -79,13 +80,13 @@ class PersonaManager:
         conn = get_connection()
         if user_id:
             rows = conn.run("""
-                SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id FROM personas
+                SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id, source_persona_id FROM personas
                 WHERE user_id=:user_id OR user_id IS NULL
                 ORDER BY role DESC, is_default DESC, created_at ASC
             """, user_id=user_id)
         else:
             rows = conn.run("""
-                SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id FROM personas WHERE user_id IS NULL
+                SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id, source_persona_id FROM personas WHERE user_id IS NULL
                 ORDER BY role DESC, created_at ASC
             """)
         conn.close()
@@ -95,11 +96,11 @@ class PersonaManager:
         conn = get_connection()
         if user_id:
             rows = conn.run("""
-                SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id FROM personas
+                SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id, source_persona_id FROM personas
                 WHERE id=:id AND user_id=:user_id
             """, id=persona_id, user_id=user_id)
         else:
-            rows = conn.run("SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id FROM personas WHERE id=:id", id=persona_id)
+            rows = conn.run("SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id, source_persona_id FROM personas WHERE id=:id", id=persona_id)
         conn.close()
         return serialize_persona(row_to_dict(COLUMNS, rows[0])) if rows else None
 
@@ -114,14 +115,14 @@ class PersonaManager:
         if user_id:
             rows = conn.run("""
                 SELECT id, user_id, name, avatar, description, personality,
-                       speaking_style, background, color, role, is_default, created_at, voice_id
+                       speaking_style, background, color, role, is_default, created_at, voice_id, source_persona_id
                 FROM personas
                 WHERE id = ANY(:ids) AND user_id=:user_id
             """, ids=list(ids), user_id=user_id)
         else:
             rows = conn.run("""
                 SELECT id, user_id, name, avatar, description, personality,
-                       speaking_style, background, color, role, is_default, created_at, voice_id
+                       speaking_style, background, color, role, is_default, created_at, voice_id, source_persona_id
                 FROM personas
                 WHERE id = ANY(:ids)
             """, ids=list(ids))
@@ -157,11 +158,11 @@ class PersonaManager:
         is_deceased_confirmed=bool(data.get('is_deceased_confirmed', False)))
         if user_id is not None:
             rows = conn.run("""
-                SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id FROM personas WHERE id=:id AND user_id=:user_id
+                SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id, source_persona_id FROM personas WHERE id=:id AND user_id=:user_id
             """, id=persona_id, user_id=user_id)
         else:
             rows = conn.run("""
-                SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id FROM personas WHERE id=:id AND user_id IS NULL
+                SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id, source_persona_id FROM personas WHERE id=:id AND user_id IS NULL
             """, id=persona_id)
         conn.close()
         return serialize_persona(row_to_dict(COLUMNS, rows[0])) if rows else None
@@ -189,7 +190,7 @@ class PersonaManager:
             color=data.get('color','#8B5CF6'),
             voice_id=data.get('voice_id') or None)
             rows = conn.run("""
-                SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id FROM personas WHERE id=:id AND user_id=:user_id
+                SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id, source_persona_id FROM personas WHERE id=:id AND user_id=:user_id
             """, id=persona_id, user_id=user_id)
         else:
             conn.run("""
@@ -208,9 +209,64 @@ class PersonaManager:
             background=data.get('background','').strip(),
             color=data.get('color','#8B5CF6'),
             voice_id=data.get('voice_id') or None)
-            rows = conn.run("SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id FROM personas WHERE id=:id", id=persona_id)
+            rows = conn.run("SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id, source_persona_id FROM personas WHERE id=:id", id=persona_id)
         conn.close()
         return serialize_persona(row_to_dict(COLUMNS, rows[0])) if rows else None
+
+    def copy_default_persona(self, default_persona_id, user_id):
+        """
+        デフォルトペルソナ(user_id=NULL)をユーザー専用コピーとして複製する。
+        すでにコピーが存在する場合はそのコピーを返す。
+        """
+        conn = get_connection()
+        existing = conn.run(
+            "SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id, source_persona_id FROM personas WHERE source_persona_id=:src AND user_id=:uid",
+            src=default_persona_id, uid=user_id
+        )
+        if existing:
+            conn.close()
+            return serialize_persona(row_to_dict(COLUMNS, existing[0]))
+
+        rows = conn.run(
+            "SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id, source_persona_id FROM personas WHERE id=:id AND user_id IS NULL",
+            id=default_persona_id
+        )
+        if not rows:
+            conn.close()
+            return None
+        src = row_to_dict(COLUMNS, rows[0])
+
+        new_id = f"{default_persona_id}_{str(user_id)[-6:]}"
+        conn.run(
+            """INSERT INTO personas
+               (id, user_id, name, avatar, description, personality,
+                speaking_style, background, color, role, is_default,
+                voice_id, source_persona_id, extra_settings)
+               VALUES
+               (:id, :user_id, :name, :avatar, :description, :personality,
+                :speaking_style, :background, :color, :role, false,
+                :voice_id, :source_persona_id, '{}')
+               ON CONFLICT DO NOTHING
+            """,
+            id=new_id, user_id=user_id,
+            name=src['name'],
+            avatar=src.get('avatar', ''),
+            description=src.get('description', ''),
+            personality=src.get('personality', ''),
+            speaking_style=src.get('speaking_style', ''),
+            background=src.get('background', ''),
+            color=src.get('color', '#667eea'),
+            role=src.get('role', ''),
+            voice_id=src.get('voice_id') or None,
+            source_persona_id=default_persona_id
+        )
+
+        copied = conn.run(
+            "SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id, source_persona_id FROM personas WHERE id=:id AND user_id=:uid",
+            id=new_id, uid=user_id
+        )
+        conn.close()
+        return serialize_persona(row_to_dict(COLUMNS, copied[0])) if copied else None
 
     def delete_persona(self, persona_id, user_id=None):
         protected = {'koumei', 'hideyoshi', 'professor', 'facilitator'}
