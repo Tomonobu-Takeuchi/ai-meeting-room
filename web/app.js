@@ -1945,16 +1945,18 @@ function showPurchaseConfirm(type) {
   $('purchaseConfirmOk').dataset.planType = type;
 }
 
-async function purchasePlan(type) {
+async function purchasePlan(type, newWindow = null) {
   $('purchaseConfirmOverlay').classList.add('hidden');
   const btn = type === 'standard' ? $('buyStandardBtn') : $('buyProBtn');
   if (btn) { btn.disabled = true; btn.textContent = '処理中...'; }
-  // ポップアップブロッカー回避：awaitの前にwindow.openを呼ぶ
-  const newWindow = window.open('', '_blank');
   try {
     const data = await API.post('/api/payment/checkout', { type });
-    if (data.checkout_url && newWindow) {
-      newWindow.location.href = data.checkout_url;
+    if (data.checkout_url) {
+      if (newWindow) {
+        newWindow.location.href = data.checkout_url;
+      } else {
+        window.location.href = data.checkout_url;
+      }
     } else if (newWindow) {
       newWindow.close();
     }
@@ -2016,6 +2018,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   $('purchaseConfirmOk')?.addEventListener('click', () => {
     const type = $('purchaseConfirmOk').dataset.planType;
-    if (type) purchasePlan(type);
+    if (!type) return;
+    const newWindow = window.open('', '_blank'); // 同期コンテキストで開く（ブロッカー回避）
+    purchasePlan(type, newWindow);
   });
 });
