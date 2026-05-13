@@ -84,7 +84,6 @@ const DOM = {
   micBtn: $('micBtn'),
   topicMicBtn: $('topicMicBtn'),
   freeStartBtn: $('freeStartBtn'),
-  prohibitedNoticeOverlay: $('prohibitedNoticeOverlay'),
 };
 
 const API = {
@@ -919,7 +918,13 @@ async function startMeeting() {
   if (State.selectedMemberIds.length === 0) { showToast('メンバーを選択してください', 'error'); return; }
   // T-05: 禁止事項同意チェック（初回のみ）
   if (!localStorage.getItem('prohibited_notice_agreed')) {
-    DOM.prohibitedNoticeOverlay.classList.remove('hidden');
+    const overlay = document.getElementById('prohibitedNoticeOverlay');
+    if (overlay) {
+      overlay.classList.remove('hidden');
+    } else {
+      console.error('T-05: prohibitedNoticeOverlay not found');
+      localStorage.setItem('prohibited_notice_agreed', '1');
+    }
     return;
   }
   setLoading(true);
@@ -1896,7 +1901,8 @@ function closeGuideModal() {
 
 // ===== T-05: 禁止事項・情報公開禁止モーダル =====
 function closeProhibitedNoticeModal() {
-  DOM.prohibitedNoticeOverlay.classList.add('hidden');
+  const overlay = document.getElementById('prohibitedNoticeOverlay');
+  if (overlay) overlay.classList.add('hidden');
 }
 function agreeProhibitedNotice() {
   localStorage.setItem('prohibited_notice_agreed', '1');
