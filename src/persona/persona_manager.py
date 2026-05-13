@@ -139,9 +139,9 @@ class PersonaManager:
         conn = get_connection()
         conn.run("""
             INSERT INTO personas (id, user_id, name, avatar, description, personality,
-                speaking_style, background, color, role, is_default, voice_id)
+                speaking_style, background, color, role, is_default, voice_id, is_deceased_confirmed)
             VALUES (:id, :user_id, :name, :avatar, :description, :personality,
-                :speaking_style, :background, :color, :role, FALSE, :voice_id)
+                :speaking_style, :background, :color, :role, FALSE, :voice_id, :is_deceased_confirmed)
             ON CONFLICT DO NOTHING
         """,
         id=persona_id, user_id=user_id,
@@ -153,10 +153,16 @@ class PersonaManager:
         background=data.get('background','').strip(),
         color=data.get('color','#8B5CF6'),
         role=data.get('role','member'),
-        voice_id=data.get('voice_id') or None)
-        rows = conn.run("""
-            SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id FROM personas WHERE id=:id AND user_id=:user_id
-        """, id=persona_id, user_id=user_id)
+        voice_id=data.get('voice_id') or None,
+        is_deceased_confirmed=bool(data.get('is_deceased_confirmed', False)))
+        if user_id is not None:
+            rows = conn.run("""
+                SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id FROM personas WHERE id=:id AND user_id=:user_id
+            """, id=persona_id, user_id=user_id)
+        else:
+            rows = conn.run("""
+                SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id FROM personas WHERE id=:id AND user_id IS NULL
+            """, id=persona_id)
         conn.close()
         return serialize_persona(row_to_dict(COLUMNS, rows[0])) if rows else None
 

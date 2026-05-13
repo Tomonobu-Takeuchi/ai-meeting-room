@@ -137,8 +137,8 @@
     .modal h2{font-size:16px;font-weight:700;margin-bottom:20px;}
     .form-group{margin-bottom:14px;}
     .form-group label{display:block;font-size:12px;color:var(--text-secondary);margin-bottom:6px;}
-    .form-group input:not([type=color]):not([type=file]):not([type=hidden]),.form-group textarea{width:100%;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius);padding:9px 12px;color:var(--text-primary);font-size:13px;font-family:'Noto Sans JP',sans-serif;outline:none;transition:border-color 0.15s;}
-    .form-group input:not([type=color]):not([type=file]):not([type=hidden]):focus,.form-group textarea:focus{border-color:var(--accent-blue);}
+    .form-group input:not([type=color]):not([type=file]):not([type=hidden]):not([type=checkbox]),.form-group textarea{width:100%;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius);padding:9px 12px;color:var(--text-primary);font-size:13px;font-family:'Noto Sans JP',sans-serif;outline:none;transition:border-color 0.15s;}
+    .form-group input:not([type=color]):not([type=file]):not([type=hidden]):not([type=checkbox]):focus,.form-group textarea:focus{border-color:var(--accent-blue);}
     .form-group textarea{resize:vertical;min-height:60px;}
     .form-row{display:flex;gap:10px;}
     .form-row .form-group{flex:1;}
@@ -563,10 +563,14 @@
       <div id="learnDataList"></div>
       <div class="learn-status" id="learnStatus"></div>
     </div>
-    <div class="form-group" style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius);padding:10px;">
-      <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:12px;color:var(--text-secondary);">
+    <div class="form-group" style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius);padding:10px;display:block;width:100%;box-sizing:border-box;">
+      <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:12px;color:var(--text-secondary);margin-bottom:8px;width:100%;">
         <input type="checkbox" id="pIsFictional" checked style="margin-top:2px;cursor:pointer;flex-shrink:0;" />
-        <span>このペルソナは架空の人物です（実在する生存者を模したペルソナの作成は禁止されています）</span>
+        <span style="flex:1;min-width:0;word-break:break-word;">このペルソナは架空の人物です（実在する生存者を模したペルソナの作成は禁止されています）</span>
+      </label>
+      <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:12px;color:var(--text-secondary);width:100%;">
+        <input type="checkbox" id="is_deceased_check" style="margin-top:2px;cursor:pointer;flex-shrink:0;" />
+        <span style="flex:1;min-width:0;word-break:break-word;">この人物は故人（亡くなった方）ですか？</span>
       </label>
     </div>
     <div class="modal-footer">
@@ -1178,6 +1182,25 @@
     <div class="modal-footer">
       <button class="btn" onclick="closeProhibitedNoticeModal()">キャンセル</button>
       <button class="btn btn-primary" onclick="agreeProhibitedNotice()">同意して開始</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== T-06: 故人ペルソナ同意確認モーダル ===== -->
+<div class="modal-overlay hidden" id="deceasedConsentOverlay">
+  <div class="prohibited-notice-box">
+    <h2>📋 故人ペルソナの作成に関する同意確認</h2>
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px;line-height:1.6;">以下の事項に同意の上、ペルソナを作成してください。</p>
+    <ul class="prohibited-list">
+      <li>作成するペルソナの内容・利用に関する責任はすべてあなた（ユーザー）が負います。</li>
+      <li>逝去から1年以内の方の場合、遺族等の関係者への事前承諾の取得を推奨します（義務ではありません）。</li>
+      <li>故人を侮辱・中傷する内容のペルソナ作成は禁止されています。</li>
+      <li>本ペルソナを用いて第三者を欺く行為は禁止されています。</li>
+      <li>遺族等から削除請求があった場合、当社は当該ペルソナを削除することがあります。</li>
+    </ul>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeDeceasedConsentModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="agreeDeceasedConsent()">同意してペルソナを作成</button>
     </div>
   </div>
 </div>

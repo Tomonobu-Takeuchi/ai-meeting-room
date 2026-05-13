@@ -1137,9 +1137,7 @@ async function submitAddPersona() {
   DOM.confirmAddPersona.textContent = '保存中...';
   const name = $('pName').value.trim(), avatar = $('pAvatar').value.trim() || '👤';
   const description = $('pDescription').value.trim(), personality = $('pPersonality').value.trim();
-  const speakingStyle = $('pSpeakingStyle').value.trim(), color = $('pColor').value;
-  let background = buildBackgroundFromLearnData($('pBackground').value.trim(), State.addLearnFiles);
-  const voiceId = $('pVoiceId')?.value || 'none';
+  const speakingStyle = $('pSpeakingStyle').value.trim();
   // T-04: 生存者禁止チェック
   const isFictional = $('pIsFictional')?.checked !== false;
   if (!name || !description || !personality || !speakingStyle) {
@@ -1156,8 +1154,41 @@ async function submitAddPersona() {
     DOM.confirmAddPersona.textContent = '追加する';
     return;
   }
+  // T-06: 故人チェック → 同意モーダル表示
+  if (document.getElementById('is_deceased_check')?.checked) {
+    State.addSubmitting = false;
+    DOM.confirmAddPersona.disabled = false;
+    DOM.confirmAddPersona.textContent = '追加する';
+    const overlay = document.getElementById('deceasedConsentOverlay');
+    if (overlay) overlay.classList.remove('hidden');
+    return;
+  }
+  await doCreatePersona(false);
+}
+
+function closeDeceasedConsentModal() {
+  const overlay = document.getElementById('deceasedConsentOverlay');
+  if (overlay) overlay.classList.add('hidden');
+}
+
+async function agreeDeceasedConsent() {
+  closeDeceasedConsentModal();
+  await doCreatePersona(true);
+}
+
+async function doCreatePersona(isDeceasedConfirmed) {
+  if (State.addSubmitting) return;
+  State.addSubmitting = true;
+  DOM.confirmAddPersona.disabled = true;
+  DOM.confirmAddPersona.textContent = '保存中...';
+  const name = $('pName').value.trim(), avatar = $('pAvatar').value.trim() || '👤';
+  const description = $('pDescription').value.trim(), personality = $('pPersonality').value.trim();
+  const speakingStyle = $('pSpeakingStyle').value.trim(), color = $('pColor').value;
+  let background = buildBackgroundFromLearnData($('pBackground').value.trim(), State.addLearnFiles);
+  const voiceId = $('pVoiceId')?.value || 'none';
   try {
-    const data = await API.post('/api/personas/add', { name, avatar, description, personality, speaking_style: speakingStyle, background, role: 'member', color, voice_id: voiceId === 'none' ? null : voiceId, is_fictional: true });
+    const data = await API.post('/api/personas/add', { name, avatar, description, personality, speaking_style: speakingStyle, background, role: 'member', color, voice_id: voiceId === 'none' ? null : voiceId, is_fictional: true, is_deceased_confirmed: isDeceasedConfirmed });
+    if (!data.persona) throw new Error('ペルソナの作成に失敗しました');
     if (State.addAvatarDataUrl) State.avatarImages[data.persona.id] = State.addAvatarDataUrl;
 
     // ★ 学習データをpersona_learnテーブルにDB保存（3件バッチ並列・1件失敗でも続行）

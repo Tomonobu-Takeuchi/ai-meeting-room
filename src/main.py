@@ -159,6 +159,7 @@ def get_members():
     return jsonify({"members": members, "facilitator": facilitator})
 
 @app.route("/api/personas/add", methods=["POST"])
+@login_required
 def add_persona():
     user_id = get_current_user_id()
     data = request.json
