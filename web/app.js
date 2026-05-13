@@ -384,7 +384,6 @@ async function init() {
   // 認証ボタンのイベント（動的生成されるため直接バインド）
   document.addEventListener('click', (e) => {
     if (e.target.id === 'loginBtnHeader') openAuthModal();
-    if (e.target.id === 'freeStartBtn') startFree();
     if (e.target.id === 'loginSubmitBtn') submitLogin();
     if (e.target.id === 'registerSubmitBtn') submitRegister();
   });
@@ -1950,18 +1949,17 @@ async function purchasePlan(type) {
   $('purchaseConfirmOverlay').classList.add('hidden');
   const btn = type === 'standard' ? $('buyStandardBtn') : $('buyProBtn');
   if (btn) { btn.disabled = true; btn.textContent = '処理中...'; }
+  // ポップアップブロッカー回避：awaitの前にwindow.openを呼ぶ
+  const newWindow = window.open('', '_blank');
   try {
     const data = await API.post('/api/payment/checkout', { type });
-    if (data.checkout_url) {
-      const a = document.createElement('a');
-      a.href = data.checkout_url;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+    if (data.checkout_url && newWindow) {
+      newWindow.location.href = data.checkout_url;
+    } else if (newWindow) {
+      newWindow.close();
     }
   } catch (e) {
+    if (newWindow) newWindow.close();
     showToast(`決済エラー: ${e.message}`, 'error');
   } finally {
     if (btn) {
