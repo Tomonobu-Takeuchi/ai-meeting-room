@@ -1954,6 +1954,8 @@ async function purchasePlan(type, newWindow = null) {
     if (data.checkout_url) {
       if (newWindow) {
         newWindow.location.href = data.checkout_url;
+        newWindow.focus();
+        closePricingModal();
       } else {
         window.location.href = data.checkout_url;
       }
