@@ -384,7 +384,7 @@ async function init() {
   // 認証ボタンのイベント（動的生成されるため直接バインド）
   document.addEventListener('click', (e) => {
     if (e.target.id === 'loginBtnHeader') openAuthModal();
-    if (e.target.id === 'freeStartBtn') openAuthModal();
+    if (e.target.id === 'freeStartBtn') startFree();
     if (e.target.id === 'loginSubmitBtn') submitLogin();
     if (e.target.id === 'registerSubmitBtn') submitRegister();
   });
@@ -1765,7 +1765,7 @@ function renderAuthArea() {
       <button class="btn" id="logoutBtn" onclick="logout()">ログアウト</button>
     `;
   } else {
-    area.innerHTML = `<button class="btn btn-green" id="freeStartBtn" onclick="openAuthModal()">🚀 無料で始める</button><button class="btn" id="loginBtnHeader" onclick="openAuthModal()">🔑 ログイン</button>`;
+    area.innerHTML = `<button class="btn btn-green" id="freeStartBtn" onclick="startFree()">🚀 無料で始める</button><button class="btn" id="loginBtnHeader" onclick="openAuthModal()">🔑 ログイン</button>`;
   }
 }
 
@@ -1778,6 +1778,15 @@ function closeAuthModal() {
   $('authModalOverlay').classList.add('hidden');
   $('loginError').textContent = '';
   $('registerError').textContent = '';
+}
+
+function startFree() {
+  if (!localStorage.getItem('guide_shown')) {
+    showGuideModal();
+  } else {
+    showToast('ゲストとして利用中です。議題を入力して会議を始めましょう！', 'success');
+    DOM.topicInput?.focus();
+  }
 }
 
 function showLoginPanel() {
@@ -1919,22 +1928,46 @@ function closePricingModal() {
   if (overlay) overlay.classList.add('hidden');
 }
 
-async function purchasePlan(type) {
+// 決済確認モーダルを表示
+function showPurchaseConfirm(type) {
   if (!State.currentUser) {
     closePricingModal();
     openAuthModal();
     return;
   }
+  const isStandard = type === 'standard';
+  $('purchaseConfirmTitle').textContent = isStandard
+    ? 'スタンダードプラン ¥480 を購入'
+    : 'プロプラン ¥980/月 に登録';
+  $('purchaseConfirmDesc').textContent = isStandard
+    ? '50回分の会議チケットを購入します。有効期限はありません。'
+    : '月間会議回数無制限のプロプランに登録します。';
+  $('purchaseConfirmOverlay').classList.remove('hidden');
+  $('purchaseConfirmOk').dataset.planType = type;
+}
+
+async function purchasePlan(type) {
+  $('purchaseConfirmOverlay').classList.add('hidden');
   const btn = type === 'standard' ? $('buyStandardBtn') : $('buyProBtn');
   if (btn) { btn.disabled = true; btn.textContent = '処理中...'; }
   try {
     const data = await API.post('/api/payment/checkout', { type });
     if (data.checkout_url) {
-      window.location.href = data.checkout_url;
+      const a = document.createElement('a');
+      a.href = data.checkout_url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     }
   } catch (e) {
     showToast(`決済エラー: ${e.message}`, 'error');
-    if (btn) { btn.disabled = false; btn.textContent = type === 'standard' ? 'チケットを購入' : 'プロプランに登録'; }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = type === 'standard' ? 'チケットを購入' : 'プロプランに登録';
+    }
   }
 }
 
@@ -1947,6 +1980,7 @@ window.previewVoice = previewVoice;
 window.openPricingModal = openPricingModal;
 window.closePricingModal = closePricingModal;
 window.purchasePlan = purchasePlan;
+window.showPurchaseConfirm = showPurchaseConfirm;
 
 // ===== 使い方モーダル =====
 function openHowToModal(tabIdx) {
@@ -1975,4 +2009,15 @@ function initMobileActionBar() {
   if (DOM.mobileFacilitatorBtn) DOM.mobileFacilitatorBtn.addEventListener('click', invokeFacilitator);
 }
 
-document.addEventListener('DOMContentLoaded', () => { init(); initMobileActionBar(); });
+document.addEventListener('DOMContentLoaded', () => {
+  init();
+  initMobileActionBar();
+  // 決済確認モーダル
+  $('purchaseConfirmCancel')?.addEventListener('click', () => {
+    $('purchaseConfirmOverlay').classList.add('hidden');
+  });
+  $('purchaseConfirmOk')?.addEventListener('click', () => {
+    const type = $('purchaseConfirmOk').dataset.planType;
+    if (type) purchasePlan(type);
+  });
+});

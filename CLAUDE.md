@@ -113,9 +113,11 @@ SELECT id, name, user_id FROM personas WHERE user_id IS NULL ORDER BY id;
 
 ### テスト実行コマンド（本番DB混入防止）
 ```powershell
-# DATABASE_URLはそのまま使用。ガードが本番DB接続を自動検出して中止する
+# 手順1: .envのDATABASE_URL行頭に # を付けて一時コメントアウト
+# 手順2: テスト実行
 python -X utf8 test_comprehensive.py 2>&1 | Out-File -Encoding utf8 "C:\Temp\test_result.txt"
 Get-Content "C:\Temp\test_result.txt" | Select-Object -Last 15
+# 手順3: テスト成否に関わらず .env の # を外してDATABASE_URLを復元（必須）
 ```
 
 ### テスト後の本番DB確認（必須）
@@ -131,14 +133,37 @@ AND id NOT IN ('koumei','hideyoshi','professor','elizabeth1','facilitator');
 【実装内容】
 ...
 【デグレード確認】
-$env:DATABASE_URL=""; python -X utf8 test_comprehensive.py 2>&1 | Out-File -Encoding utf8 "C:\Temp\test_result.txt"
-Get-Content "C:\Temp\test_result.txt" | Select-Object -Last 15
-→ 183件以上PASS確認
+① .envのDATABASE_URLを一時コメントアウト
+   .envを開き DATABASE_URL=... の行頭に # を追加して保存
+
+② テスト実行
+   python -X utf8 test_comprehensive.py 2>&1 | Out-File -Encoding utf8 "C:\Temp\test_result.txt"
+   Get-Content "C:\Temp\test_result.txt" | Select-Object -Last 15
+   → 183件以上PASS確認
+
+③ .envを必ず元に戻す（テスト成否に関わらず必須）
+   # を外してDATABASE_URLを復元して保存
+
+④ 復元確認
+   .envを開いてDATABASE_URLが復元されていることを確認してから報告
+
+【デグレード確認】
 【本番環境確認】
-・本番URLで動作確認（具体的な確認項目を列挙）
-・本番DBゴミデータ確認SQL実行→0 rows確認
 【完了条件】
-上記3つ全て確認できた場合のみcommit・push
+の3セクションは省略禁止。
+⚠️ 【実装内容】が「なし」の場合も4セクション全て省略禁止
+
+【デグレード確認】
+上記①〜④を実施し完了を報告する
+
+【本番環境確認】
+本番URLでの動作確認（具体的な確認項目を列挙）
+RailwayのQueryタブで以下を実行し0 rows確認：
+SELECT id, name FROM personas WHERE user_id IS NULL
+AND id NOT IN ('koumei','hideyoshi','professor','elizabeth1','facilitator');
+
+【完了条件】
+上記3つ全て確認後のみgit push
 ```
 
 ## Utility Scripts (Untracked)
