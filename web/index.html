@@ -158,6 +158,11 @@
     .delete-confirm-box{background:var(--bg-surface);border:1px solid var(--accent-red);border-radius:var(--radius-lg);padding:28px;width:360px;max-width:90vw;text-align:center;}
     .delete-confirm-box h3{font-size:16px;margin-bottom:12px;color:var(--accent-red);}
     .delete-confirm-box p{font-size:13px;color:var(--text-secondary);margin-bottom:20px;line-height:1.6;}
+    .prohibited-notice-box{background:var(--bg-surface);border:1px solid #F59E0B;border-radius:var(--radius-lg);padding:28px;width:480px;max-width:92vw;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow);}
+    .prohibited-notice-box h2{font-size:16px;font-weight:700;margin-bottom:14px;color:#F59E0B;}
+    .prohibited-list{list-style:none;padding:0;margin:0 0 14px;display:flex;flex-direction:column;gap:6px;}
+    .prohibited-list li{font-size:12px;color:var(--text-secondary);padding:6px 10px;background:rgba(245,158,11,0.08);border-radius:6px;line-height:1.5;}
+    .prohibited-disclosure{font-size:12px;color:var(--text-secondary);padding:10px 12px;background:var(--bg-elevated);border-radius:6px;border-left:3px solid #F59E0B;line-height:1.6;}
     .member-check-item{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:var(--radius);border:1px solid var(--border);cursor:pointer;transition:all 0.15s;}
     .member-check-item:hover{background:var(--bg-hover);border-color:var(--accent-blue);}
     .member-check-item input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent-blue);cursor:pointer;flex-shrink:0;}
@@ -1152,6 +1157,31 @@
     </div>
   </div>
 </div>
+<!-- ===== T-05: 禁止事項・情報公開禁止モーダル ===== -->
+<div class="modal-overlay hidden" id="prohibitedNoticeOverlay">
+  <div class="prohibited-notice-box">
+    <h2>⚠️ 禁止事項・情報公開禁止</h2>
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px;line-height:1.6;">会議を開始する前に、以下の禁止事項をご確認ください。</p>
+    <p style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;">【禁止事例】</p>
+    <ul class="prohibited-list">
+      <li>✕ 会話内容・ペルソナの発言をSNS等に無断で拡散すること</li>
+      <li>✕ ペルソナの発言を切り取り、実在する人物の発言として第三者に見せること</li>
+      <li>✕ 会話を録音・録画し、第三者に公開・配布すること</li>
+      <li>✕ 元交際相手・元配偶者等のペルソナを本人の同意なく作成し接触に利用すること</li>
+      <li>✕ 上司・同僚等のペルソナを業務上の意思決定に悪用すること</li>
+    </ul>
+    <p style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;">【情報公開禁止】</p>
+    <div class="prohibited-disclosure">
+      本サービス内の会話内容を本サービス外で公開・共有することは禁止です。<br>
+      違反した場合、アカウントを停止し法的措置を取ることがあります。
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeProhibitedNoticeModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="agreeProhibitedNotice()">同意して開始</button>
+    </div>
+  </div>
+</div>
+
 <!-- 決済確認モーダル -->
 <div class="modal-overlay hidden" id="purchaseConfirmOverlay">
   <div class="modal" style="max-width:400px;text-align:center;">

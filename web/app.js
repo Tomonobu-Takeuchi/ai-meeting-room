@@ -84,6 +84,7 @@ const DOM = {
   micBtn: $('micBtn'),
   topicMicBtn: $('topicMicBtn'),
   freeStartBtn: $('freeStartBtn'),
+  prohibitedNoticeOverlay: $('prohibitedNoticeOverlay'),
 };
 
 const API = {
@@ -916,6 +917,11 @@ async function startMeeting() {
   const topic = DOM.topicInput.value.trim();
   if (!topic) { showToast('議題を入力してください', 'error'); return; }
   if (State.selectedMemberIds.length === 0) { showToast('メンバーを選択してください', 'error'); return; }
+  // T-05: 禁止事項同意チェック（初回のみ）
+  if (!localStorage.getItem('prohibited_notice_agreed')) {
+    DOM.prohibitedNoticeOverlay.classList.remove('hidden');
+    return;
+  }
   setLoading(true);
   try {
     const data = await API.post('/api/meeting/start', { topic, member_ids: State.selectedMemberIds });
@@ -1886,6 +1892,16 @@ function showGuideModal() {
 function closeGuideModal() {
   $('guideModal').classList.add('hidden');
   localStorage.setItem('guide_shown', '1');
+}
+
+// ===== T-05: 禁止事項・情報公開禁止モーダル =====
+function closeProhibitedNoticeModal() {
+  DOM.prohibitedNoticeOverlay.classList.add('hidden');
+}
+function agreeProhibitedNotice() {
+  localStorage.setItem('prohibited_notice_agreed', '1');
+  closeProhibitedNoticeModal();
+  startMeeting();
 }
 
 // ===== 料金プランモーダル =====
