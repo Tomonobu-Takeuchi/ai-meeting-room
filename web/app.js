@@ -1163,6 +1163,10 @@ async function submitAddPersona() {
     if (overlay) overlay.classList.remove('hidden');
     return;
   }
+  // doCreatePersona内で再度addSubmitting=trueにするためリセット
+  State.addSubmitting = false;
+  DOM.confirmAddPersona.disabled = false;
+  DOM.confirmAddPersona.textContent = '追加する';
   await doCreatePersona(false);
 }
 
