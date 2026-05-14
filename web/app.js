@@ -155,8 +155,9 @@ function closeExternalApiConsentModal() {
 }
 function agreeExternalApiConsent() {
   setExternalApiConsent();
+  const cb = _extApiConsentCallback;
   closeExternalApiConsentModal();
-  if (_extApiConsentCallback) { _extApiConsentCallback(); _extApiConsentCallback = null; }
+  if (cb) cb();
 }
 window.closeExternalApiConsentModal = closeExternalApiConsentModal;
 window.agreeExternalApiConsent = agreeExternalApiConsent;
