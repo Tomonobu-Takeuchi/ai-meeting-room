@@ -455,6 +455,7 @@ async function init() {
     const statusId = mode === 'add' ? 'learnStatus' : 'editLearnStatus';
     const inputId = mode === 'add' ? 'learnAudioFile' : 'editLearnAudioFile';
     $(btnId)?.addEventListener('click', (e) => {
+      if (e.target === $(inputId)) return;
       e.preventDefault();
       const st = $(statusId);
       const doOpen = () => {
@@ -473,6 +474,7 @@ async function init() {
     const statusId = mode === 'add' ? 'learnStatus' : 'editLearnStatus';
     const inputId = mode === 'add' ? 'learnVideoFile' : 'editLearnVideoFile';
     $(btnId)?.addEventListener('click', (e) => {
+      if (e.target === $(inputId)) return;
       e.preventDefault();
       const st = $(statusId);
       const doOpen = () => {
