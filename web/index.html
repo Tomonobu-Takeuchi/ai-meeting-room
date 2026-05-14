@@ -285,6 +285,9 @@
       #logoutBtn{padding:3px 6px;font-size:9px;}
       #loginBtnHeader{padding:3px 6px;font-size:9px;}
       .btn-green#freeStartBtn{padding:3px 6px;font-size:9px;}
+      .btn-full-text{display:none;}
+      .btn-short-text{display:inline;}
+      .btn-login-text{display:none;}
       .user-badge .user-name{display:none;}
       .voice-text{display:none;}
       #allRespondBtn{display:none;} /* 画面幅が足りない場合は非表示 */
@@ -317,6 +320,9 @@
     .auth-guest{text-align:center;margin-top:12px;font-size:12px;color:var(--text-muted);}
     .auth-guest a{color:var(--text-muted);cursor:pointer;text-decoration:underline;}
     /* ヘッダーのユーザー表示 */
+    .btn-full-text{display:inline;}
+    .btn-short-text{display:none;}
+    .btn-login-text{display:inline;}
     .user-badge{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);padding:4px 10px;background:var(--bg-elevated);border-radius:20px;border:1px solid var(--border);}
     .header-user{gap:4px;}
     .user-badge .user-name{max-width:50px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -435,8 +441,8 @@
     </nav>
     <div class="header-logo">AI<span style="color:#7C3AED">-</span>PERSONA 会議室</div>
     <div class="header-user" id="authArea">
-      <button class="btn btn-green" id="freeStartBtn" style="display:none;">🚀 無料で始める</button>
-      <button class="btn" id="loginBtnHeader">🔑 ログイン</button>
+      <button class="btn btn-green" id="freeStartBtn" onclick="startFree()">🚀 <span class="btn-full-text">無料で始める</span><span class="btn-short-text">無料</span></button>
+      <button class="btn" id="loginBtnHeader" onclick="openAuthModal()">🔑<span class="btn-login-text"> ログイン</span></button>
     </div>
   </div>
   <!-- 第2行：会議前 -->

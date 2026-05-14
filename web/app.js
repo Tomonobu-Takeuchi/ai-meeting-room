@@ -1996,7 +1996,7 @@ function renderAuthArea() {
       <button class="btn" id="logoutBtn" onclick="logout()">ログアウト</button>
     `;
   } else {
-    area.innerHTML = `<button class="btn btn-green" id="freeStartBtn" onclick="startFree()">🚀 無料で始める</button><button class="btn" id="loginBtnHeader" onclick="openAuthModal()">🔑 ログイン</button>`;
+    area.innerHTML = `<button class="btn btn-green" id="freeStartBtn" onclick="startFree()">🚀 <span class="btn-full-text">無料で始める</span><span class="btn-short-text">無料</span></button><button class="btn" id="loginBtnHeader" onclick="openAuthModal()">🔑<span class="btn-login-text"> ログイン</span></button>`;
   }
 }
 
