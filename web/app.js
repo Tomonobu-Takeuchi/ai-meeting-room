@@ -184,7 +184,6 @@ function speakText(text, personaId, targetEl = null) {
   if (!State.voiceMode || !window.speechSynthesis) return Promise.resolve();
   if (State.jaVoices.length === 0) loadVoices();
 
-  // ★ 漢字の読み間違いを修正（諸葛亮孔明を先に置換）
   const fixedText = text
     .replace(/諸葛亮孔明/g, 'しょかつこうめい')
     .replace(/諸葛亮/g, 'しょかつりょう')
@@ -205,7 +204,9 @@ function speakText(text, personaId, targetEl = null) {
   return new Promise((resolve) => {
     if (State.speakEndResolve) { State.speakEndResolve(); State.speakEndResolve = null; }
     State.speakEndResolve = resolve;
-    const estimatedMs = Math.min(Math.max(speakStr.length * 100 + 3000, 5000), 25000);
+
+    const charCount = speakStr.length;
+    const estimatedMs = Math.min(Math.max(charCount * 200 + 5000, 8000), 60000);
     const speakTimer = setTimeout(() => { done(); }, estimatedMs);
 
     utterance.onstart = () => {
@@ -219,16 +220,18 @@ function speakText(text, personaId, targetEl = null) {
       if (State.speakEndResolve) { State.speakEndResolve(); State.speakEndResolve = null; }
     };
     utterance.onend = done;
-    utterance.onerror = done;
+    utterance.onerror = (e) => {
+      if (e.error === 'interrupted' || e.error === 'canceled') return;
+      done();
+    };
 
     if (isIOS) {
       window.speechSynthesis.speak(utterance);
     } else {
-      window.speechSynthesis.cancel();
       setTimeout(() => {
         if (!State.voiceMode) { done(); return; }
         window.speechSynthesis.speak(utterance);
-      }, 200);
+      }, 100);
     }
   });
 }
