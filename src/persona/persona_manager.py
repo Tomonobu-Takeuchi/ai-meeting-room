@@ -40,7 +40,16 @@ class PersonaManager:
             rows = conn.run("""
                 SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id, source_persona_id FROM personas
                 WHERE role='member'
-                  AND (user_id=:user_id OR user_id IS NULL)
+                  AND (
+                    user_id = :user_id
+                    OR (
+                      user_id IS NULL
+                      AND id NOT IN (
+                        SELECT source_persona_id FROM personas
+                        WHERE user_id = :user_id AND source_persona_id IS NOT NULL
+                      )
+                    )
+                  )
                 ORDER BY is_default DESC, created_at ASC
             """, user_id=user_id)
         else:
@@ -81,7 +90,16 @@ class PersonaManager:
         if user_id:
             rows = conn.run("""
                 SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id, source_persona_id FROM personas
-                WHERE user_id=:user_id OR user_id IS NULL
+                WHERE (
+                    user_id = :user_id
+                    OR (
+                      user_id IS NULL
+                      AND id NOT IN (
+                        SELECT source_persona_id FROM personas
+                        WHERE user_id = :user_id AND source_persona_id IS NOT NULL
+                      )
+                    )
+                  )
                 ORDER BY role DESC, is_default DESC, created_at ASC
             """, user_id=user_id)
         else:
