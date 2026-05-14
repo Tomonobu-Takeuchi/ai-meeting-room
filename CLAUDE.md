@@ -2,11 +2,26 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 作成日：2026年5月14日（v8からの更新版）
+
 ## Project Overview
 
 **AI-PERSONA会議室** (AI-Persona Meeting Room) — A web app where users create AI personas that conduct real-time AI-powered discussions about user-specified topics, powered by Claude.
 
-**Current Version: v0.9.6**
+**現在バージョン**: v0.9.9（コピー・オン・エディット実装済み）
+**最新コミット**: f4d0855
+
+## 完成済み機能
+
+| 機能 | 状態 |
+|------|------|
+| Stripe課金実装 | ✅（v0.9.5） |
+| テスト強化・法律対応T-01〜T-04・iPhone修正 | ✅（v0.9.6） |
+| T-05：禁止事項・情報公開禁止モーダル | ✅（2026/05/13） |
+| T-06：故人ペルソナ同意確認モーダル | ✅（2026/05/13） |
+| コピー・オン・エディット機能 | ✅（2026/05/14実装・本番確認済み） |
+| source_persona_id / extra_settings カラム追加 | ✅（2026/05/14） |
+| PUT /api/personas/:id に @login_required追加 | ✅（2026/05/14） |
 
 ## Development Commands
 
@@ -73,6 +88,8 @@ data: {"type": "error", "message": "..."}
 - `users` — auth (email, bcrypt password hash, `plan` VARCHAR(20), `credits` INTEGER DEFAULT 0, `plan_expires_at` TIMESTAMP, `monthly_meeting_count` INTEGER, `monthly_reset_at` TIMESTAMP, `stripe_customer_id` VARCHAR)
 - `payments` — Stripe payment records; `stripe_session_id` is unique (prevents double-grant)
 - `personas` — persona definitions; `user_id=NULL` for system defaults, `role=facilitator|member`
+  ※ source_persona_id: コピー元デフォルトペルソナのID（コピー・オン・エディット用）
+  ※ extra_settings: JSONB拡張カラム（将来の設定項目追加用）
 - `persona_learn` — knowledge base with `vector(1536)` embeddings for semantic search
 - `persona_patterns` — extracted conversation patterns
 - `persona_growth` — maturity levels (0=初回, 1=見習い, 2=熟練, 3=達人) + scores
@@ -95,6 +112,37 @@ data: {"type": "error", "message": "..."}
 - **DB plan column:** `plan` (NOT `plan_type`) in the `users` table
 - **Stripe SDK 7.x:** StripeObject fields must use dot notation or `getattr()` — `.get()` is not available
 - **Double-grant prevention:** `payments` table checks `stripe_session_id` uniqueness before granting credits
+
+## 開発方針
+
+### チャット（claude.ai）とCodeの役割分担（確定版）
+
+| 作業 | 担当 | 方法 |
+|---|---|---|
+| コード修正・git操作 | Claude Code | 従来通り |
+| バグ原因の特定・解析 | このチャット | ソースファイルをアップロードして解析 |
+| 本番環境の動作確認 | このチャット | スクリーンショットを貼って確認 |
+| RailwayのQueryタブSQL | 智信さん＋チャット | SQLをチャットで案内→実行→結果を貼る |
+| Codeへの指示作成 | このチャット | 原因・修正箇所・検証方法を全て明記した仕様書として渡す |
+| 外部サービス設定変更 | 智信さん自身 | APIキー再発行・Railway環境変数等 |
+
+### バグ発生時のフロー（必ず守ること）
+
+1. 本番でバグ発生 → スクリーンショット＋コンソールエラーをチャットに貼る
+2. チャットがソースファイル（app.js・index.html等）のアップロードを要求する
+3. チャットがコードを直接解析し「どのファイルの何行目に何の問題があるか」まで特定する
+4. チャットがCodeへの指示を「修正ファイル・修正行・修正内容・検証方法」を全て明記した仕様書として作成する
+5. Codeは指示通りに実装し、完了条件チェックリストを全項目報告する
+6. チャットでスクリーンショットを受け取り合否判定する
+7. NGなら再度コード解析してCodeに差し戻す
+
+### Codeへの指示で「調査してください」は禁止
+- NG：「調査して修正してください」
+- OK：「○○ファイルの○○行目の○○を○○に変更する」
+
+### バックアップ体制
+- ai-meeting-roomフォルダはGoogle Drive（G:）に自動同期済み
+- 同期先：taketomo6630@gmail.com のマイコンピュータ
 
 ## テストデータ管理ルール（本番DB汚染防止）
 
@@ -188,18 +236,59 @@ AND id NOT IN ('koumei','hideyoshi','professor','elizabeth1','facilitator');
   このチャットにファイルをアップロードして直接解析する
 - Claude in Chrome (Beta) のClaudeCode連携は未確立（引き続き設定要）
 
-### 次回作業予定（5/14）
-- 要件定義書・機能設計書・運用手順書の作成
-- 本番環境の総合機能確認・運用試験
-- 5/15 14:00 法律相談の準備
+## 2026/05/14 実施済み作業
+
+### コピー・オン・エディット機能実装
+- デフォルトペルソナの編集時に自動でユーザー専用コピーを作成する機能
+- DBカラム追加：source_persona_id（コピー元ID）、extra_settings（JSONB拡張）
+- copyPersonaモーダルHTMLをscriptタグ前に移動（DOM null参照バグ修正）
+- PUT /api/personas/:id に @login_required 追加
+
+### .gitignore修正
+- env（ドットなし）を追加（GitHub Secret Scanning対策）
+
+## ⚠️ 教訓
+
+| 日付 | 教訓 | 対策 |
+|---|---|---|
+| 2026/05/13 | ClaudeCodeはブラウザ描画を確認できない | フロントエンドのバグ調査はチャットにファイルをアップロードして直接解析する |
+| 2026/05/14 | HTMLモーダルをscriptタグより後に配置するとDOM初期化時にnullになる | 新規モーダルHTMLは必ず`<script src="app.js">`より前に配置すること |
+| 2026/05/14 | .envファイルをgitにコミットするとGitHubのSecret Scanningでブロックされる | .gitignoreに`.env`と`env`（ドットなし）の両方を記載すること |
+
+## 品質改善履歴
+
+| 日付 | 修正内容 | 重要度 |
+|---|---|---|
+| 2026/05/13 | T-05：禁止事項・情報公開禁止モーダル実装 | ★★★ |
+| 2026/05/13 | T-06：故人ペルソナ同意確認モーダル実装 | ★★★ |
+| 2026/05/13 | CSS checkbox幅バグ修正（:not([type=checkbox])追加） | ★★ |
+| 2026/05/13 | submitAddPersonaのaddSubmittingリセット漏れ修正 | ★★ |
+| 2026/05/13 | /api/personas/add に @login_required 追加 | ★★★ |
+| 2026/05/14 | コピー・オン・エディット機能実装（デフォルトペルソナをユーザー専用コピーとして複製） | ★★★ |
+| 2026/05/14 | source_persona_id / extra_settings カラムをpersonasテーブルに追加 | ★★★ |
+| 2026/05/14 | copyPersonaモーダルHTMLをscriptタグ前に移動（DOM null参照バグ修正） | ★★★ |
+| 2026/05/14 | .gitignoreにenv（ドットなし）を追加（Secret Scanning対策） | ★★★ |
+| 2026/05/14 | チャット/Codeの役割分担・バグ対応フローをCLAUDE.mdに明記 | ★★★ |
+| 2026/05/14 | ai-meeting-roomをGoogle Driveに自動同期設定（バックアップ体制確立） | ★★ |
+
+## 次回チャット開始時の注意
+
+- **最優先バグ**: 音声途切れ修正（全員で議論モードで必ず発生）
+- **フェーズ2**: デフォルトペルソナ30体追加（カテゴリ構成は智信さんが検討中）
+- **次の開発課題**: T-07実装・Docker環境整備・Alembic導入（βテスト前必須）
+- **5/15**: 弁護士相談（terms.html・privacy.htmlドラフト持参）→ 相談後に正式版デプロイ
 
 ## Roadmap
 1. ✅ Stripe課金実装（v0.9.5）
 2. ✅ テスト強化・法律対応T-01〜T-04・iPhone修正（v0.9.6）
-3. 利用規約・プライバシーポリシー正式版更新（5/14弁護士相談前）
-4. iPhone Safari音声再生問題修正
-5. PC版UI残課題（ログイン前ボタン等）
-6. 法律対応T-05〜T-07
-7. Stripe本番環境への切り替え（KYB・銀行口座登録）
-8. βテスト（5〜10名）
-9. v1.0正式リリース
+3. ✅ 法律対応T-05・T-06・コピー・オン・エディット実装（v0.9.9）
+4. 利用規約・プライバシーポリシー正式版更新（5/15弁護士相談後）
+5. 音声途切れ修正（全員で議論モード）
+6. iPhone Safari音声再生問題修正
+7. PC版UI残課題（ログイン前ボタン等）
+8. 法律対応T-07
+9. デフォルトペルソナ30体追加
+10. Docker環境整備・Alembic導入
+11. Stripe本番環境への切り替え（KYB・銀行口座登録）
+12. βテスト（5〜10名）
+13. v1.0正式リリース
