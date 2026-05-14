@@ -202,7 +202,6 @@ function speakText(text, personaId, targetEl = null) {
   if (voice) utterance.voice = voice;
 
   return new Promise((resolve) => {
-    if (State.speakEndResolve) { State.speakEndResolve(); State.speakEndResolve = null; }
     State.speakEndResolve = resolve;
 
     const charCount = speakStr.length;
@@ -249,8 +248,6 @@ async function speakWithTTS(text, voiceId, targetEl = null) {
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
-    if (targetEl) targetEl.classList.add('voice-speaking');
-    State.isSpeaking = true;
     return new Promise(resolve => {
       const estimatedMs = Math.min(Math.max(text.length * 80 + 3000, 5000), 30000);
       const done = () => {
@@ -263,7 +260,9 @@ async function speakWithTTS(text, voiceId, targetEl = null) {
       const ttsTimer = setTimeout(done, estimatedMs);
       audio.onended = done;
       audio.onerror = done;
-      audio.play().catch(done);
+      audio.play().then(() => {
+        State.isSpeaking = true;
+      }).catch(done);
     });
   } catch (e) {
     console.error('TTS error:', e);
@@ -1158,8 +1157,8 @@ async function triggerMemberResponse(personaId, trigger = null) {
         fullText += data.text;
       } else if (data.type === 'done') {
         streamEl?.querySelector('.msg-bubble')?.classList.remove('streaming');
-        evtSource.close(); State.isStreaming = false;
-        setStreamingButtons(false); setMemberSpeaking(personaId, false); scrollToBottom();
+        evtSource.close();
+        setMemberSpeaking(personaId, false); scrollToBottom();
         if (State.voiceMode && fullText) {
           if (persona.voice_id) {
             await speakWithTTS(fullText, persona.voice_id, streamEl?.querySelector('.msg-bubble'));
@@ -1167,6 +1166,8 @@ async function triggerMemberResponse(personaId, trigger = null) {
             await speakText(fullText, personaId, streamEl?.querySelector('.msg-bubble'));
           }
         }
+        State.isStreaming = false;
+        setStreamingButtons(false);
         resolve();
       } else if (data.type === 'error') {
         typingEl?.remove(); streamEl?.remove(); evtSource.close();
@@ -1232,7 +1233,18 @@ async function autoDiscuss() {
   if (!State.sessionId || State.isStreaming) return;
   for (const member of State.members.filter(m => State.selectedMemberIds.includes(m.id))) {
     await triggerMemberResponse(member.id);
+    await waitForSpeechEnd();
   }
+}
+
+function waitForSpeechEnd() {
+  return new Promise(resolve => {
+    if (!State.isSpeaking) { resolve(); return; }
+    const check = setInterval(() => {
+      if (!State.isSpeaking) { clearInterval(check); resolve(); }
+    }, 100);
+    setTimeout(() => { clearInterval(check); resolve(); }, 60000);
+  });
 }
 
 function waitForStreamEnd() {
