@@ -515,6 +515,9 @@
 <div class="modal-overlay hidden" id="addPersonaModal">
   <div class="modal">
     <h2>🧑 ペルソナを追加</h2>
+    <div style="background:rgba(8,145,178,0.06);border:1px solid rgba(8,145,178,0.25);border-radius:var(--radius);padding:8px 12px;margin-bottom:12px;font-size:12px;color:#67E8F9;line-height:1.6;">
+      ⚠️ 本名・住所・電話番号・メールアドレス等の個人情報を入力しないでください。
+    </div>
     <div class="avatar-upload-row">
       <div class="avatar-preview" id="addAvatarPreview">👤</div>
       <div class="avatar-upload-info">
@@ -585,6 +588,9 @@
 <div class="modal-overlay hidden" id="editPersonaModal">
   <div class="modal">
     <h2>⚙️ ペルソナを編集</h2>
+    <div style="background:rgba(8,145,178,0.06);border:1px solid rgba(8,145,178,0.25);border-radius:var(--radius);padding:8px 12px;margin-bottom:12px;font-size:12px;color:#67E8F9;line-height:1.6;">
+      ⚠️ 本名・住所・電話番号・メールアドレス等の個人情報を入力しないでください。
+    </div>
     <input type="hidden" id="editPersonaId" />
     <div class="avatar-upload-row">
       <div class="avatar-preview" id="editAvatarPreview">👤</div>
@@ -691,6 +697,27 @@
     <div style="display:flex;justify-content:center;gap:12px;">
       <button class="btn" id="cancelDeleteBtn">キャンセル</button>
       <button class="btn" id="confirmDeleteBtn" style="background:var(--accent-red);border-color:var(--accent-red);color:#fff;">削除する</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== T-07: 外部API送信同意モーダル ===== -->
+<div class="modal-overlay hidden" id="externalApiConsentOverlay">
+  <div class="prohibited-notice-box" style="border-color:var(--accent-teal);">
+    <h2 style="color:#67E8F9;">🔒 外部サービスへのデータ送信について</h2>
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px;line-height:1.6;">
+      音声・動画ファイルの文字起こしには、OpenAI社のWhisper APIを使用します。<br>
+      ファイルの内容が文字起こし処理のためOpenAIのサーバーに送信されます。
+    </p>
+    <ul class="prohibited-list" style="margin-bottom:14px;">
+      <li>🔊 送信されるデータ：アップロードした音声・動画ファイルの内容</li>
+      <li>🏢 送信先：OpenAI Inc.（米国）</li>
+      <li>⚠️ 個人名・住所・電話番号等の個人情報を含む音声は送信しないことを推奨します</li>
+    </ul>
+    <p style="font-size:11px;color:var(--text-muted);margin-bottom:14px;">※ 同意は本セッション中は記憶されます（再読み込みでリセット）</p>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeExternalApiConsentModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="agreeExternalApiConsent()">同意して続ける</button>
     </div>
   </div>
 </div>

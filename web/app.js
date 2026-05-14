@@ -138,6 +138,29 @@ const API = {
   },
 };
 
+// ===== T-07: 外部API同意ヘルパー =====
+function hasExternalApiConsent() { return sessionStorage.getItem('ext_api_consent') === '1'; }
+function setExternalApiConsent() { sessionStorage.setItem('ext_api_consent', '1'); }
+
+let _extApiConsentCallback = null;
+function openExternalApiConsentModal(callback) {
+  _extApiConsentCallback = callback;
+  const el = document.getElementById('externalApiConsentOverlay');
+  if (el) el.classList.remove('hidden');
+}
+function closeExternalApiConsentModal() {
+  const el = document.getElementById('externalApiConsentOverlay');
+  if (el) el.classList.add('hidden');
+  _extApiConsentCallback = null;
+}
+function agreeExternalApiConsent() {
+  setExternalApiConsent();
+  closeExternalApiConsentModal();
+  if (_extApiConsentCallback) { _extApiConsentCallback(); _extApiConsentCallback = null; }
+}
+window.closeExternalApiConsentModal = closeExternalApiConsentModal;
+window.agreeExternalApiConsent = agreeExternalApiConsent;
+
 function loadVoices() {
   const voices = window.speechSynthesis.getVoices();
   State.jaVoices = voices.filter(v => v.lang.startsWith('ja'));
@@ -433,11 +456,15 @@ async function init() {
     const inputId = mode === 'add' ? 'learnAudioFile' : 'editLearnAudioFile';
     $(btnId)?.addEventListener('click', () => {
       const st = $(statusId);
-      if (st) {
-        st.textContent = '💡 対応形式：mp3・wav・m4a（200MB以下）。それ以上はYouTube URLをご利用ください。1時間超の音声は処理に数分かかります。';
-        st.style.color = 'var(--text-muted)'; st.style.whiteSpace = 'pre-line';
-      }
-      $(inputId)?.click();
+      const doOpen = () => {
+        if (st) {
+          st.textContent = '💡 対応形式：mp3・wav・m4a（200MB以下）。それ以上はYouTube URLをご利用ください。1時間超の音声は処理に数分かかります。';
+          st.style.color = 'var(--text-muted)'; st.style.whiteSpace = 'pre-line';
+        }
+        $(inputId)?.click();
+      };
+      if (hasExternalApiConsent()) { doOpen(); }
+      else { openExternalApiConsentModal(doOpen); }
     });
   });
   ['learnVideoBtn', 'editLearnVideoBtn'].forEach((btnId, i) => {
@@ -446,11 +473,15 @@ async function init() {
     const inputId = mode === 'add' ? 'learnVideoFile' : 'editLearnVideoFile';
     $(btnId)?.addEventListener('click', () => {
       const st = $(statusId);
-      if (st) {
-        st.textContent = '💡 対応形式：mp4・mov・avi（200MB以下）。それ以上はYouTube URLをご利用ください。音声抽出・圧縮処理のため数分かかります。';
-        st.style.color = 'var(--text-muted)'; st.style.whiteSpace = 'pre-line';
-      }
-      $(inputId)?.click();
+      const doOpen = () => {
+        if (st) {
+          st.textContent = '💡 対応形式：mp4・mov・avi（200MB以下）。それ以上はYouTube URLをご利用ください。音声抽出・圧縮処理のため数分かかります。';
+          st.style.color = 'var(--text-muted)'; st.style.whiteSpace = 'pre-line';
+        }
+        $(inputId)?.click();
+      };
+      if (hasExternalApiConsent()) { doOpen(); }
+      else { openExternalApiConsentModal(doOpen); }
     });
   });
   $('learnVideoFile')?.addEventListener('change', (e) => handleLearnVideo(e, 'add'));
@@ -917,6 +948,21 @@ async function submitEditPersona() {
     DOM.confirmEditPersona.textContent = '保存する';
     return;
   }
+  // T-07: PII検知警告
+  const piiFieldsEdit = [
+    { value: name, label: '名前' },
+    { value: description, label: '説明・肩書き' },
+    { value: personality, label: '性格・思考スタイル' },
+    { value: speakingStyle, label: '話し方の特徴' },
+    { value: $('eBackground').value.trim(), label: 'バックグラウンド' },
+  ];
+  const piiWarningEdit = checkPersonaFormPII(piiFieldsEdit);
+  if (piiWarningEdit && !confirm(piiWarningEdit)) {
+    State.editSubmitting = false;
+    DOM.confirmEditPersona.disabled = false;
+    DOM.confirmEditPersona.textContent = '保存する';
+    return;
+  }
   if (State.editAvatarDataUrl) State.avatarImages[memberId] = State.editAvatarDataUrl;
   try {
     const data = await API.put(`/api/personas/${memberId}`, { name, avatar, description, personality, speaking_style: speakingStyle, background, color, voice_id: voiceId === 'none' ? null : voiceId });
@@ -1196,6 +1242,21 @@ async function submitAddPersona() {
   const isFictional = $('pIsFictional')?.checked !== false;
   if (!name || !description || !personality || !speakingStyle) {
     showToast('必須項目を入力してください', 'error');
+    State.addSubmitting = false;
+    DOM.confirmAddPersona.disabled = false;
+    DOM.confirmAddPersona.textContent = '追加する';
+    return;
+  }
+  // T-07: PII検知警告
+  const piiFields = [
+    { value: name, label: '名前' },
+    { value: description, label: '説明・肩書き' },
+    { value: personality, label: '性格・思考スタイル' },
+    { value: speakingStyle, label: '話し方の特徴' },
+    { value: $('pBackground').value.trim(), label: 'バックグラウンド' },
+  ];
+  const piiWarning = checkPersonaFormPII(piiFields);
+  if (piiWarning && !confirm(piiWarning)) {
     State.addSubmitting = false;
     DOM.confirmAddPersona.disabled = false;
     DOM.confirmAddPersona.textContent = '追加する';
@@ -1615,6 +1676,27 @@ function skipFeedback() {
 
 function closeFeedbackModal() {
   if (DOM.feedbackModal) DOM.feedbackModal.classList.add('hidden');
+}
+
+// ===== T-07: 個人情報（PII）検知 =====
+function detectPII(text) {
+  if (!text) return null;
+  const patterns = [
+    { regex: /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/, label: 'メールアドレス' },
+    { regex: /0\d{1,4}[-\s]?\d{1,4}[-\s]?\d{4}/, label: '電話番号' },
+    { regex: /\+81[-\s]?\d{1,4}[-\s]?\d{1,4}[-\s]?\d{4}/, label: '電話番号（国際）' },
+  ];
+  for (const { regex, label } of patterns) {
+    if (regex.test(text)) return label;
+  }
+  return null;
+}
+function checkPersonaFormPII(fields) {
+  for (const { value, label } of fields) {
+    const hit = detectPII(value);
+    if (hit) return `「${label}」に${hit}と思われる情報が含まれています。\n個人情報の入力は推奨されません。このまま続行しますか？`;
+  }
+  return null;
 }
 
 // ★ 学習データ取得エラーをユーザー向けに翻訳
