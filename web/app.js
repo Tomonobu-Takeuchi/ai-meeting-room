@@ -962,7 +962,8 @@ async function submitEditPersona() {
     { value: $('eBackground').value.trim(), label: 'バックグラウンド' },
   ];
   const piiWarningEdit = checkPersonaFormPII(piiFieldsEdit);
-  if (piiWarningEdit && !confirm(piiWarningEdit)) {
+  if (piiWarningEdit) {
+    showToast('⚠️ 個人情報と思われる入力が含まれています。入力内容を確認してください。', 'error');
     State.editSubmitting = false;
     DOM.confirmEditPersona.disabled = false;
     DOM.confirmEditPersona.textContent = '保存する';
@@ -1261,7 +1262,8 @@ async function submitAddPersona() {
     { value: $('pBackground').value.trim(), label: 'バックグラウンド' },
   ];
   const piiWarning = checkPersonaFormPII(piiFields);
-  if (piiWarning && !confirm(piiWarning)) {
+  if (piiWarning) {
+    showToast('⚠️ 個人情報と思われる入力が含まれています。入力内容を確認してください。', 'error');
     State.addSubmitting = false;
     DOM.confirmAddPersona.disabled = false;
     DOM.confirmAddPersona.textContent = '追加する';
