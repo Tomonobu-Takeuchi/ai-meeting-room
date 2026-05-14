@@ -42,6 +42,7 @@ const State = {
   currentUser: null,  // ログイン中ユーザー情報
   paymentStatus: null, // 課金ステータスキャッシュ
   growthCache: {},    // Lvバッジキャッシュ
+  audioCtx: null,
 };
 
 const $ = id => document.getElementById(id);
@@ -245,6 +246,27 @@ async function speakWithTTS(text, voiceId, targetEl = null) {
       body: JSON.stringify({ text: text.slice(0, 200), voice_id: voiceId })
     });
     if (!res.ok) return;
+    if (isIOS && State.audioCtx) {
+      const arrayBuffer = await res.arrayBuffer();
+      const audioBuffer = await State.audioCtx.decodeAudioData(arrayBuffer);
+      return new Promise(resolve => {
+        const source = State.audioCtx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(State.audioCtx.destination);
+        if (targetEl) targetEl.classList.add('voice-speaking');
+        State.isSpeaking = true;
+        const estimatedMs = Math.min(Math.max(text.length * 80 + 3000, 5000), 30000);
+        const done = () => {
+          clearTimeout(ttsTimer);
+          State.isSpeaking = false;
+          if (targetEl) targetEl.classList.remove('voice-speaking');
+          resolve();
+        };
+        const ttsTimer = setTimeout(done, estimatedMs);
+        source.onended = done;
+        source.start(0);
+      });
+    }
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
@@ -347,11 +369,17 @@ function toggleVoiceMode() {
     DOM.topicMicBtn.classList.remove('hidden');
     if (State.sessionId) DOM.micBtn.classList.remove('hidden');
     loadVoices();
-    if (isIOS && window.speechSynthesis) {
-      const unlock = new SpeechSynthesisUtterance('');
-      unlock.volume = 0;
-      unlock.onend = () => loadVoices();
-      window.speechSynthesis.speak(unlock);
+    if (isIOS) {
+      if (!State.audioCtx) {
+        State.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (State.audioCtx.state === 'suspended') State.audioCtx.resume();
+      if (window.speechSynthesis) {
+        const unlock = new SpeechSynthesisUtterance('');
+        unlock.volume = 0;
+        unlock.onend = () => loadVoices();
+        window.speechSynthesis.speak(unlock);
+      }
     }
     showToast('音声モードON：AIの発言を読み上げます', 'success');
   } else {

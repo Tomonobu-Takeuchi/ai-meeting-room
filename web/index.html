@@ -265,14 +265,28 @@
       .header-logo{font-size:14px;}
       .user-badge{padding:3px 6px;gap:4px;}
       .plan-badge{display:none;}
-      #howToBtn{display:none;}
-      #planBtn{display:none;}
-      #freeStartBtn{display:none;}
+      .header-row1{position:relative;}
+      .header-logo{
+        position:absolute;left:50%;transform:translateX(-50%);
+        pointer-events:none;z-index:0;flex:none;
+      }
+      .header-nav{flex:none;flex-shrink:0;z-index:1;gap:2px;}
+      .header-user{flex:none;flex-shrink:0;margin-left:auto;z-index:1;gap:3px;}
+      .nav-text{display:none;}
+      .nav-link{padding:4px 6px;font-size:14px;position:relative;}
+      .nav-link[data-tip]:focus::after,
+      .nav-link[data-tip]:active::after{
+        content:attr(data-tip);
+        position:absolute;top:32px;left:50%;transform:translateX(-50%);
+        background:#2a2a3a;color:#e0e0e0;font-size:10px;
+        padding:3px 8px;border-radius:6px;white-space:nowrap;
+        border:1px solid #3a3a4a;z-index:200;
+      }
+      #logoutBtn{padding:3px 6px;font-size:9px;}
+      #loginBtnHeader{padding:3px 6px;font-size:9px;}
+      .btn-green#freeStartBtn{padding:3px 6px;font-size:9px;}
       .user-badge .user-name{display:none;}
-      #logoutBtn{padding:3px 5px;font-size:9px;}
-      #loginBtnHeader{font-size:10px;padding:4px 8px;}
       .voice-text{display:none;}
-      #voiceModeBtn::after{content:'音声';font-size:9px;display:block;line-height:1;}
       #allRespondBtn{display:none;} /* 画面幅が足りない場合は非表示 */
       .member-trigger-btn{padding:6px 8px;font-size:11px;}
       .modal{padding:20px;max-height:92svh;}
@@ -415,9 +429,9 @@
   <!-- 第1行：常時表示 -->
   <div class="header-row1">
     <nav class="header-nav">
-      <button class="nav-link" id="howToBtn" onclick="openHowToModal()">📖 使い方</button>
-      <button class="nav-link" id="planBtn" onclick="openPricingModal()">料金プラン</button>
-      <button class="nav-link" id="voiceModeBtn" title="音声モード">🎙️<span class="voice-text"> 音声モード</span></button>
+      <button class="nav-link" id="howToBtn" data-tip="使い方" onclick="openHowToModal()">📖<span class="nav-text"> 使い方</span></button>
+      <button class="nav-link" id="planBtn" data-tip="料金プラン" onclick="openPricingModal()">🏷️<span class="nav-text"> 料金プラン</span></button>
+      <button class="nav-link" id="voiceModeBtn" data-tip="音声モード" title="音声モード">🎙️<span class="voice-text"> 音声モード</span></button>
     </nav>
     <div class="header-logo">AI<span style="color:#7C3AED">-</span>PERSONA 会議室</div>
     <div class="header-user" id="authArea">
