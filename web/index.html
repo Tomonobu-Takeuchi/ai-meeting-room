@@ -265,13 +265,10 @@
       .header-logo{font-size:14px;}
       .user-badge{padding:3px 6px;gap:4px;}
       .plan-badge{display:none;}
-      .header-row1{position:relative;}
-      .header-logo{
-        position:absolute;left:50%;transform:translateX(-50%);
-        pointer-events:none;z-index:0;flex:none;
-      }
-      .header-nav{flex:none;flex-shrink:0;z-index:1;gap:2px;}
-      .header-user{flex:none;flex-shrink:0;margin-left:auto;z-index:1;gap:3px;}
+      .header-row1{display:grid;grid-template-columns:auto 1fr auto;align-items:center;height:44px;padding:0 8px;gap:4px;}
+      .header-logo{position:static;transform:none;font-size:11px;text-align:center;pointer-events:auto;flex:none;}
+      .header-nav{flex:none;gap:2px;}
+      .header-user{flex:none;gap:3px;justify-content:flex-end;display:flex;align-items:center;}
       .nav-text{display:none;}
       .nav-link{padding:4px 6px;font-size:14px;position:relative;}
       .nav-link[data-tip]:focus::after,
@@ -320,9 +317,11 @@
     .auth-guest{text-align:center;margin-top:12px;font-size:12px;color:var(--text-muted);}
     .auth-guest a{color:var(--text-muted);cursor:pointer;text-decoration:underline;}
     /* ヘッダーのユーザー表示 */
-    .btn-full-text{display:inline;}
-    .btn-short-text{display:none;}
-    .btn-login-text{display:inline;}
+    @media (min-width: 481px) {
+      .btn-full-text{display:inline;}
+      .btn-short-text{display:none;}
+      .btn-login-text{display:inline;}
+    }
     .user-badge{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);padding:4px 10px;background:var(--bg-elevated);border-radius:20px;border:1px solid var(--border);}
     .header-user{gap:4px;}
     .user-badge .user-name{max-width:50px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
