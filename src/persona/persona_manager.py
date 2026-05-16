@@ -581,13 +581,26 @@ class PersonaManager:
 - 他のメンバーの発言を踏まえて発言してください
 - 200〜400字程度で簡潔に発言してください
 - キャラクターとして一貫して振る舞ってください
+- 議論の流れで自然なタイミングがあれば、相談者（ユーザー）に一言問いかけてください（毎回ではなく、3〜4回に1回程度）
 """
         if history_text:
             prompt += f"\n【これまでの会話】\n{history_text}"
         return prompt
 
     def build_facilitator_prompt(self, facilitator, topic, history_text, mode='guide'):
-        if mode == 'summarize':
+        if mode == 'opening':
+            instruction = (
+                "会議を始めるにあたり、相談者（ユーザー）に以下を自然な言葉で聞いてください。\n"
+                "①現在の状況や背景、②気になっていること・不安なこと、③制約や条件があれば。\n"
+                "質問は押しつけがましくなく、相談者が話しやすい雰囲気で。200字以内で。"
+            )
+        elif mode == 'closing':
+            instruction = (
+                "議論が深まってきました。ここで相談者（ユーザー）に確認してください。\n"
+                "出てきた方向性・選択肢を簡潔に整理した上で、「どちらを優先したいですか？」"
+                "または「この方向性で進めてよいですか？」と問いかけてください。200字以内で。"
+            )
+        elif mode == 'summarize':
             instruction = "議論全体を振り返り、各メンバーの主な意見・共通点・相違点・結論を整理してください。"
         else:
             instruction = "議論の進行を促し、次の論点や深掘りすべき点を提示してください。"

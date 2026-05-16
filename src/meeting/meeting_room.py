@@ -105,14 +105,23 @@ class MeetingRoom:
         except Exception as e:
             yield f"data: {_dumps({'type': 'error', 'message': str(e)})}\n\n"
 
-    def generate_facilitator_response_stream(self, session_id):
+    def generate_facilitator_response_stream(self, session_id, mode=None):
         session = self.sessions.get(session_id)
         if not session:
             yield "data: [ERROR] セッションが見つかりません\n\n"
             return
         discussion_text = self._format_discussion(session)
+        # modeが指定されていない場合はメッセージ数で自動判定
+        if mode is None:
+            msg_count = len(session["messages"])
+            if msg_count == 0:
+                mode = 'opening'
+            elif msg_count >= 8:
+                mode = 'closing'
+            else:
+                mode = 'guide'
         system_prompt = self.persona_manager.build_facilitator_prompt(
-            session["facilitator"], session["topic"], discussion_text
+            session["facilitator"], session["topic"], discussion_text, mode=mode
         )
         try:
             full_response = ""
