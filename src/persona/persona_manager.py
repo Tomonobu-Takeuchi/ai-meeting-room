@@ -287,7 +287,7 @@ class PersonaManager:
         return serialize_persona(row_to_dict(COLUMNS, copied[0])) if copied else None
 
     def delete_persona(self, persona_id, user_id=None):
-        protected = {'koumei', 'hideyoshi', 'professor', 'facilitator'}
+        protected = {'koumei', 'hideyoshi', 'professor', 'facilitator', 'elizabeth1'}
         if persona_id in protected:
             return False, 'デフォルトペルソナは削除できません'
         conn = get_connection()
