@@ -725,6 +725,100 @@ def post_message(session_id):
     msg = meeting_room.add_message(session_id, "user", "user", content)
     return jsonify({"message": msg})
 
+@app.route("/api/meeting/<session_id>/brief", methods=["POST"])
+def generate_brief(session_id):
+    """Layer 1（アクション・ブリーフ）と Layer 2（戦略レポート）をJSON返却"""
+    summary = meeting_room.get_session_summary(session_id)
+    if not summary:
+        return jsonify({"error": "セッションが見つかりません"}), 404
+    try:
+        user_id = get_current_user_id()
+        plan = 'free'
+        if user_id:
+            from src.database import get_connection
+            conn = get_connection()
+            try:
+                row = conn.run("SELECT plan FROM users WHERE id = :uid", uid=user_id)
+                if row:
+                    plan = row[0][0] or 'free'
+            finally:
+                conn.close()
+
+        discussion = ""
+        user_messages = []
+        for msg in summary.get("messages", []):
+            if msg["persona_id"] == "user":
+                name = "ユーザー"
+                user_messages.append(msg["content"])
+            elif msg["persona_id"] == "facilitator":
+                name = "ファシリテータ"
+            else:
+                persona = next((m for m in summary["members"] if m["id"] == msg["persona_id"]), None)
+                name = persona["name"] if persona else msg["persona_id"]
+            discussion += f"{name}: {msg['content']}\n\n"
+
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        member_names = ", ".join([m["name"] for m in summary["members"]])
+        user_context = "\n".join([f"・{m}" for m in user_messages]) if user_messages else "（なし）"
+
+        layer1_prompt = f"""以下の会議から「アクション・ブリーフ」を作成してください。
+議題：{summary['topic']}
+参加者：{member_names}
+ユーザーの発言：
+{user_context}
+議論内容：
+{discussion if discussion else "（議論なし）"}
+
+以下のJSON形式のみで出力してください：
+{{
+  "conclusion": "結論を2〜3文で。ユーザーの発言を踏まえて記述",
+  "actions": ["次にやること1", "次にやること2", "次にやること3"],
+  "user_basis": "ユーザーの発言「〜」を踏まえ、〜を優先する方針"
+}}
+JSONのみ出力してください。"""
+
+        layer1_res = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=800,
+            messages=[{"role": "user", "content": layer1_prompt}]
+        )
+        layer1_text = layer1_res.content[0].text.strip().replace("```json", "").replace("```", "").strip()
+        layer1_data = json.loads(layer1_text)
+
+        layer2_data = None
+        if plan in ('standard', 'pro'):
+            layer2_prompt = f"""以下の会議から「戦略レポート」を作成してください。
+議題：{summary['topic']}
+参加者：{member_names}
+議論内容：
+{discussion if discussion else "（議論なし）"}
+
+以下のJSON形式のみで出力してください：
+{{
+  "overview": "議論全体の概要を3〜4文で",
+  "persona_analysis": {{"参加者名": "この人物がなぜそう言ったか、背景・価値観・立場を含めて2〜3文で"}},
+  "risks": ["注意すべきリスク1", "注意すべきリスク2"],
+  "recommendation": "総合的な推奨アクションを2〜3文で"
+}}
+JSONのみ出力してください。"""
+
+            layer2_res = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=1500,
+                messages=[{"role": "user", "content": layer2_prompt}]
+            )
+            layer2_text = layer2_res.content[0].text.strip().replace("```json", "").replace("```", "").strip()
+            layer2_data = json.loads(layer2_text)
+
+        return jsonify({
+            "plan": plan,
+            "topic": summary["topic"],
+            "layer1": layer1_data,
+            "layer2": layer2_data
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/api/meeting/<session_id>/minutes", methods=["POST"])
 def generate_minutes(session_id):
     summary = meeting_room.get_session_summary(session_id)

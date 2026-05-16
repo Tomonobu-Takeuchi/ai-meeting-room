@@ -91,6 +91,15 @@ const DOM = {
   copyPersonaMessage: $('copyPersonaMessage'),
   copyPersonaCancel: $('copyPersonaCancel'),
   copyPersonaConfirm: $('copyPersonaConfirm'),
+  reportBtn: $('reportBtn'),
+  reportModal: $('reportModal'),
+  briefConclusion: $('briefConclusion'),
+  briefActions: $('briefActions'),
+  briefUserBasis: $('briefUserBasis'),
+  downloadLayer1Btn: $('downloadLayer1Btn'),
+  layer2Content: $('layer2Content'),
+  layer2Locked: $('layer2Locked'),
+  downloadLayer2Btn: $('downloadLayer2Btn'),
   // チーム提案モーダル
   teamSuggestModal: $('teamSuggestModal'),
   teamSuggestPattern: $('teamSuggestPattern'),
@@ -458,6 +467,9 @@ async function init() {
 
   DOM.summarizeBtn.addEventListener('click', summarizeMeeting);
   DOM.minutesBtn.addEventListener('click', downloadMinutes);
+  DOM.reportBtn.addEventListener('click', showReportModal);
+  DOM.downloadLayer1Btn.addEventListener('click', downloadLayer1PDF);
+  DOM.downloadLayer2Btn?.addEventListener('click', downloadLayer2PDF);
 
   DOM.voiceModeBtn.addEventListener('click', toggleVoiceMode);
   DOM.stopSpeakBtn.addEventListener('click', stopSpeaking);
@@ -812,6 +824,79 @@ async function downloadMinutes() {
     startFeedbackFlow();
   } catch (e) { showToast(translateApiError(e.message, '議事録のダウンロード'), 'error'); startFeedbackFlow(); }
   finally { btn.disabled = false; btn.textContent = '📄 議事録をダウンロード（PDF）'; }
+}
+
+let _briefData = null;
+
+async function showReportModal() {
+  if (!State.sessionId) return;
+  DOM.reportModal.classList.remove('hidden');
+  DOM.briefConclusion.textContent = '⏳ 生成中...';
+  DOM.briefActions.textContent = '';
+  DOM.briefUserBasis.textContent = '';
+  DOM.layer2Content.innerHTML = '';
+  DOM.layer2Locked.classList.add('hidden');
+  DOM.downloadLayer2Btn.classList.add('hidden');
+
+  try {
+    const data = await API.post(`/api/meeting/${State.sessionId}/brief`, {});
+    _briefData = data;
+
+    const l1 = data.layer1;
+    DOM.briefConclusion.textContent = l1.conclusion || '';
+    DOM.briefActions.innerHTML = (l1.actions || []).map(a => `<div>・${a}</div>`).join('');
+    DOM.briefUserBasis.textContent = l1.user_basis || '';
+
+    if (data.layer2) {
+      const l2 = data.layer2;
+      let html = '';
+      html += `<div style="font-size:13px;line-height:1.7;margin-bottom:12px;">${l2.overview || ''}</div>`;
+      html += `<div style="font-size:13px;font-weight:600;margin-bottom:6px;">🧠 各ペルソナの視点</div>`;
+      for (const [name, analysis] of Object.entries(l2.persona_analysis || {})) {
+        html += `<div style="margin-bottom:8px;padding:10px;background:var(--bg-base);border-radius:6px;">
+          <div style="font-weight:600;font-size:12px;color:var(--accent-blue);margin-bottom:4px;">${name}</div>
+          <div style="font-size:12px;line-height:1.6;">${analysis}</div>
+        </div>`;
+      }
+      html += `<div style="font-size:13px;font-weight:600;margin:12px 0 6px;">⚠️ 注意すべきリスク</div>`;
+      html += (l2.risks || []).map(r => `<div style="font-size:12px;">・${r}</div>`).join('');
+      html += `<div style="font-size:13px;font-weight:600;margin:12px 0 6px;">🎯 総合推奨</div>`;
+      html += `<div style="font-size:12px;line-height:1.7;">${l2.recommendation || ''}</div>`;
+      DOM.layer2Content.innerHTML = html;
+      DOM.downloadLayer2Btn.classList.remove('hidden');
+    } else {
+      DOM.layer2Locked.classList.remove('hidden');
+    }
+  } catch (e) {
+    DOM.briefConclusion.textContent = 'レポートの生成に失敗しました。';
+    showToast(translateApiError(e.message, 'レポートの生成'), 'error');
+  }
+}
+
+async function downloadLayer1PDF() {
+  if (!State.sessionId) return;
+  const btn = DOM.downloadLayer1Btn;
+  btn.disabled = true; btn.textContent = '⏳ 生成中...';
+  try {
+    const res = await fetch(`/api/meeting/${State.sessionId}/minutes`, { method: 'POST' });
+    if (!res.ok) throw new Error('生成失敗');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `アクションブリーフ_${State.topic?.slice(0,20)}_${new Date().toISOString().slice(0,10)}.pdf`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('PDFをダウンロードしました', 'success');
+  } catch (e) {
+    showToast('PDFの生成に失敗しました', 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '📄 アクション・ブリーフをPDFで保存';
+  }
+}
+
+async function downloadLayer2PDF() {
+  showToast('戦略レポートPDFは近日実装予定です', 'info');
 }
 
 async function handleLearnFiles(e, mode, type) {
