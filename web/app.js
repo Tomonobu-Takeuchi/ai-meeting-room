@@ -43,6 +43,7 @@ const State = {
   paymentStatus: null, // 課金ステータスキャッシュ
   growthCache: {},    // Lvバッジキャッシュ
   audioCtx: null,
+  suggestedRoles: [],   // APIから返ってきた役割リスト [{role, persona_id, persona_name, ...}]
 };
 
 const $ = id => document.getElementById(id);
@@ -89,6 +90,19 @@ const DOM = {
   copyPersonaMessage: $('copyPersonaMessage'),
   copyPersonaCancel: $('copyPersonaCancel'),
   copyPersonaConfirm: $('copyPersonaConfirm'),
+  // チーム提案モーダル
+  teamSuggestModal: $('teamSuggestModal'),
+  teamSuggestPattern: $('teamSuggestPattern'),
+  teamSuggestDesc: $('teamSuggestDesc'),
+  teamSuggestRoles: $('teamSuggestRoles'),
+  teamSuggestConfirmBtn: $('teamSuggestConfirmBtn'),
+  teamSuggestChangeBtn: $('teamSuggestChangeBtn'),
+  // 役割別変更モーダル
+  roleEditModal: $('roleEditModal'),
+  roleEditList: $('roleEditList'),
+  roleEditAddBtn: $('roleEditAddBtn'),
+  roleEditCancelBtn: $('roleEditCancelBtn'),
+  roleEditConfirmBtn: $('roleEditConfirmBtn'),
 };
 
 const API = {
@@ -420,7 +434,7 @@ async function init() {
 
   DOM.newMeetingBtn.addEventListener('click', resetMeeting);
   DOM.endMeetingBtn.addEventListener('click', endMeeting);
-  DOM.startMeetingBtn.addEventListener('click', showMemberSelectModal);
+  DOM.startMeetingBtn.addEventListener('click', showTeamSuggestModal);
   DOM.facilitatorBtn.addEventListener('click', invokeFacilitator);
   DOM.autoDiscussBtn.addEventListener('click', autoDiscuss);
   DOM.sendBtn.addEventListener('click', sendUserMessage);
@@ -428,6 +442,18 @@ async function init() {
 
   DOM.cancelMemberSelect.addEventListener('click', () => DOM.memberSelectModal.classList.add('hidden'));
   DOM.confirmMemberSelect.addEventListener('click', startMeetingFromModal);
+
+  // チーム提案モーダル
+  DOM.teamSuggestConfirmBtn.addEventListener('click', confirmSuggestedTeam);
+  DOM.teamSuggestChangeBtn.addEventListener('click', openRoleEditModal);
+
+  // 役割別変更モーダル
+  DOM.roleEditAddBtn.addEventListener('click', addRoleEditRow);
+  DOM.roleEditCancelBtn.addEventListener('click', () => {
+    DOM.roleEditModal.classList.add('hidden');
+    DOM.teamSuggestModal.classList.remove('hidden');
+  });
+  DOM.roleEditConfirmBtn.addEventListener('click', confirmRoleEdit);
 
   DOM.summarizeBtn.addEventListener('click', summarizeMeeting);
   DOM.minutesBtn.addEventListener('click', downloadMinutes);
@@ -569,6 +595,135 @@ async function init() {
   window.addEventListener('beforeunload', e => {
     if (State.sessionId) { e.preventDefault(); e.returnValue = ''; }
   });
+}
+
+// ===== チーム提案モーダル =====
+
+async function showTeamSuggestModal() {
+  const topic = DOM.topicInput.value.trim();
+  if (!topic) { showToast('議題を入力してください', 'error'); DOM.topicInput.focus(); return; }
+
+  DOM.teamSuggestConfirmBtn.disabled = true;
+  DOM.teamSuggestChangeBtn.disabled = true;
+  DOM.teamSuggestPattern.textContent = '⏳ チームを考えています...';
+  DOM.teamSuggestDesc.textContent = '';
+  DOM.teamSuggestRoles.innerHTML = '';
+  DOM.teamSuggestModal.classList.remove('hidden');
+
+  try {
+    const data = await API.post('/api/team/suggest', { topic });
+    State.suggestedRoles = data.roles;
+
+    DOM.teamSuggestPattern.textContent = `パターン${data.pattern}：${data.pattern_name}`;
+    DOM.teamSuggestDesc.textContent = data.description;
+
+    // 役割カードを描画
+    DOM.teamSuggestRoles.innerHTML = '';
+    data.roles.forEach(r => {
+      const avatarHtml = r.persona_avatar && r.persona_avatar.startsWith('data:')
+        ? `<img src="${r.persona_avatar}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;" />`
+        : `<span style="font-size:20px;">${r.persona_avatar || '👤'}</span>`;
+      const card = document.createElement('div');
+      card.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg-base);';
+      card.innerHTML = `
+        <div style="width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:${r.persona_color}22;flex-shrink:0;">${avatarHtml}</div>
+        <div>
+          <div style="font-size:13px;color:var(--text-muted);font-weight:500;">${r.role}</div>
+          <div style="font-size:16px;font-weight:600;color:var(--text-primary);">${r.persona_name}</div>
+        </div>`;
+      DOM.teamSuggestRoles.appendChild(card);
+    });
+
+    DOM.teamSuggestConfirmBtn.disabled = false;
+    DOM.teamSuggestChangeBtn.disabled = false;
+  } catch (e) {
+    DOM.teamSuggestModal.classList.add('hidden');
+    showToast('チームの提案に失敗しました', 'error');
+    // フォールバック：従来のメンバー選択モーダルへ
+    showMemberSelectModal();
+  }
+}
+
+function confirmSuggestedTeam() {
+  // 提案されたpersona_idをselectedMemberIdsにセット
+  State.selectedMemberIds = State.suggestedRoles.map(r => r.persona_id);
+  DOM.teamSuggestModal.classList.add('hidden');
+  startMeeting();
+}
+
+// ===== 役割別変更モーダル =====
+
+function openRoleEditModal() {
+  DOM.teamSuggestModal.classList.add('hidden');
+  renderRoleEditList(State.suggestedRoles);
+  DOM.roleEditModal.classList.remove('hidden');
+}
+
+function renderRoleEditList(roles) {
+  DOM.roleEditList.innerHTML = '';
+  roles.forEach((r, idx) => {
+    DOM.roleEditList.appendChild(createRoleEditRow(r.role, r.persona_id, idx));
+  });
+}
+
+function createRoleEditRow(roleName, personaId, idx) {
+  const row = document.createElement('div');
+  row.className = 'role-edit-row';
+  row.dataset.idx = idx;
+  row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center;';
+
+  // 役割名入力
+  const roleInput = document.createElement('input');
+  roleInput.type = 'text';
+  roleInput.value = roleName;
+  roleInput.placeholder = '役割名（例：推進派）';
+  roleInput.style.cssText = 'padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-base);color:var(--text-primary);font-size:13px;';
+
+  // ペルソナ選択ドロップダウン
+  const select = document.createElement('select');
+  select.style.cssText = 'padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-base);color:var(--text-primary);font-size:13px;';
+  State.members.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.id;
+    opt.textContent = m.name;
+    if (m.id === personaId) opt.selected = true;
+    select.appendChild(opt);
+  });
+
+  // 削除ボタン
+  const delBtn = document.createElement('button');
+  delBtn.className = 'btn';
+  delBtn.textContent = '✕';
+  delBtn.style.cssText = 'padding:6px 10px;color:var(--text-muted);flex-shrink:0;';
+  delBtn.addEventListener('click', () => {
+    const rows = DOM.roleEditList.querySelectorAll('.role-edit-row');
+    if (rows.length <= 1) { showToast('最低1人は必要です', 'error'); return; }
+    row.remove();
+  });
+
+  row.appendChild(roleInput);
+  row.appendChild(select);
+  row.appendChild(delBtn);
+  return row;
+}
+
+function addRoleEditRow() {
+  const rows = DOM.roleEditList.querySelectorAll('.role-edit-row');
+  const newIdx = rows.length;
+  DOM.roleEditList.appendChild(createRoleEditRow('', State.members[0]?.id || '', newIdx));
+}
+
+function confirmRoleEdit() {
+  const rows = DOM.roleEditList.querySelectorAll('.role-edit-row');
+  const selectedIds = [];
+  rows.forEach(row => {
+    const select = row.querySelector('select');
+    if (select && select.value) selectedIds.push(select.value);
+  });
+  if (selectedIds.length === 0) { showToast('最低1人選択してください', 'error'); return; }
+  State.selectedMemberIds = selectedIds;
+  DOM.roleEditModal.classList.add('hidden');
+  startMeeting();
 }
 
 function showMemberSelectModal() {

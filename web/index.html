@@ -536,6 +536,34 @@
   </div>
 </div>
 
+<!-- ===== チーム提案モーダル ===== -->
+<div class="modal-overlay hidden" id="teamSuggestModal">
+  <div class="modal" style="width:500px;">
+    <h2>🤖 AIがチームを提案します</h2>
+    <div id="teamSuggestPattern" style="font-size:17px;font-weight:700;color:var(--accent-blue);margin-bottom:4px;"></div>
+    <p id="teamSuggestDesc" style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;"></p>
+    <div id="teamSuggestRoles" style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px;"></div>
+    <div class="modal-footer">
+      <button class="btn" id="teamSuggestChangeBtn">✏️ メンバーを変更する</button>
+      <button class="btn btn-green" id="teamSuggestConfirmBtn">▶ このメンバーで始める</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 役割別変更モーダル ===== -->
+<div class="modal-overlay hidden" id="roleEditModal">
+  <div class="modal" style="width:520px;">
+    <h2>✏️ 役割とメンバーを変更</h2>
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">役割名を編集し、担当ペルソナをドロップダウンで選んでください</p>
+    <div id="roleEditList" style="display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto;margin-bottom:12px;"></div>
+    <button class="btn" id="roleEditAddBtn" style="width:100%;margin-bottom:16px;">＋ 役割を追加</button>
+    <div class="modal-footer">
+      <button class="btn" id="roleEditCancelBtn">戻る</button>
+      <button class="btn btn-green" id="roleEditConfirmBtn">▶ この構成で会議を始める</button>
+    </div>
+  </div>
+</div>
+
 <!-- ペルソナ追加モーダル -->
 <div class="modal-overlay hidden" id="addPersonaModal">
   <div class="modal">
