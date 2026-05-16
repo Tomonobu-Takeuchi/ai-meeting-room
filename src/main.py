@@ -899,8 +899,9 @@ def stream_member(session_id, persona_id):
 
 @app.route("/api/stream/facilitator/<session_id>")
 def stream_facilitator(session_id):
+    mode = request.args.get('mode', None)
     def generate():
-        yield from meeting_room.generate_facilitator_response_stream(session_id)
+        yield from meeting_room.generate_facilitator_response_stream(session_id, mode=mode)
     return Response(generate(), mimetype="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"})
 

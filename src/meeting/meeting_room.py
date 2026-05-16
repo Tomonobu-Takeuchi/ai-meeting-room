@@ -120,8 +120,10 @@ class MeetingRoom:
                 mode = 'closing'
             else:
                 mode = 'guide'
+        member_ids = [m['id'] for m in session.get('members', [])]
         system_prompt = self.persona_manager.build_facilitator_prompt(
-            session["facilitator"], session["topic"], discussion_text, mode=mode
+            session["facilitator"], session["topic"], discussion_text,
+            mode=mode, member_ids=member_ids
         )
         try:
             full_response = ""

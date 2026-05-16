@@ -587,7 +587,7 @@ class PersonaManager:
             prompt += f"\n【これまでの会話】\n{history_text}"
         return prompt
 
-    def build_facilitator_prompt(self, facilitator, topic, history_text, mode='guide'):
+    def build_facilitator_prompt(self, facilitator, topic, history_text, mode='guide', member_ids=None):
         if mode == 'opening':
             instruction = (
                 "【質問】と冒頭に必ず付けて、相談者（ユーザー）に直接語りかけてください。\n"
@@ -600,6 +600,15 @@ class PersonaManager:
                 "議論が深まってきました。ここで相談者（ユーザー）に確認してください。\n"
                 "出てきた方向性・選択肢を簡潔に整理した上で、「どちらを優先したいですか？」"
                 "または「この方向性で進めてよいですか？」と問いかけてください。200字以内で。"
+            )
+        elif mode == 'nominate':
+            member_ids_str = ', '.join(member_ids) if member_ids else '（参加者から選択）'
+            instruction = (
+                "議論を一言で整理した上で、次に発言すべき参加者を1人指名してください。\n"
+                f"必ず「【指名:persona_id】」の形式でIDを文中に含めてください。\n"
+                f"指名できるpersona_idは以下から選んでください：{member_ids_str}\n"
+                "例：【指名:koumei】孔明殿、戦略的な観点からご意見をお聞かせください。\n"
+                "100字以内で。"
             )
         elif mode == 'summarize':
             instruction = "議論全体を振り返り、各メンバーの主な意見・共通点・相違点・結論を整理してください。"

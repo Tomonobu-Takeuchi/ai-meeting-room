@@ -1326,10 +1326,18 @@ async function sendUserMessage() {
   addMessage({ role: 'user', persona_id: 'user', content, id: 'tmp_' + Date.now() });
   try {
     await API.post(`/api/meeting/${State.sessionId}/message`, { content });
-    // ユーザー発言後に選択中のペルソナ全員が順番に返答
-    for (const member of State.members.filter(m => State.selectedMemberIds.includes(m.id))) {
-      await triggerMemberResponse(member.id);
-      if (State.waitingForUser) break;  // 質問が出たらループ中断
+    // ランダムで1〜2体のペルソナが反応
+    const activeMembers = shuffleArray(
+      State.members.filter(m => State.selectedMemberIds.includes(m.id))
+    );
+    const respondCount = Math.min(2, activeMembers.length);
+    for (let i = 0; i < respondCount; i++) {
+      await triggerMemberResponse(activeMembers[i].id);
+      if (State.waitingForUser) break;
+    }
+    // 質問が出なかった場合はファシリテーターが仕切り直して指名
+    if (!State.waitingForUser) {
+      await invokeFacilitatorNominate();
     }
   }
   catch (e) { showToast(translateApiError(e.message, 'メッセージの送信'), 'error'); }
@@ -1461,6 +1469,15 @@ function waitForSpeechEnd() {
     }, 100);
     setTimeout(() => { clearInterval(check); resolve(); }, 60000);
   });
+}
+
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
 }
 
 function waitForStreamEnd() {
@@ -1661,6 +1678,53 @@ function addFacilitatorBanner() {
 function appendToFacilitatorBanner(row, text) {
   const el = row.querySelector('.facilitator-text');
   if (el) { el.textContent += text; scrollToBottom(); }
+}
+
+async function invokeFacilitatorNominate() {
+  if (!State.sessionId || State.isStreaming) return;
+  State.isStreaming = true; setStreamingButtons(true);
+  const facilitator = State.facilitator;
+  if (!facilitator) { State.isStreaming = false; setStreamingButtons(false); return; }
+  const typingEl = addTypingIndicator(facilitator);
+  const evtSource = new EventSource(`/api/stream/facilitator/${State.sessionId}?mode=nominate`);
+  let streamEl = null, fullText = '';
+
+  return new Promise((resolve) => {
+    evtSource.onmessage = async (e) => {
+      const data = JSON.parse(e.data);
+      if (data.type === 'chunk') {
+        typingEl?.remove();
+        if (!streamEl) streamEl = addFacilitatorBanner();
+        appendToFacilitatorBanner(streamEl, data.text);
+        fullText += data.text;
+      } else if (data.type === 'done') {
+        evtSource.close(); State.isStreaming = false; setStreamingButtons(false);
+        scrollToBottom();
+        // 【指名:id】タグを検出してタグ除去
+        const match = fullText.match(/【指名:([a-zA-Z0-9_]+)】/);
+        if (match) {
+          const nominatedId = match[1];
+          const cleanText = fullText.replace(/【指名:[^\]]+】/g, '').trim();
+          const textEl = streamEl?.querySelector('.facilitator-text');
+          if (textEl) textEl.textContent = cleanText;
+          // 指名されたペルソナが発言
+          if (State.selectedMemberIds.includes(nominatedId)) {
+            await triggerMemberResponse(nominatedId);
+          }
+        }
+        resolve();
+      } else if (data.type === 'error') {
+        typingEl?.remove(); streamEl?.remove(); evtSource.close();
+        State.isStreaming = false; setStreamingButtons(false);
+        resolve();
+      }
+    };
+    evtSource.onerror = () => {
+      typingEl?.remove(); evtSource.close();
+      State.isStreaming = false; setStreamingButtons(false);
+      resolve();
+    };
+  });
 }
 
 function showQuestionBadge() {
