@@ -775,7 +775,13 @@ async function summarizeMeeting() {
       evtSource.close(); State.isStreaming = false; setStreamingButtons(false);
       DOM.minutesBar.classList.remove('hidden');
       scrollToBottom();
-      if (State.voiceMode && fullText) speakText(fullText, 'facilitator', streamEl?.querySelector('.facilitator-banner'));
+      if (fullText.includes('【質問】')) {
+        const cleanText = fullText.replace(/【質問】/g, '').trim();
+        const textEl = streamEl?.querySelector('.facilitator-text');
+        if (textEl) textEl.textContent = cleanText;
+        showQuestionBadge();
+      }
+      if (State.voiceMode && fullText) speakText(fullText.replace(/【質問】/g, '').trim(), 'facilitator', streamEl?.querySelector('.facilitator-banner'));
     } else if (data.type === 'error') {
       typingEl?.remove(); streamEl?.remove(); evtSource.close();
       State.isStreaming = false; setStreamingButtons(false);
@@ -1312,6 +1318,7 @@ function endMeeting() {
 async function sendUserMessage() {
   const content = DOM.chatInput.value.trim();
   if (!content || !State.sessionId || State.isStreaming) return;
+  clearQuestionBadge();
   if (State.isRecognizing && State.recognition) State.recognition.stop();
   DOM.chatInput.value = ''; DOM.chatInput.style.height = 'auto';
   addMessage({ role: 'user', persona_id: 'user', content, id: 'tmp_' + Date.now() });
@@ -1339,6 +1346,12 @@ async function triggerMemberResponse(personaId, trigger = null) {
         appendToStreamingBubble(streamEl, data.text);
         fullText += data.text;
       } else if (data.type === 'done') {
+        if (fullText.includes('【質問】')) {
+          const cleanText = fullText.replace(/【質問】/g, '').trim();
+          const bubble = streamEl?.querySelector('.msg-bubble');
+          if (bubble) bubble.textContent = cleanText;
+          showPersonaQuestionBadge(streamEl);
+        }
         streamEl?.querySelector('.msg-bubble')?.classList.remove('streaming');
         evtSource.close();
         setMemberSpeaking(personaId, false); scrollToBottom();
@@ -1395,7 +1408,13 @@ async function invokeFacilitator() {
       fullText += data.text;
     } else if (data.type === 'done') {
       evtSource.close(); State.isStreaming = false; setStreamingButtons(false); scrollToBottom();
-      if (State.voiceMode && fullText) speakText(fullText, 'facilitator', streamEl?.querySelector('.facilitator-banner'));
+      if (fullText.includes('【質問】')) {
+        const cleanText = fullText.replace(/【質問】/g, '').trim();
+        const textEl = streamEl?.querySelector('.facilitator-text');
+        if (textEl) textEl.textContent = cleanText;
+        showQuestionBadge();
+      }
+      if (State.voiceMode && fullText) speakText(fullText.replace(/【質問】/g, '').trim(), 'facilitator', streamEl?.querySelector('.facilitator-banner'));
     } else if (data.type === 'error') {
       typingEl?.remove(); streamEl?.remove(); evtSource.close();
       State.isStreaming = false; setStreamingButtons(false);
@@ -1628,6 +1647,37 @@ function addFacilitatorBanner() {
 function appendToFacilitatorBanner(row, text) {
   const el = row.querySelector('.facilitator-text');
   if (el) { el.textContent += text; scrollToBottom(); }
+}
+
+function showQuestionBadge() {
+  document.querySelectorAll('.question-badge').forEach(el => el.remove());
+  const banners = document.querySelectorAll('.facilitator-banner');
+  if (banners.length === 0) return;
+  const lastBanner = banners[banners.length - 1];
+  const badge = document.createElement('div');
+  badge.className = 'question-badge';
+  badge.textContent = '💬 あなたへの質問です — 下の入力欄に返答してください';
+  lastBanner.parentElement.insertBefore(badge, lastBanner.nextSibling);
+  DOM.chatInput.classList.add('question-highlight');
+  DOM.chatInput.placeholder = '💬 ファシリテーターへの返答を入力... (Enter で送信)';
+  DOM.chatInput.focus();
+}
+
+function showPersonaQuestionBadge(row) {
+  document.querySelectorAll('.question-badge').forEach(el => el.remove());
+  const badge = document.createElement('div');
+  badge.className = 'question-badge';
+  badge.textContent = '💬 あなたへの質問です — 下の入力欄に返答してください';
+  row.parentElement.insertBefore(badge, row.nextSibling);
+  DOM.chatInput.classList.add('question-highlight');
+  DOM.chatInput.placeholder = '💬 ペルソナへの返答を入力... (Enter で送信)';
+  DOM.chatInput.focus();
+}
+
+function clearQuestionBadge() {
+  document.querySelectorAll('.question-badge').forEach(el => el.remove());
+  DOM.chatInput.classList.remove('question-highlight');
+  DOM.chatInput.placeholder = 'メッセージを入力... (Enter で送信)';
 }
 
 function setMemberSpeaking(personaId, isSpeaking) {
