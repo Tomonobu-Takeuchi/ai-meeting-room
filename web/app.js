@@ -775,7 +775,7 @@ async function summarizeMeeting() {
   State.isStreaming = true; setStreamingButtons(true);
   DOM.summarizeBtn.disabled = true;
   const typingEl = addTypingIndicator(State.facilitator, true);
-  const evtSource = new EventSource(`/api/stream/facilitator/${State.sessionId}`);
+  const evtSource = new EventSource(`/api/stream/facilitator/${State.sessionId}?mode=summarize`);
   let streamEl = null, fullText = '';
   evtSource.onmessage = (e) => {
     const data = JSON.parse(e.data);
@@ -788,13 +788,7 @@ async function summarizeMeeting() {
       evtSource.close(); State.isStreaming = false; setStreamingButtons(false);
       DOM.minutesBar.classList.remove('hidden');
       scrollToBottom();
-      if (fullText.includes('【質問】')) {
-        const cleanText = fullText.replace(/【質問】/g, '').trim();
-        const textEl = streamEl?.querySelector('.facilitator-text');
-        if (textEl) textEl.textContent = cleanText;
-        showQuestionBadge();
-      }
-      if (State.voiceMode && fullText) speakText(fullText.replace(/【質問】/g, '').trim(), 'facilitator', streamEl?.querySelector('.facilitator-banner'));
+      if (State.voiceMode && fullText) speakText(fullText, 'facilitator', streamEl?.querySelector('.facilitator-banner'));
     } else if (data.type === 'error') {
       typingEl?.remove(); streamEl?.remove(); evtSource.close();
       State.isStreaming = false; setStreamingButtons(false);
@@ -836,7 +830,7 @@ async function showReportModal() {
   DOM.briefUserBasis.textContent = '';
   DOM.layer2Content.innerHTML = '';
   DOM.layer2Locked.classList.add('hidden');
-  DOM.downloadLayer2Btn.classList.add('hidden');
+  DOM.downloadLayer2Btn.style.display = 'none';
 
   try {
     const data = await API.post(`/api/meeting/${State.sessionId}/brief`, {});
@@ -863,7 +857,7 @@ async function showReportModal() {
       html += `<div style="font-size:13px;font-weight:600;margin:12px 0 6px;">🎯 総合推奨</div>`;
       html += `<div style="font-size:12px;line-height:1.7;">${l2.recommendation || ''}</div>`;
       DOM.layer2Content.innerHTML = html;
-      DOM.downloadLayer2Btn.classList.remove('hidden');
+      DOM.downloadLayer2Btn.style.display = 'block';
     } else {
       DOM.layer2Locked.classList.remove('hidden');
     }
