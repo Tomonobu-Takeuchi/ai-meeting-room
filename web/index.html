@@ -538,7 +538,8 @@
 
 <!-- ===== チーム提案モーダル ===== -->
 <div class="modal-overlay hidden" id="teamSuggestModal">
-  <div class="modal" style="width:500px;">
+  <div class="modal" style="width:500px;position:relative;">
+    <button onclick="document.getElementById('teamSuggestModal').classList.add('hidden');document.getElementById('topicInput').value='';" style="position:absolute;top:12px;right:16px;background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;">✕</button>
     <h2>🤖 AIがチームを提案します</h2>
     <div id="teamSuggestPattern" style="font-size:17px;font-weight:700;color:var(--accent-blue);margin-bottom:4px;"></div>
     <p id="teamSuggestDesc" style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;"></p>

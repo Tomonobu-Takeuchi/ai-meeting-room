@@ -628,7 +628,7 @@ async function showTeamSuggestModal() {
       card.innerHTML = `
         <div style="width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:${r.persona_color}22;flex-shrink:0;">${avatarHtml}</div>
         <div>
-          <div style="font-size:13px;color:var(--text-muted);font-weight:500;">${r.role}</div>
+          <div style="font-size:14px;color:var(--text-muted);font-weight:500;">${r.role}</div>
           <div style="font-size:16px;font-weight:600;color:var(--text-primary);">${r.persona_name}</div>
         </div>`;
       DOM.teamSuggestRoles.appendChild(card);
