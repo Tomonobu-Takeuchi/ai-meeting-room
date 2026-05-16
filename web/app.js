@@ -466,8 +466,8 @@ async function init() {
   DOM.roleEditConfirmBtn.addEventListener('click', confirmRoleEdit);
 
   DOM.summarizeBtn.addEventListener('click', summarizeMeeting);
-  DOM.minutesBtn.addEventListener('click', downloadMinutes);
   DOM.reportBtn.addEventListener('click', showReportModal);
+  document.getElementById('minutesEndBtn')?.addEventListener('click', endMeeting);
   DOM.downloadLayer1Btn.addEventListener('click', downloadLayer1PDF);
   DOM.downloadLayer2Btn?.addEventListener('click', downloadLayer2PDF);
 
@@ -890,7 +890,25 @@ async function downloadLayer1PDF() {
 }
 
 async function downloadLayer2PDF() {
-  showToast('戦略レポートPDFは近日実装予定です', 'info');
+  if (!State.sessionId) return;
+  const btn = DOM.downloadLayer2Btn;
+  btn.disabled = true; btn.textContent = '⏳ 生成中...';
+  try {
+    const res = await fetch(`/api/meeting/${State.sessionId}/minutes`, { method: 'POST' });
+    if (!res.ok) throw new Error('生成失敗');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `戦略レポート_${State.topic?.slice(0,20)}_${new Date().toISOString().slice(0,10)}.pdf`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('PDFをダウンロードしました', 'success');
+  } catch (e) {
+    showToast('PDFの生成に失敗しました', 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '📄 戦略レポートをPDFで保存';
+  }
 }
 
 async function handleLearnFiles(e, mode, type) {
@@ -1494,7 +1512,7 @@ async function invokeFacilitator() {
   if (!State.sessionId || State.isStreaming) return;
   State.isStreaming = true; setStreamingButtons(true);
   const typingEl = addTypingIndicator(State.facilitator, true);
-  const evtSource = new EventSource(`/api/stream/facilitator/${State.sessionId}`);
+  const evtSource = new EventSource(`/api/stream/facilitator/${State.sessionId}?mode=guide`);
   let streamEl = null, fullText = '';
   evtSource.onmessage = (e) => {
     const data = JSON.parse(e.data);
