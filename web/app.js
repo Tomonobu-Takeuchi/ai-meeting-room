@@ -1322,7 +1322,13 @@ async function sendUserMessage() {
   if (State.isRecognizing && State.recognition) State.recognition.stop();
   DOM.chatInput.value = ''; DOM.chatInput.style.height = 'auto';
   addMessage({ role: 'user', persona_id: 'user', content, id: 'tmp_' + Date.now() });
-  try { await API.post(`/api/meeting/${State.sessionId}/message`, { content }); }
+  try {
+    await API.post(`/api/meeting/${State.sessionId}/message`, { content });
+    // ユーザー発言後に選択中のペルソナ全員が順番に返答
+    for (const member of State.members.filter(m => State.selectedMemberIds.includes(m.id))) {
+      await triggerMemberResponse(member.id);
+    }
+  }
   catch (e) { showToast(translateApiError(e.message, 'メッセージの送信'), 'error'); }
 }
 
