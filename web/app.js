@@ -872,7 +872,7 @@ async function downloadLayer1PDF() {
   const btn = DOM.downloadLayer1Btn;
   btn.disabled = true; btn.textContent = '⏳ 生成中...';
   try {
-    const res = await fetch(`/api/meeting/${State.sessionId}/minutes`, { method: 'POST' });
+    const res = await fetch(`/api/meeting/${State.sessionId}/brief_pdf`, { method: 'POST' });
     if (!res.ok) throw new Error('生成失敗');
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
@@ -894,7 +894,7 @@ async function downloadLayer2PDF() {
   const btn = DOM.downloadLayer2Btn;
   btn.disabled = true; btn.textContent = '⏳ 生成中...';
   try {
-    const res = await fetch(`/api/meeting/${State.sessionId}/minutes`, { method: 'POST' });
+    const res = await fetch(`/api/meeting/${State.sessionId}/strategy_pdf`, { method: 'POST' });
     if (!res.ok) throw new Error('生成失敗');
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);

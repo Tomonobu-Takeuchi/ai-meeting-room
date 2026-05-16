@@ -819,6 +819,251 @@ JSONのみ出力してください。"""
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/meeting/<session_id>/brief_pdf", methods=["POST"])
+def generate_brief_pdf(session_id):
+    """Layer 1（アクション・ブリーフ）をPDF化して返す"""
+    summary = meeting_room.get_session_summary(session_id)
+    if not summary:
+        return jsonify({"error": "セッションが見つかりません"}), 404
+    try:
+        import io
+        from datetime import datetime
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.lib.units import mm
+        from reportlab.lib.colors import HexColor
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        discussion = ""
+        user_messages = []
+        for msg in summary.get("messages", []):
+            if msg["persona_id"] == "user":
+                name = "ユーザー"
+                user_messages.append(msg["content"])
+            elif msg["persona_id"] == "facilitator":
+                name = "ファシリテータ"
+            else:
+                persona = next((m for m in summary["members"] if m["id"] == msg["persona_id"]), None)
+                name = persona["name"] if persona else msg["persona_id"]
+            discussion += f"{name}: {msg['content']}\n\n"
+
+        member_names = ", ".join([m["name"] for m in summary["members"]])
+        user_context = "\n".join([f"・{m}" for m in user_messages]) if user_messages else "（なし）"
+
+        layer1_prompt = f"""以下の会議から「アクション・ブリーフ」を作成してください。
+議題：{summary['topic']}
+参加者：{member_names}
+ユーザーの発言：
+{user_context}
+議論内容：
+{discussion if discussion else "（議論なし）"}
+
+以下のJSON形式のみで出力してください：
+{{
+  "conclusion": "結論を2〜3文で。ユーザーの発言を踏まえて記述",
+  "actions": ["次にやること1", "次にやること2", "次にやること3"],
+  "user_basis": "ユーザーの発言「〜」を踏まえ、〜を優先する方針"
+}}
+JSONのみ出力してください。"""
+
+        res = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=800,
+            messages=[{"role": "user", "content": layer1_prompt}]
+        )
+        text = res.content[0].text.strip().replace("```json", "").replace("```", "").strip()
+        data = json.loads(text)
+
+        pdfmetrics.registerFont(UnicodeCIDFont('HeiseiMin-W3'))
+        buf = io.BytesIO()
+        now = datetime.now()
+        doc = SimpleDocTemplate(buf, pagesize=A4,
+            rightMargin=20*mm, leftMargin=20*mm,
+            topMargin=20*mm, bottomMargin=20*mm)
+
+        def make_style(size=11, color=None):
+            s = ParagraphStyle('s', fontName='HeiseiMin-W3', fontSize=size, leading=size*1.8)
+            if color:
+                s.textColor = HexColor(color)
+            return s
+
+        story = []
+        story.append(Paragraph('アクション・ブリーフ', make_style(18, '#1a1a2e')))
+        story.append(Spacer(1, 2*mm))
+        story.append(HRFlowable(width='100%', thickness=1, color=HexColor('#2563EB')))
+        story.append(Spacer(1, 3*mm))
+
+        for label, value in [
+            ('日時', now.strftime('%Y年%m月%d日 %H:%M')),
+            ('議題', summary['topic']),
+            ('参加者', member_names),
+        ]:
+            story.append(Paragraph(f'<b>{label}：</b>{value}', make_style(10)))
+        story.append(Spacer(1, 5*mm))
+
+        story.append(Paragraph('■ 結論', make_style(13, '#2563EB')))
+        story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
+        story.append(Spacer(1, 2*mm))
+        story.append(Paragraph(data.get('conclusion', ''), make_style(10)))
+        story.append(Spacer(1, 5*mm))
+
+        story.append(Paragraph('■ 次にやること', make_style(13, '#2563EB')))
+        story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
+        story.append(Spacer(1, 2*mm))
+        for action in data.get('actions', []):
+            story.append(Paragraph(f'・{action}', make_style(10)))
+            story.append(Spacer(1, 1*mm))
+        story.append(Spacer(1, 5*mm))
+
+        story.append(Paragraph('■ あなたの発言から', make_style(13, '#2563EB')))
+        story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
+        story.append(Spacer(1, 2*mm))
+        story.append(Paragraph(data.get('user_basis', ''), make_style(10)))
+
+        doc.build(story)
+        buf.seek(0)
+        topic_short = summary['topic'][:20].replace('/', '_').replace('\\', '_')
+        filename = f'アクションブリーフ_{topic_short}_{now.strftime("%Y%m%d")}.pdf'
+        return send_file(buf, as_attachment=True, download_name=filename, mimetype='application/pdf')
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/meeting/<session_id>/strategy_pdf", methods=["POST"])
+def generate_strategy_pdf(session_id):
+    """Layer 2（戦略レポート）をPDF化して返す"""
+    summary = meeting_room.get_session_summary(session_id)
+    if not summary:
+        return jsonify({"error": "セッションが見つかりません"}), 404
+    try:
+        import io
+        from datetime import datetime
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.lib.units import mm
+        from reportlab.lib.colors import HexColor
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+
+        user_id = get_current_user_id()
+        plan = 'free'
+        if user_id:
+            from src.database import get_connection
+            conn = get_connection()
+            try:
+                row = conn.run("SELECT plan FROM users WHERE id = :uid", uid=user_id)
+                if row:
+                    plan = row[0][0] or 'free'
+            finally:
+                conn.close()
+        if plan not in ('standard', 'pro'):
+            return jsonify({"error": "スタンダード以上のプランが必要です"}), 403
+
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        discussion = ""
+        for msg in summary.get("messages", []):
+            if msg["persona_id"] == "user":
+                name = "ユーザー"
+            elif msg["persona_id"] == "facilitator":
+                name = "ファシリテータ"
+            else:
+                persona = next((m for m in summary["members"] if m["id"] == msg["persona_id"]), None)
+                name = persona["name"] if persona else msg["persona_id"]
+            discussion += f"{name}: {msg['content']}\n\n"
+
+        member_names = ", ".join([m["name"] for m in summary["members"]])
+
+        layer2_prompt = f"""以下の会議から「戦略レポート」を作成してください。
+議題：{summary['topic']}
+参加者：{member_names}
+議論内容：
+{discussion if discussion else "（議論なし）"}
+
+以下のJSON形式のみで出力してください：
+{{
+  "overview": "議論全体の概要を3〜4文で",
+  "persona_analysis": {{"参加者名": "この人物がなぜそう言ったか、背景・価値観・立場を含めて2〜3文で"}},
+  "risks": ["注意すべきリスク1", "注意すべきリスク2"],
+  "recommendation": "総合的な推奨アクションを2〜3文で"
+}}
+JSONのみ出力してください。"""
+
+        res = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1500,
+            messages=[{"role": "user", "content": layer2_prompt}]
+        )
+        text = res.content[0].text.strip().replace("```json", "").replace("```", "").strip()
+        data = json.loads(text)
+
+        pdfmetrics.registerFont(UnicodeCIDFont('HeiseiMin-W3'))
+        buf = io.BytesIO()
+        now = datetime.now()
+        doc = SimpleDocTemplate(buf, pagesize=A4,
+            rightMargin=20*mm, leftMargin=20*mm,
+            topMargin=20*mm, bottomMargin=20*mm)
+
+        def make_style(size=11, color=None):
+            s = ParagraphStyle('s', fontName='HeiseiMin-W3', fontSize=size, leading=size*1.8)
+            if color:
+                s.textColor = HexColor(color)
+            return s
+
+        story = []
+        story.append(Paragraph('戦略レポート', make_style(18, '#1a1a2e')))
+        story.append(Spacer(1, 2*mm))
+        story.append(HRFlowable(width='100%', thickness=1, color=HexColor('#7C3AED')))
+        story.append(Spacer(1, 3*mm))
+
+        for label, value in [
+            ('日時', now.strftime('%Y年%m月%d日 %H:%M')),
+            ('議題', summary['topic']),
+            ('参加者', member_names),
+        ]:
+            story.append(Paragraph(f'<b>{label}：</b>{value}', make_style(10)))
+        story.append(Spacer(1, 5*mm))
+
+        story.append(Paragraph('■ 議論の概要', make_style(13, '#7C3AED')))
+        story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
+        story.append(Spacer(1, 2*mm))
+        story.append(Paragraph(data.get('overview', ''), make_style(10)))
+        story.append(Spacer(1, 5*mm))
+
+        story.append(Paragraph('■ 各ペルソナの視点', make_style(13, '#7C3AED')))
+        story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
+        story.append(Spacer(1, 2*mm))
+        for name, analysis in data.get('persona_analysis', {}).items():
+            story.append(Paragraph(f'<b>【{name}】</b>', make_style(11, '#7C3AED')))
+            story.append(Paragraph(analysis, make_style(10)))
+            story.append(Spacer(1, 3*mm))
+        story.append(Spacer(1, 2*mm))
+
+        story.append(Paragraph('■ 注意すべきリスク', make_style(13, '#7C3AED')))
+        story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
+        story.append(Spacer(1, 2*mm))
+        for risk in data.get('risks', []):
+            story.append(Paragraph(f'・{risk}', make_style(10)))
+            story.append(Spacer(1, 1*mm))
+        story.append(Spacer(1, 5*mm))
+
+        story.append(Paragraph('■ 総合推奨', make_style(13, '#7C3AED')))
+        story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
+        story.append(Spacer(1, 2*mm))
+        story.append(Paragraph(data.get('recommendation', ''), make_style(10)))
+
+        doc.build(story)
+        buf.seek(0)
+        topic_short = summary['topic'][:20].replace('/', '_').replace('\\', '_')
+        filename = f'戦略レポート_{topic_short}_{now.strftime("%Y%m%d")}.pdf'
+        return send_file(buf, as_attachment=True, download_name=filename, mimetype='application/pdf')
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/meeting/<session_id>/minutes", methods=["POST"])
 def generate_minutes(session_id):
     summary = meeting_room.get_session_summary(session_id)
