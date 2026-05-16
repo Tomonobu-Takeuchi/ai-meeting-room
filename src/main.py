@@ -582,6 +582,107 @@ def extract_pdf():
                 pass
 
 
+# ===== チーム提案API =====
+TEAM_PATTERNS = {
+    'A': {
+        'name': '新規事業・起業相談',
+        'description': '推進派・懐疑派・論理派・戦略家の4人で多角的に議論します',
+        'keywords': ['ビジネス', '事業', '起業', '副業', '会社', '創業', '新規', '立ち上げ'],
+        'roles': [
+            {'role': '推進派', 'persona_id': 'hideyoshi'},
+            {'role': '懐疑派', 'persona_id': 'koumei'},
+            {'role': '論理派', 'persona_id': 'professor'},
+            {'role': '戦略家', 'persona_id': 'elizabeth1'},
+        ]
+    },
+    'B': {
+        'name': 'キャリア・転職相談',
+        'description': '共感派・現実派・挑戦派・経験派の4人でサポートします',
+        'keywords': ['転職', '仕事', 'キャリア', '就職', '辞める', '働く', '職場', '就活'],
+        'roles': [
+            {'role': '共感派',  'persona_id': 'nightingale'},
+            {'role': '現実派',  'persona_id': 'professor'},
+            {'role': '挑戦派',  'persona_id': 'ryoma'},
+            {'role': '経験派',  'persona_id': 'shibusawa'},
+        ]
+    },
+    'C': {
+        'name': '人間関係の悩み相談',
+        'description': '傾聴・共感を大切にする4人が気持ちに寄り添います',
+        'keywords': ['人間関係', '恋愛', '家族', '友人', '悩み', 'つらい', '相談', '孤独', '気持ち'],
+        'roles': [
+            {'role': '傾聴者',     'persona_id': 'nightingale'},
+            {'role': '共感者',     'persona_id': 'obaa'},
+            {'role': '視点提供者', 'persona_id': 'ojii'},
+            {'role': '整理者',     'persona_id': 'shisho'},
+        ]
+    },
+    'D': {
+        'name': '学び・スキルアップ相談',
+        'description': '学術派・実践派・批評派・応援派の4人が学習をサポートします',
+        'keywords': ['勉強', '学習', 'スキル', '資格', '習い事', '勉強法', '学ぶ', '上達'],
+        'roles': [
+            {'role': '学術派', 'persona_id': 'einstein'},
+            {'role': '実践派', 'persona_id': 'edison'},
+            {'role': '批評派', 'persona_id': 'critic'},
+            {'role': '応援派', 'persona_id': 'tsuda'},
+        ]
+    },
+    'E': {
+        'name': 'おまかせ・何でも相談',
+        'description': 'AIが内容を判断してパターンAのチームをお勧めします',
+        'keywords': [],
+        'roles': [
+            {'role': '推進派', 'persona_id': 'hideyoshi'},
+            {'role': '懐疑派', 'persona_id': 'koumei'},
+            {'role': '論理派', 'persona_id': 'professor'},
+            {'role': '戦略家', 'persona_id': 'elizabeth1'},
+        ]
+    },
+}
+
+@app.route("/api/team/suggest", methods=["POST"])
+def suggest_team():
+    """議題からパターンを判定して最適なチームを提案する"""
+    user_id = get_current_user_id()
+    data = request.json
+    topic = data.get("topic", "").strip()
+    if not topic:
+        return jsonify({"error": "議題を入力してください"}), 400
+
+    # キーワードマッチでパターン判定
+    matched_pattern = 'E'
+    for pattern_key, pattern in TEAM_PATTERNS.items():
+        if pattern_key == 'E':
+            continue
+        if any(kw in topic for kw in pattern['keywords']):
+            matched_pattern = pattern_key
+            break
+
+    pattern = TEAM_PATTERNS[matched_pattern]
+
+    # ペルソナ情報を取得してrolesに付加
+    enriched_roles = []
+    for role_def in pattern['roles']:
+        persona = persona_manager.get_persona(role_def['persona_id'], user_id)
+        # デフォルトペルソナにフォールバック
+        if not persona:
+            persona = persona_manager.get_persona(role_def['persona_id'])
+        enriched_roles.append({
+            'role': role_def['role'],
+            'persona_id': role_def['persona_id'],
+            'persona_name': persona['name'] if persona else role_def['persona_id'],
+            'persona_avatar': persona.get('avatar', '👤') if persona else '👤',
+            'persona_color': persona.get('color', '#8B5CF6') if persona else '#8B5CF6',
+        })
+
+    return jsonify({
+        'pattern': matched_pattern,
+        'pattern_name': pattern['name'],
+        'description': pattern['description'],
+        'roles': enriched_roles,
+    })
+
 # ===== 会議API =====
 
 @app.route("/api/meeting/start", methods=["POST"])
