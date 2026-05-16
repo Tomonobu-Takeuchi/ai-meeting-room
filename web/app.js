@@ -43,6 +43,7 @@ const State = {
   paymentStatus: null, // 課金ステータスキャッシュ
   growthCache: {},    // Lvバッジキャッシュ
   audioCtx: null,
+  waitingForUser: false,  // ペルソナが質問中でユーザー返答待ちの状態
   suggestedRoles: [],   // APIから返ってきた役割リスト [{role, persona_id, persona_name, ...}]
 };
 
@@ -1319,6 +1320,7 @@ async function sendUserMessage() {
   const content = DOM.chatInput.value.trim();
   if (!content || !State.sessionId || State.isStreaming) return;
   clearQuestionBadge();
+  State.waitingForUser = false;
   if (State.isRecognizing && State.recognition) State.recognition.stop();
   DOM.chatInput.value = ''; DOM.chatInput.style.height = 'auto';
   addMessage({ role: 'user', persona_id: 'user', content, id: 'tmp_' + Date.now() });
@@ -1327,6 +1329,7 @@ async function sendUserMessage() {
     // ユーザー発言後に選択中のペルソナ全員が順番に返答
     for (const member of State.members.filter(m => State.selectedMemberIds.includes(m.id))) {
       await triggerMemberResponse(member.id);
+      if (State.waitingForUser) break;  // 質問が出たらループ中断
     }
   }
   catch (e) { showToast(translateApiError(e.message, 'メッセージの送信'), 'error'); }
@@ -1357,6 +1360,7 @@ async function triggerMemberResponse(personaId, trigger = null) {
           const bubble = streamEl?.querySelector('.msg-bubble');
           if (bubble) bubble.textContent = cleanText;
           showPersonaQuestionBadge(streamEl);
+          State.waitingForUser = true;  // ユーザー返答待ちに設定
         }
         streamEl?.querySelector('.msg-bubble')?.classList.remove('streaming');
         evtSource.close();
@@ -1432,16 +1436,20 @@ async function invokeFacilitator() {
 
 async function allRespond() {
   if (!State.sessionId || State.isStreaming) return;
+  State.waitingForUser = false;
   for (const member of State.members.filter(m => State.selectedMemberIds.includes(m.id))) {
     await triggerMemberResponse(member.id);
+    if (State.waitingForUser) break;  // 質問が出たらループ中断
   }
 }
 
 async function autoDiscuss() {
   if (!State.sessionId || State.isStreaming) return;
+  State.waitingForUser = false;
   for (const member of State.members.filter(m => State.selectedMemberIds.includes(m.id))) {
     await triggerMemberResponse(member.id);
     await waitForSpeechEnd();
+    if (State.waitingForUser) break;  // 質問が出たらループ中断
   }
 }
 
