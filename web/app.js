@@ -433,6 +433,7 @@ async function init() {
   try {
     const data = await API.get('/api/personas/members');
     State.members = data.members;
+    if (data.facilitator) State.facilitator = data.facilitator;
     // ★ デフォルトアバター画像をセット
     State.members.forEach(m => {
       // DB画像(data URL)を優先、なければDEFAULT_AVATARSにフォールバック
