@@ -690,7 +690,7 @@ def suggest_team():
             'role': role_def['role'],
             'persona_id': role_def['persona_id'],
             'persona_name': persona['name'] if persona else role_def['persona_id'],
-            'persona_avatar': persona.get('avatar', '👤') if persona else '👤',
+            'persona_avatar': (persona.get('avatar') or '👤') if persona else '👤',
             'persona_color': persona.get('color', '#8B5CF6') if persona else '#8B5CF6',
         })
 
