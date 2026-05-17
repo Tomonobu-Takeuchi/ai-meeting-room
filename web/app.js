@@ -1468,7 +1468,6 @@ async function triggerMemberResponse(personaId, trigger = null) {
         fullText += data.text;
       } else if (data.type === 'done') {
         if (fullText.includes('【質問】')) {
-          const cleanText = fullText.replace(/【質問】/g, '').trim();
           const bubble = streamEl?.querySelector('.msg-bubble');
           if (bubble) bubble.innerHTML = bubble.innerHTML.replace(/【質問】/g, '').trim();
           showPersonaQuestionBadge(streamEl);
@@ -1531,9 +1530,8 @@ async function invokeFacilitator() {
     } else if (data.type === 'done') {
       evtSource.close(); State.isStreaming = false; setStreamingButtons(false); scrollToBottom();
       if (fullText.includes('【質問】')) {
-        const cleanText = fullText.replace(/【質問】/g, '').trim();
         const textEl = streamEl?.querySelector('.facilitator-text');
-        if (textEl) textEl.textContent = cleanText;
+        if (textEl) textEl.innerHTML = textEl.innerHTML.replace(/【質問】/g, '').trim();
         showQuestionBadge();
       }
       if (State.voiceMode && fullText) speakText(fullText.replace(/【質問】/g, '').trim(), 'facilitator', streamEl?.querySelector('.facilitator-banner'));
