@@ -47,6 +47,8 @@ const State = {
   audioCtx: null,
   waitingForUser: false,  // ペルソナが質問中でユーザー返答待ちの状態
   suggestedRoles: [],   // APIから返ってきた役割リスト [{role, persona_id, persona_name, ...}]
+  meetingCategory: null,
+  suggestedPersonaIds: [],
 };
 
 const $ = id => document.getElementById(id);
@@ -451,7 +453,7 @@ async function init() {
 
   DOM.newMeetingBtn.addEventListener('click', resetMeeting);
   DOM.endMeetingBtn.addEventListener('click', endMeeting);
-  DOM.startMeetingBtn.addEventListener('click', showTeamSuggestModal);
+  DOM.startMeetingBtn.addEventListener('click', showCategorySelectModal);
   DOM.facilitatorBtn.addEventListener('click', invokeFacilitator);
   DOM.autoDiscussBtn.addEventListener('click', autoDiscuss);
   DOM.sendBtn.addEventListener('click', sendUserMessage);
@@ -615,6 +617,46 @@ async function init() {
   window.addEventListener('beforeunload', e => {
     if (State.sessionId) { e.preventDefault(); e.returnValue = ''; }
   });
+}
+
+// ===== カテゴリ選択モーダル =====
+
+const MEETING_CATEGORIES = [
+  { id: 'strategy',   icon: '📊', label: '戦略・企画',   desc: 'ビジネス戦略・企画書レビュー・新規事業',    personas: ['hideyoshi','koumei','critic','consultant'] },
+  { id: 'practice',   icon: '🎤', label: '発表・練習',   desc: 'プレゼン練習・報告書レビュー・論文発表',    personas: ['professor','elizabeth1','critic','amanojaku'] },
+  { id: 'study',      icon: '📚', label: '学習・研究',   desc: '論文壁打ち・スキルアップ・創作',            personas: ['professor','turing','curie','shisho'] },
+  { id: 'consulting', icon: '💬', label: '人生相談',     desc: 'キャリア・人間関係・恋愛・意思決定',        personas: ['obaa','koumei','yako','amanojaku'] },
+  { id: 'chat',       icon: '☕', label: '雑談・その他', desc: '自由に話したい・フレームワークなし',         personas: [] },
+];
+
+function showCategorySelectModal() {
+  const topic = DOM.topicInput.value.trim();
+  if (!topic) {
+    showToast('議題を入力してください', 'error');
+    DOM.topicInput.focus();
+    return;
+  }
+  const list = document.getElementById('categoryBtnList');
+  list.innerHTML = '';
+  MEETING_CATEGORIES.forEach(cat => {
+    const btn = document.createElement('button');
+    btn.className = 'category-btn';
+    btn.innerHTML = `<span class="category-btn-icon">${cat.icon}</span><div><div class="category-btn-label">${cat.label}</div><div class="category-btn-desc">${cat.desc}</div></div>`;
+    btn.addEventListener('click', () => selectCategory(cat));
+    list.appendChild(btn);
+  });
+  document.getElementById('categorySelectModal').classList.remove('hidden');
+}
+
+function selectCategory(cat) {
+  State.meetingCategory = cat.id;
+  State.suggestedPersonaIds = cat.personas;
+  document.getElementById('categorySelectModal').classList.add('hidden');
+  showTeamSuggestModal();
+}
+
+function closeCategoryModal() {
+  document.getElementById('categorySelectModal').classList.add('hidden');
 }
 
 // ===== チーム提案モーダル =====
@@ -2620,6 +2662,8 @@ async function logout() {
     await API.post('/api/auth/logout', {});
     State.currentUser = null;
     State.userAvatar = '👤';
+    State.meetingCategory = null;
+    State.suggestedPersonaIds = [];
     renderAuthArea();
     showToast('ログアウトしました', 'success');
     await reloadPersonas();
