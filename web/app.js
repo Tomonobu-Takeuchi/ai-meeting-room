@@ -1468,9 +1468,11 @@ async function triggerMemberResponse(personaId, trigger = null) {
         fullText += data.text;
       } else if (data.type === 'done') {
         if (fullText.includes('【質問】')) {
+          const questionMatch = fullText.match(/【質問】([\s\S]*?)$/);
+          const questionText = questionMatch ? questionMatch[1].trim() : '';
           const bubble = streamEl?.querySelector('.msg-bubble');
-          if (bubble) bubble.innerHTML = bubble.innerHTML.replace(/【質問】/g, '').trim();
-          showPersonaQuestionBadge(streamEl);
+          if (bubble) bubble.innerHTML = bubble.innerHTML.replace(/【質問】[\s\S]*$/, '').trim();
+          showPersonaQuestionBadge(streamEl, questionText);
           State.waitingForUser = true;  // ユーザー返答待ちに設定
         }
         streamEl?.querySelector('.msg-bubble')?.classList.remove('streaming');
@@ -1530,9 +1532,11 @@ async function invokeFacilitator() {
     } else if (data.type === 'done') {
       evtSource.close(); State.isStreaming = false; setStreamingButtons(false); scrollToBottom();
       if (fullText.includes('【質問】')) {
+        const questionMatch = fullText.match(/【質問】([\s\S]*?)$/);
+        const questionText = questionMatch ? questionMatch[1].trim() : '';
         const textEl = streamEl?.querySelector('.facilitator-text');
-        if (textEl) textEl.innerHTML = textEl.innerHTML.replace(/【質問】/g, '').trim();
-        showQuestionBadge();
+        if (textEl) textEl.innerHTML = textEl.innerHTML.replace(/【質問】[\s\S]*$/, '').trim();
+        showQuestionBadge(questionText);
       }
       if (State.voiceMode && fullText) speakText(fullText.replace(/【質問】/g, '').trim(), 'facilitator', streamEl?.querySelector('.facilitator-banner'));
     } else if (data.type === 'error') {
@@ -1829,25 +1833,25 @@ async function invokeFacilitatorNominate() {
   });
 }
 
-function showQuestionBadge() {
+function showQuestionBadge(questionText = '') {
   document.querySelectorAll('.question-badge').forEach(el => el.remove());
   const banners = document.querySelectorAll('.facilitator-banner');
   if (banners.length === 0) return;
   const lastBanner = banners[banners.length - 1];
   const badge = document.createElement('div');
   badge.className = 'question-badge';
-  badge.textContent = '💬 あなたへの質問です — 下の入力欄に返答してください';
+  badge.textContent = questionText ? `💬 ${questionText}` : '💬 あなたへの質問です — 下の入力欄に返答してください';
   lastBanner.parentElement.insertBefore(badge, lastBanner.nextSibling);
   DOM.chatInput.classList.add('question-highlight');
   DOM.chatInput.placeholder = '💬 ファシリテーターへの返答を入力... (Enter で送信)';
   DOM.chatInput.focus();
 }
 
-function showPersonaQuestionBadge(row) {
+function showPersonaQuestionBadge(row, questionText = '') {
   document.querySelectorAll('.question-badge').forEach(el => el.remove());
   const badge = document.createElement('div');
   badge.className = 'question-badge';
-  badge.textContent = '💬 あなたへの質問です — 下の入力欄に返答してください';
+  badge.textContent = questionText ? `💬 ${questionText}` : '💬 あなたへの質問です — 下の入力欄に返答してください';
   row.parentElement.insertBefore(badge, row.nextSibling);
   DOM.chatInput.classList.add('question-highlight');
   DOM.chatInput.placeholder = '💬 ペルソナへの返答を入力... (Enter で送信)';
