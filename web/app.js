@@ -703,7 +703,7 @@ function createRoleEditRow(roleName, personaId, idx) {
     const opt = document.createElement('option');
     opt.value = m.id;
     opt.textContent = m.name;
-    if (m.id === personaId) opt.selected = true;
+    if (m.id === personaId || m.source_persona_id === personaId) opt.selected = true;
     select.appendChild(opt);
   });
 
