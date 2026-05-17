@@ -1470,7 +1470,7 @@ async function triggerMemberResponse(personaId, trigger = null) {
         if (fullText.includes('【質問】')) {
           const cleanText = fullText.replace(/【質問】/g, '').trim();
           const bubble = streamEl?.querySelector('.msg-bubble');
-          if (bubble) bubble.textContent = cleanText;
+          if (bubble) bubble.innerHTML = bubble.innerHTML.replace(/【質問】/g, '').trim();
           showPersonaQuestionBadge(streamEl);
           State.waitingForUser = true;  // ユーザー返答待ちに設定
         }

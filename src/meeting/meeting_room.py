@@ -57,6 +57,7 @@ class MeetingRoom:
             "members": members,
             "facilitator": facilitator,
             "messages": [],
+            "user_id": user_id,
             "created_at": datetime.now().isoformat(),
             "status": "active"
         }
@@ -92,7 +93,7 @@ class MeetingRoom:
             return
         messages = self._build_conversation_history(session, persona_id, trigger_message)
         system_prompt = self.persona_manager.build_system_prompt(
-            persona, session["topic"], session["members"]
+            persona, session["topic"], user_id=session.get("user_id")
         )
         try:
             full_response = ""
