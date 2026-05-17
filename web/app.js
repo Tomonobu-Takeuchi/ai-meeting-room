@@ -1319,7 +1319,14 @@ async function submitEditPersona() {
     DOM.confirmEditPersona.textContent = '保存する';
     return;
   }
-  if (State.editAvatarDataUrl) State.avatarImages[memberId] = State.editAvatarDataUrl;
+  if (State.editAvatarDataUrl) {
+    State.avatarImages[memberId] = State.editAvatarDataUrl;
+    // source_persona_idがある場合は元IDでもセット
+    const editMember = State.members.find(m => m.id === memberId);
+    if (editMember?.source_persona_id) {
+      State.avatarImages[editMember.source_persona_id] = State.editAvatarDataUrl;
+    }
+  }
   try {
     const data = await API.put(`/api/personas/${memberId}`, { name, avatar, description, personality, speaking_style: speakingStyle, background, color, voice_id: voiceId === 'none' ? null : voiceId });
     const idx = State.members.findIndex(m => m.id === memberId);
@@ -2610,13 +2617,13 @@ async function reloadPersonas() {
     State.members = data.members;
     if (data.facilitator) State.facilitator = data.facilitator;
     State.members.forEach(m => {
+      const baseId = m.source_persona_id || m.id;
       if (m.avatar && m.avatar.startsWith('data:')) {
         State.avatarImages[m.id] = m.avatar;
-      } else {
-        const baseId = m.source_persona_id || m.id;
-        if (DEFAULT_AVATARS[baseId]) {
-          State.avatarImages[m.id] = DEFAULT_AVATARS[baseId];
-        }
+        // コピー元IDでもセット（renderMemberListのフォールバック用）
+        if (m.source_persona_id) State.avatarImages[m.source_persona_id] = m.avatar;
+      } else if (DEFAULT_AVATARS[baseId]) {
+        State.avatarImages[m.id] = DEFAULT_AVATARS[baseId];
       }
     });
     // ファシリテータのアバター更新
