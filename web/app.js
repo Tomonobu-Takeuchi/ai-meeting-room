@@ -1290,7 +1290,8 @@ async function submitEditPersona() {
   DOM.confirmEditPersona.disabled = true;
   DOM.confirmEditPersona.textContent = '保存中...';
   const memberId = $('editPersonaId').value;
-  const name = $('eName').value.trim(), avatar = $('eAvatar').value.trim() || '👤';
+  const name = $('eName').value.trim();
+  const avatar = State.editAvatarDataUrl || $('eAvatar').value.trim() || '👤';
   const description = $('eDescription').value.trim(), personality = $('ePersonality').value.trim();
   const speakingStyle = $('eSpeakingStyle').value.trim(), color = $('eColor').value;
   let background = buildBackgroundFromLearnData($('eBackground').value.trim(), State.editLearnFiles);
@@ -2607,6 +2608,7 @@ async function reloadPersonas() {
   try {
     const data = await API.get('/api/personas/members');
     State.members = data.members;
+    if (data.facilitator) State.facilitator = data.facilitator;
     State.members.forEach(m => {
       if (m.avatar && m.avatar.startsWith('data:')) {
         State.avatarImages[m.id] = m.avatar;
