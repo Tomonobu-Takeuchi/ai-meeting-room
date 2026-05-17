@@ -152,9 +152,9 @@ class PersonaManager:
 
     def add_persona(self, data, user_id=None):
         persona_id = data.get('id') or str(uuid.uuid4())[:8]
-        # T-03: アバターは絵文字のみ（最大4文字）
         avatar_raw = data.get('avatar', '👤').strip() or '👤'
-        avatar_val = avatar_raw[:4]
+        # base64画像はそのまま保持、絵文字のみ4文字制限
+        avatar_val = avatar_raw if avatar_raw.startswith('data:') else avatar_raw[:4]
         conn = get_connection()
         conn.run("""
             INSERT INTO personas (id, user_id, name, avatar, description, personality,
@@ -186,9 +186,9 @@ class PersonaManager:
         return serialize_persona(row_to_dict(COLUMNS, rows[0])) if rows else None
 
     def update_persona(self, persona_id, data, user_id=None):
-        # T-03: アバターは絵文字のみ（最大4文字）
         avatar_raw = data.get('avatar', '👤').strip() or '👤'
-        avatar_val = avatar_raw[:4]
+        # base64画像はそのまま保持、絵文字のみ4文字制限
+        avatar_val = avatar_raw if avatar_raw.startswith('data:') else avatar_raw[:4]
         conn = get_connection()
         if user_id:
             conn.run("""

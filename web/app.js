@@ -1011,7 +1011,7 @@ function renderMemberList() {
       <div class="member-card-main">
         <div class="member-avatar" style="background:#7C3AED22;border:2px solid #7C3AED44;">${avatarHtml}</div>
         <div class="member-info">
-          <div class="member-name">${escapeHtml(State.currentUser.name || 'あなた')}<span style="color:var(--text-muted);font-size:11px;margin-left:4px;">（あなた）</span></div>
+          <div class="member-name">あなた</div>
           <div class="member-role">参加者</div>
         </div>
         <div class="member-status ${State.sessionId ? 'online' : ''}"></div>
@@ -1021,6 +1021,30 @@ function renderMemberList() {
       </div>`;
     userCard.querySelector('[data-action="user-avatar"]').addEventListener('click', (e) => { e.stopPropagation(); openUserAvatarModal(); });
     DOM.memberList.appendChild(userCard);
+  }
+
+  // ファシリテーターカードを「あなた」の直後に表示
+  if (State.facilitator) {
+    const facCard = document.createElement('div');
+    facCard.className = 'member-card selected';
+    facCard.dataset.id = State.facilitator.id;
+    const facAv = State.avatarImages[State.facilitator.id] || State.facilitator.avatar;
+    const facAvatarHtml = facAv && facAv.startsWith('data:') ? `<img src="${facAv}" alt="${escapeHtml(State.facilitator.name)}" />` : (facAv || '🎤');
+    const facColor = State.facilitator.color || '#7C3AED';
+    facCard.innerHTML = `
+      <div class="member-card-main">
+        <div class="member-avatar" style="background:${facColor}22;border:2px solid ${facColor}44;">${facAvatarHtml}</div>
+        <div class="member-info">
+          <div class="member-name">${escapeHtml(State.facilitator.name)}<span class="source-badge" style="background:rgba(124,58,237,0.85);margin-left:5px;">ファシリテーター</span></div>
+          <div class="member-role">${escapeHtml((State.facilitator.description||'').slice(0,28))}${(State.facilitator.description||'').length>28?'…':''}</div>
+        </div>
+        <div class="member-status ${State.sessionId ? 'online' : ''}"></div>
+      </div>
+      <div class="member-card-actions">
+        <button class="btn-icon" title="設定" data-action="fac-settings">⚙</button>
+      </div>`;
+    facCard.querySelector('[data-action="fac-settings"]').addEventListener('click', (e) => { e.stopPropagation(); openEditModal(State.facilitator.id); });
+    DOM.memberList.appendChild(facCard);
   }
 
   // category順でソート（system→historical→fictional）
@@ -1298,7 +1322,10 @@ async function submitEditPersona() {
   try {
     const data = await API.put(`/api/personas/${memberId}`, { name, avatar, description, personality, speaking_style: speakingStyle, background, color, voice_id: voiceId === 'none' ? null : voiceId });
     const idx = State.members.findIndex(m => m.id === memberId);
-    if (idx >= 0) State.members[idx] = { ...State.members[idx], ...data.persona };
+    if (idx >= 0) {
+      const preserved = { category: State.members[idx].category, created_at: State.members[idx].created_at };
+      State.members[idx] = { ...State.members[idx], ...data.persona, ...preserved };
+    }
 
     // ★ 学習データをpersona_learnテーブルにDB保存（3件バッチ並列・1件失敗でも続行）
     const textFiles = State.editLearnFiles.filter(f => f.type === 'text' || f.type === 'pdf');
