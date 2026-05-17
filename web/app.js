@@ -41,6 +41,7 @@ const State = {
   recognition: null, jaVoices: [],
   speakEndResolve: null,
   currentUser: null,  // ログイン中ユーザー情報
+  userAvatar: '👤',  // ログイン中ユーザーのアバター
   paymentStatus: null, // 課金ステータスキャッシュ
   growthCache: {},    // Lvバッジキャッシュ
   audioCtx: null,
@@ -92,6 +93,7 @@ const DOM = {
   copyPersonaMessage: $('copyPersonaMessage'),
   copyPersonaCancel: $('copyPersonaCancel'),
   copyPersonaConfirm: $('copyPersonaConfirm'),
+  userAvatarModal: $('userAvatarModal'),
   reportBtn: $('reportBtn'),
   reportModal: $('reportModal'),
   briefConclusion: $('briefConclusion'),
@@ -997,7 +999,37 @@ function buildBackgroundFromLearnData(existingBackground, learnFiles) {
 function renderMemberList() {
   DOM.memberList.innerHTML = '';
   if (State.selectedMemberIds.length === 0) State.selectedMemberIds = State.members.map(m => m.id);
-  State.members.forEach(member => {
+
+  // ログイン中は"あなた"カードを先頭に挿入
+  if (State.currentUser) {
+    const userCard = document.createElement('div');
+    userCard.className = 'member-card selected';
+    userCard.id = 'user-self-card';
+    const av = State.userAvatar;
+    const avatarHtml = av && av.startsWith('data:') ? `<img src="${av}" alt="あなた" />` : av;
+    userCard.innerHTML = `
+      <div class="member-card-main">
+        <div class="member-avatar" style="background:#7C3AED22;border:2px solid #7C3AED44;">${avatarHtml}</div>
+        <div class="member-info">
+          <div class="member-name">${escapeHtml(State.currentUser.name || 'あなた')}<span style="color:var(--text-muted);font-size:11px;margin-left:4px;">（あなた）</span></div>
+          <div class="member-role">参加者</div>
+        </div>
+        <div class="member-status ${State.sessionId ? 'online' : ''}"></div>
+      </div>
+      <div class="member-card-actions">
+        <button class="btn-icon" title="アバター設定" data-action="user-avatar">⚙</button>
+      </div>`;
+    userCard.querySelector('[data-action="user-avatar"]').addEventListener('click', (e) => { e.stopPropagation(); openUserAvatarModal(); });
+    DOM.memberList.appendChild(userCard);
+  }
+
+  // category順でソート（system→historical→fictional）
+  const categoryOrder = { system: 0, historical: 1, fictional: 2 };
+  const sorted = [...State.members].sort((a, b) => {
+    return (categoryOrder[a.category] ?? 1) - (categoryOrder[b.category] ?? 1);
+  });
+
+  sorted.forEach(member => {
     const isSelected = State.selectedMemberIds.includes(member.id);
     const card = document.createElement('div');
     card.className = `member-card ${isSelected ? 'selected' : ''}`; card.dataset.id = member.id;
@@ -2012,6 +2044,73 @@ async function handleLearnAudio(e, mode) {
 
 function escapeHtml(text) { const d = document.createElement('div'); d.textContent = text; return d.innerHTML; }
 
+// ===== ユーザーアバター設定モーダル =====
+const USER_AVATAR_EMOJIS = ['👤','🧑‍💼','👨‍💼','👩‍💼','🧑‍🔬','👨‍🔬','👩‍🔬','🧑‍💻','👨‍💻','👩‍💻',
+  '🧑‍🎨','👨‍🎨','👩‍🎨','🧑‍🏫','👨‍🏫','👩‍🏫','🧑‍🍳','👨‍🍳','👩‍🍳','🧙','🦸','🦹','🤖','👻','🐱','🦊','🐧','🦁'];
+let _userAvatarPending = null;
+
+function openUserAvatarModal() {
+  _userAvatarPending = State.userAvatar;
+  const preview = $('userAvatarPreview');
+  const grid = $('userAvatarEmojiGrid');
+  if (!preview || !grid) return;
+  _updateUserAvatarPreview(preview, _userAvatarPending);
+  grid.innerHTML = '';
+  USER_AVATAR_EMOJIS.forEach(emoji => {
+    const btn = document.createElement('button');
+    btn.className = 'btn-icon';
+    btn.style.cssText = 'font-size:22px;width:38px;height:38px;border-radius:8px;';
+    btn.textContent = emoji;
+    btn.addEventListener('click', () => {
+      _userAvatarPending = emoji;
+      _updateUserAvatarPreview(preview, emoji);
+    });
+    grid.appendChild(btn);
+  });
+  const fileInput = $('userAvatarFileInput');
+  if (fileInput) {
+    fileInput.value = '';
+    fileInput.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        _userAvatarPending = ev.target.result;
+        _updateUserAvatarPreview(preview, ev.target.result);
+      };
+      reader.readAsDataURL(file);
+    };
+  }
+  if (DOM.userAvatarModal) DOM.userAvatarModal.classList.remove('hidden');
+}
+
+function _updateUserAvatarPreview(el, avatar) {
+  if (avatar && avatar.startsWith('data:')) {
+    el.innerHTML = `<img src="${avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
+  } else {
+    el.textContent = avatar || '👤';
+  }
+}
+
+function closeUserAvatarModal() {
+  if (DOM.userAvatarModal) DOM.userAvatarModal.classList.add('hidden');
+  _userAvatarPending = null;
+}
+
+async function saveUserAvatar() {
+  const avatar = _userAvatarPending;
+  if (!avatar) { closeUserAvatarModal(); return; }
+  try {
+    await API.put('/api/user/avatar', { avatar });
+    State.userAvatar = avatar;
+    renderMemberList();
+    closeUserAvatarModal();
+    showToast('アバターを更新しました', 'success');
+  } catch (e) {
+    showToast('アバターの保存に失敗しました', 'error');
+  }
+}
+
 // ===== フィードバックモーダル制御 =====
 const FeedbackState = { members: [], currentIndex: 0, rating: null };
 
@@ -2274,6 +2373,7 @@ async function checkAuthStatus() {
     const data = await API.get('/api/auth/me');
     if (data.user) {
       State.currentUser = data.user;
+      State.userAvatar = data.user.avatar || '👤';
       renderAuthArea();
       // 支払い完了後のリダイレクト処理
       const params = new URLSearchParams(window.location.search);
@@ -2421,6 +2521,7 @@ async function submitLogin() {
     btn.textContent = 'ログイン中...'; btn.disabled = true;
     const data = await API.post('/api/auth/login', { email, password });
     State.currentUser = data.user;
+    State.userAvatar = data.user.avatar || '👤';
     renderAuthArea();
     closeAuthModal();
     showToast(`${data.user.name || data.user.email} でログインしました`, 'success');
@@ -2450,6 +2551,7 @@ async function submitRegister() {
     btn.textContent = '登録中...'; btn.disabled = true;
     const data = await API.post('/api/auth/register', { email, password, name, tos_agreed: true });
     State.currentUser = data.user;
+    State.userAvatar = data.user.avatar || '👤';
     renderAuthArea();
     closeAuthModal();
     showToast(`登録完了！${data.user.name || data.user.email} でログインしました`, 'success');
@@ -2467,6 +2569,7 @@ async function logout() {
   try {
     await API.post('/api/auth/logout', {});
     State.currentUser = null;
+    State.userAvatar = '👤';
     renderAuthArea();
     showToast('ログアウトしました', 'success');
     await reloadPersonas();

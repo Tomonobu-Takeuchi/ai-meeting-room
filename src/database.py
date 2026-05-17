@@ -213,17 +213,17 @@ def create_user(email, password_hash, name=''):
 def get_user_by_email(email):
     conn = get_connection()
     rows = conn.run("""
-        SELECT id, email, name, plan, password_hash FROM users WHERE email=:email
+        SELECT id, email, name, plan, password_hash, avatar FROM users WHERE email=:email
     """, email=email)
     conn.close()
-    return row_to_dict(['id','email','name','plan','password_hash'], rows[0]) if rows else None
+    return row_to_dict(['id','email','name','plan','password_hash','avatar'], rows[0]) if rows else None
 
 def get_user_by_id(user_id):
     conn = get_connection()
     try:
         rows = conn.run("""
             SELECT id, email, name, plan, credits, plan_expires_at,
-                   monthly_meeting_count, monthly_reset_at
+                   monthly_meeting_count, monthly_reset_at, avatar
             FROM users WHERE id=:id
         """, id=user_id)
         if not rows:
@@ -231,7 +231,7 @@ def get_user_by_id(user_id):
             return None
         r = rows[0]
         d = row_to_dict(['id','email','name','plan','credits','plan_expires_at',
-                         'monthly_meeting_count','monthly_reset_at'], r)
+                         'monthly_meeting_count','monthly_reset_at','avatar'], r)
         conn.close()
         d['credits'] = d['credits'] or 0
         d['monthly_meeting_count'] = d['monthly_meeting_count'] or 0
@@ -244,9 +244,14 @@ def get_user_by_id(user_id):
         except Exception:
             pass
         conn2 = get_connection()
-        rows = conn2.run("SELECT id, email, name, plan FROM users WHERE id=:id", id=user_id)
+        rows = conn2.run("SELECT id, email, name, plan, avatar FROM users WHERE id=:id", id=user_id)
         conn2.close()
-        return row_to_dict(['id','email','name','plan'], rows[0]) if rows else None
+        return row_to_dict(['id','email','name','plan','avatar'], rows[0]) if rows else None
+
+def update_user_avatar(user_id, avatar):
+    conn = get_connection()
+    conn.run("UPDATE users SET avatar=:avatar WHERE id=:id", avatar=avatar, id=user_id)
+    conn.close()
 
 
 # ===== 課金関連 =====

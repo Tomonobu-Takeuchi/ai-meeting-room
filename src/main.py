@@ -20,7 +20,7 @@ from src.database import (
     init_db, get_connection, get_user_by_email, get_user_by_id, create_user,
     get_user_payment_status, check_and_use_meeting,
     add_user_credits, update_user_plan, save_payment, complete_payment,
-    get_user_by_stripe_customer,
+    get_user_by_stripe_customer, update_user_avatar,
 )
 
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
@@ -125,12 +125,30 @@ def login():
     session['user_id'] = user['id']
     session['user_email'] = user['email']
     session['user_name'] = user['name']
-    return jsonify({"message": "ログイン成功", "user": {"id": user['id'], "email": user['email'], "name": user['name'], "plan": user['plan']}})
+    return jsonify({"message": "ログイン成功", "user": {"id": user['id'], "email": user['email'], "name": user['name'], "plan": user['plan'], "avatar": user.get('avatar') or '👤'}})
 
 @app.route("/api/auth/logout", methods=["POST"])
 def logout():
     session.clear()
     return jsonify({"message": "ログアウトしました"})
+
+@app.route("/api/user/avatar", methods=["GET"])
+@login_required
+def get_user_avatar():
+    user_id = get_current_user_id()
+    user = get_user_by_id(user_id)
+    return jsonify({"avatar": user.get('avatar') or '👤'})
+
+@app.route("/api/user/avatar", methods=["PUT"])
+@login_required
+def set_user_avatar():
+    user_id = get_current_user_id()
+    data = request.json or {}
+    avatar = data.get("avatar", "👤")
+    if not avatar:
+        avatar = "👤"
+    update_user_avatar(user_id, avatar)
+    return jsonify({"ok": True})
 
 @app.route("/api/auth/me", methods=["GET"])
 def me():
@@ -141,7 +159,7 @@ def me():
     if not user:
         session.clear()
         return jsonify({"user": None})
-    return jsonify({"user": {"id": user['id'], "email": user['email'], "name": user['name'], "plan": user['plan']}})
+    return jsonify({"user": {"id": user['id'], "email": user['email'], "name": user['name'], "plan": user['plan'], "avatar": user.get('avatar') or '👤'}})
 
 
 # ===== ペルソナAPI =====
