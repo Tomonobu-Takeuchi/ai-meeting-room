@@ -682,8 +682,13 @@ async function showTeamSuggestModal() {
     // 役割カードを描画
     DOM.teamSuggestRoles.innerHTML = '';
     data.roles.forEach(r => {
-      const avatarHtml = r.persona_avatar && r.persona_avatar.startsWith('data:')
-        ? `<img src="${r.persona_avatar}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;" />`
+      const baseId = r.persona_id?.replace(/_\d+$/, '') || r.persona_id;
+      const imgSrc = State.avatarImages[r.persona_id]
+        || State.avatarImages[baseId]
+        || DEFAULT_AVATARS[baseId]
+        || (r.persona_avatar?.startsWith('data:') ? r.persona_avatar : null);
+      const avatarHtml = imgSrc
+        ? `<img src="${imgSrc}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;" />`
         : `<span style="font-size:20px;">${r.persona_avatar || '👤'}</span>`;
       const card = document.createElement('div');
       card.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg-base);';
@@ -772,7 +777,7 @@ function createRoleEditRow(roleName, personaId, idx) {
 function addRoleEditRow() {
   const rows = DOM.roleEditList.querySelectorAll('.role-edit-row');
   const newIdx = rows.length;
-  DOM.roleEditList.appendChild(createRoleEditRow('', State.members[0]?.id || '', newIdx));
+  DOM.roleEditList.appendChild(createRoleEditRow('', '', newIdx));
 }
 
 function confirmRoleEdit() {
@@ -1486,7 +1491,7 @@ async function startMeeting() {
   finally { setLoading(false); }
 }
 
-function resetMeeting() {
+async function resetMeeting() {
   if (State.sessionId && !confirm('現在の会議を終了して新しい会議を始めますか？')) return;
   stopSpeaking();
   if (State.isRecognizing && State.recognition) State.recognition.stop();
@@ -1507,10 +1512,10 @@ function resetMeeting() {
   if (DOM.mobileActionBar) { DOM.mobileActionBar.classList.remove('visible'); }
   if (DOM.mobileSummarizeBtn) DOM.mobileSummarizeBtn.disabled = true;
   if (DOM.mobileFacilitatorBtn) DOM.mobileFacilitatorBtn.disabled = true;
-  renderMemberList();
+  await reloadPersonas();
 }
 
-function endMeeting() {
+async function endMeeting() {
   if (!State.sessionId) return;
   if (!confirm('会議を終了しますか？トランスクリプトを残したまま終了します。')) return;
   stopSpeaking();
@@ -1528,6 +1533,7 @@ function endMeeting() {
   if (DOM.mobileActionBar) DOM.mobileActionBar.classList.remove('visible');
   if (DOM.mobileSummarizeBtn) DOM.mobileSummarizeBtn.disabled = true;
   if (DOM.mobileFacilitatorBtn) DOM.mobileFacilitatorBtn.disabled = true;
+  await reloadPersonas();
 }
 
 async function sendUserMessage() {
