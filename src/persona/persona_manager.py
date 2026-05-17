@@ -18,7 +18,7 @@ from src.database import (
 
 COLUMNS = ['id','user_id','name','avatar','description','personality',
            'speaking_style','background','color','role','is_default','created_at','voice_id',
-           'source_persona_id','category']
+           'source_persona_id','category','base_created_at']
 
 def serialize_persona(d):
     """datetimeをstrに変換・不要フィールドを整理"""
@@ -26,6 +26,8 @@ def serialize_persona(d):
         return d
     if 'created_at' in d and d['created_at'] is not None:
         d['created_at'] = str(d['created_at'])
+    if 'base_created_at' in d and d['base_created_at'] is not None:
+        d['base_created_at'] = str(d['base_created_at'])
     return d
 
 
@@ -38,25 +40,34 @@ class PersonaManager:
         conn = get_connection()
         if user_id:
             rows = conn.run("""
-                SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id, source_persona_id, category FROM personas
-                WHERE role='member'
+                SELECT p.id, p.user_id, p.name, p.avatar, p.description, p.personality,
+                       p.speaking_style, p.background, p.color, p.role, p.is_default,
+                       p.created_at, p.voice_id, p.source_persona_id, p.category,
+                       COALESCE(base.created_at, p.created_at) as base_created_at
+                FROM personas p
+                LEFT JOIN personas base ON p.source_persona_id = base.id
+                WHERE p.role='member'
                   AND (
-                    user_id = :user_id
+                    p.user_id = :user_id
                     OR (
-                      user_id IS NULL
-                      AND id NOT IN (
+                      p.user_id IS NULL
+                      AND p.id NOT IN (
                         SELECT source_persona_id FROM personas
                         WHERE user_id = :user_id AND source_persona_id IS NOT NULL
                       )
                     )
                   )
-                ORDER BY is_default DESC, created_at ASC
+                ORDER BY p.is_default DESC, p.created_at ASC
             """, user_id=user_id)
         else:
             rows = conn.run("""
-                SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id, source_persona_id, category FROM personas
-                WHERE role='member' AND user_id IS NULL
-                ORDER BY created_at ASC
+                SELECT p.id, p.user_id, p.name, p.avatar, p.description, p.personality,
+                       p.speaking_style, p.background, p.color, p.role, p.is_default,
+                       p.created_at, p.voice_id, p.source_persona_id, p.category,
+                       p.created_at as base_created_at
+                FROM personas p
+                WHERE p.role='member' AND p.user_id IS NULL
+                ORDER BY p.created_at ASC
             """)
         conn.close()
         result = [serialize_persona(row_to_dict(COLUMNS, r)) for r in rows]

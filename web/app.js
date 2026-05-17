@@ -1052,7 +1052,9 @@ function renderMemberList() {
   // category順でソート（system→historical→fictional）
   const categoryOrder = { system: 0, historical: 1, fictional: 2 };
   const sorted = [...State.members].sort((a, b) => {
-    return (categoryOrder[a.category] ?? 1) - (categoryOrder[b.category] ?? 1);
+    const catDiff = (categoryOrder[a.category] ?? 1) - (categoryOrder[b.category] ?? 1);
+    if (catDiff !== 0) return catDiff;
+    return new Date(a.base_created_at || a.created_at) - new Date(b.base_created_at || b.created_at);
   });
 
   sorted.forEach(member => {
