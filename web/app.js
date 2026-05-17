@@ -753,8 +753,9 @@ function showMemberSelectModal() {
     const isChecked = State.selectedMemberIds.length === 0 || State.selectedMemberIds.includes(member.id);
     const label = document.createElement('label');
     label.className = 'member-check-item';
-    const avatarHtml = State.avatarImages[member.id]
-      ? `<img src="${State.avatarImages[member.id]}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;" />`
+    const _avImg1 = getAvatarImg(member);
+    const avatarHtml = _avImg1
+      ? `<img src="${_avImg1}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;" />`
       : (member.avatar && member.avatar.startsWith('data:') ? '<span>👤</span>' : (member.avatar || '👤'));
     label.innerHTML = `
       <input type="checkbox" value="${member.id}" ${isChecked ? 'checked' : ''} />
@@ -1057,7 +1058,8 @@ function renderMemberList() {
     const isSelected = State.selectedMemberIds.includes(member.id);
     const card = document.createElement('div');
     card.className = `member-card ${isSelected ? 'selected' : ''}`; card.dataset.id = member.id;
-    const avatarHtml = State.avatarImages[member.id] ? `<img src="${State.avatarImages[member.id]}" alt="${member.name}" />` : member.avatar;
+    const _avImg2 = getAvatarImg(member);
+    const avatarHtml = _avImg2 ? `<img src="${_avImg2}" alt="${member.name}" />` : member.avatar;
     const srcName = member.source_persona_id
       ? (State.members.find(m => m.id === member.source_persona_id)?.name || member.source_persona_id)
       : null;
@@ -1122,8 +1124,9 @@ function renderMemberTriggers() {
   State.members.filter(m => State.selectedMemberIds.includes(m.id)).forEach(member => {
     const btn = document.createElement('button');
     btn.className = 'member-trigger-btn'; btn.dataset.id = member.id;
-    const trigAvatar = State.avatarImages[member.id]
-      ? `<img src="${State.avatarImages[member.id]}" style="width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:4px;" />`
+    const _avImg3 = getAvatarImg(member);
+    const trigAvatar = _avImg3
+      ? `<img src="${_avImg3}" style="width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:4px;" />`
       : (member.avatar && member.avatar.startsWith('data:') ? '' : (member.avatar || ''));
     btn.innerHTML = `${trigAvatar}${member.name.split(' ')[0]}`;
     btn.addEventListener('click', () => triggerMemberResponse(member.id));
@@ -1321,11 +1324,6 @@ async function submitEditPersona() {
   }
   if (State.editAvatarDataUrl) {
     State.avatarImages[memberId] = State.editAvatarDataUrl;
-    // source_persona_idがある場合は元IDでもセット
-    const editMember = State.members.find(m => m.id === memberId);
-    if (editMember?.source_persona_id) {
-      State.avatarImages[editMember.source_persona_id] = State.editAvatarDataUrl;
-    }
   }
   try {
     const data = await API.put(`/api/personas/${memberId}`, { name, avatar, description, personality, speaking_style: speakingStyle, background, color, voice_id: voiceId === 'none' ? null : voiceId });
@@ -1784,7 +1782,7 @@ function addMessage(msg) {
     // ★ ユーザーアバターもDEFAULT_AVATARSから取得
     const avatarContent = msg.persona_id === 'user'
       ? (DEFAULT_AVATARS['user'] ? `<img src="${DEFAULT_AVATARS['user']}" alt="あなた" />` : '👤')
-      : (State.avatarImages[msg.persona_id] ? `<img src="${State.avatarImages[msg.persona_id]}" alt="${persona.name}" />` : (persona.avatar || '👤'));
+      : (getAvatarImg(persona) ? `<img src="${getAvatarImg(persona)}" alt="${persona.name}" />` : (persona.avatar || '👤'));
     row.innerHTML = `
       <div class="msg-avatar" style="background:${persona.color||'#888'}22;border:2px solid ${persona.color||'#888'}44;">${avatarContent}</div>
       <div class="msg-body"><div class="msg-name">${persona.name||'メンバー'}</div><div class="msg-bubble">${escapeHtml(msg.content)}</div></div>`;
@@ -1806,8 +1804,9 @@ function addTypingIndicator(persona, isFacilitator = false) {
     const _fAvHtml = _fAv ? `<img src="${_fAv}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:4px;" />` : '🎯';
     row.innerHTML = `<div class="facilitator-banner"><div class="facilitator-label">${_fAvHtml} ファシリテーター</div>${dots}</div>`;
   } else {
-    const avatarContent = (persona && State.avatarImages[persona.id])
-      ? `<img src="${State.avatarImages[persona.id]}" alt="${persona?.name}" />` : (persona?.avatar || '👤');
+    const _avImg4 = getAvatarImg(persona);
+    const avatarContent = _avImg4
+      ? `<img src="${_avImg4}" alt="${persona?.name}" />` : (persona?.avatar || '👤');
     row.innerHTML = `
       <div class="msg-avatar" style="background:${persona?.color||'#888'}22;border:2px solid ${persona?.color||'#888'}44;">${avatarContent}</div>
       <div class="msg-body"><div class="msg-name">${persona?.name||'メンバー'}</div>${dots}</div>`;
@@ -1817,9 +1816,9 @@ function addTypingIndicator(persona, isFacilitator = false) {
 
 function addStreamingBubble(persona) {
   const row = document.createElement('div'); row.className = 'message-row member';
-  const _av3 = State.avatarImages[persona.id];
-  const avatarContent = _av3
-    ? `<img src="${_av3}" alt="${persona.name}" />`
+  const _avImg5 = getAvatarImg(persona);
+  const avatarContent = _avImg5
+    ? `<img src="${_avImg5}" alt="${persona.name}" />`
     : (persona.avatar && !persona.avatar.startsWith('data:') ? persona.avatar : '👤');
   row.innerHTML = `
     <div class="msg-avatar" style="background:${persona.color}22;border:2px solid ${persona.color}44;">${avatarContent}</div>
@@ -2075,6 +2074,19 @@ async function handleLearnAudio(e, mode) {
     statusEl.style.whiteSpace = 'pre-line';
   }
   e.target.value = '';
+}
+
+// ===== アバター画像取得ユーティリティ =====
+function getAvatarImg(persona) {
+  if (!persona) return null;
+  // ①自分のIDで直接セットされている場合
+  if (State.avatarImages[persona.id]) return State.avatarImages[persona.id];
+  // ②コピー元IDにある場合（DEFAULT_AVATARSから来たもの）
+  const baseId = persona.source_persona_id || persona.id;
+  if (State.avatarImages[baseId]) return State.avatarImages[baseId];
+  // ③DBのavatarがbase64の場合
+  if (persona.avatar?.startsWith('data:')) return persona.avatar;
+  return null;
 }
 
 function escapeHtml(text) { const d = document.createElement('div'); d.textContent = text; return d.innerHTML; }
@@ -2620,8 +2632,6 @@ async function reloadPersonas() {
       const baseId = m.source_persona_id || m.id;
       if (m.avatar && m.avatar.startsWith('data:')) {
         State.avatarImages[m.id] = m.avatar;
-        // コピー元IDでもセット（renderMemberListのフォールバック用）
-        if (m.source_persona_id) State.avatarImages[m.source_persona_id] = m.avatar;
       } else if (DEFAULT_AVATARS[baseId]) {
         State.avatarImages[m.id] = DEFAULT_AVATARS[baseId];
       }
