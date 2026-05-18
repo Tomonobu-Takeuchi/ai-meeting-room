@@ -911,7 +911,7 @@ async function showReportModal() {
   try {
     const data = await API.post(`/api/meeting/${State.sessionId}/brief`, {
       category: State.meetingCategory || 'chat'
-    });
+    }, 120000);
     _briefData = data;
 
     // ===== Layer1 =====
@@ -1133,7 +1133,7 @@ async function useTrialLayer2() {
     const data = await API.post(`/api/meeting/${State.sessionId}/brief`, {
       category: State.meetingCategory || 'chat',
       trial_layer: 'layer2'
-    });
+    }, 120000);
     _briefData = { ..._briefData, ...data };
     if (data.layer2) {
       DOM.layer2Content.innerHTML = buildLayer2HTML(data.layer2, data.category || 'chat');
@@ -1157,7 +1157,7 @@ async function useTrialLayer3() {
     const data = await API.post(`/api/meeting/${State.sessionId}/brief`, {
       category: State.meetingCategory || 'chat',
       trial_layer: 'layer3'
-    });
+    }, 120000);
     _briefData = { ..._briefData, ...data };
     if (data.layer3) {
       DOM.layer3Content.innerHTML = buildLayer3HTML(data.layer3, data.category || 'strategy');
