@@ -45,6 +45,8 @@ def init_db():
             password_hash TEXT NOT NULL,
             name        TEXT DEFAULT '',
             plan        TEXT DEFAULT 'free',
+            trial_layer2_used BOOLEAN DEFAULT FALSE,
+            trial_layer3_used BOOLEAN DEFAULT FALSE,
             created_at  TIMESTAMP DEFAULT NOW()
         )
     """)
@@ -95,6 +97,14 @@ def init_db():
         pass
     try:
         conn.run("ALTER TABLE personas ADD COLUMN IF NOT EXISTS is_deceased_confirmed BOOLEAN DEFAULT FALSE")
+    except Exception:
+        pass
+    try:
+        conn.run("ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_layer2_used BOOLEAN DEFAULT FALSE")
+    except Exception:
+        pass
+    try:
+        conn.run("ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_layer3_used BOOLEAN DEFAULT FALSE")
     except Exception:
         pass
 
