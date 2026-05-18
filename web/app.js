@@ -1019,18 +1019,32 @@ function buildLayer3HTML(l3, cat) {
       });
       html += `</div>`;
     }
-    if (l3.target) {
-      html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">🎯 ターゲット顧客</div>`;
+    if (l3.target_market) {
+      html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">🎯 ターゲット市場</div>`;
       html += `<div style="padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:14px;">`;
-      html += `<div style="font-size:14px;font-weight:600;margin-bottom:4px;">${l3.target.primary||''}</div>`;
-      html += `<div style="font-size:12px;color:var(--text-secondary);line-height:1.6;">${l3.target.reason||''}</div></div>`;
+      html += `<div style="font-size:14px;font-weight:600;margin-bottom:4px;">${l3.target_market.primary||''}</div>`;
+      html += `<div style="font-size:12px;color:var(--text-secondary);line-height:1.6;">${l3.target_market.reason||''}</div></div>`;
     }
-    if (l3.strategy) {
-      html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">🚀 実行戦略（${l3.strategy.framework||''}）</div>`;
-      (l3.strategy.items||[]).forEach(item => {
-        html += `<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 12px;background:var(--bg-base);border-radius:8px;margin-bottom:6px;">`;
-        html += `<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;background:rgba(124,58,237,0.15);color:var(--accent-purple);flex-shrink:0;white-space:nowrap;">${item.label||''}</span>`;
-        html += `<span style="font-size:13px;line-height:1.5;">${item.content||''}</span></div>`;
+    if (l3.strategy_4p) {
+      html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">🚀 実行戦略（4P）</div>`;
+      const p4Labels = [
+        ['product', '製品'],['price', '価格'],
+        ['place', '流通'],['promotion', '販促']
+      ];
+      p4Labels.forEach(([key, label]) => {
+        if (l3.strategy_4p[key]) {
+          html += `<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 12px;background:var(--bg-base);border-radius:8px;margin-bottom:6px;">`;
+          html += `<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;background:rgba(124,58,237,0.15);color:var(--accent-purple);flex-shrink:0;white-space:nowrap;">${label}</span>`;
+          html += `<span style="font-size:13px;line-height:1.5;">${l3.strategy_4p[key]}</span></div>`;
+        }
+      });
+    }
+    if (l3.open_issues && l3.open_issues.length > 0) {
+      html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">❓ 未解決課題</div>`;
+      l3.open_issues.forEach(i => {
+        html += `<div style="margin-bottom:8px;padding:10px 12px;border-radius:8px;border:0.5px solid #F7C1C1;background:#FDF5F5;">`;
+        html += `<div style="font-size:13px;font-weight:600;color:#A32D2D;margin-bottom:4px;">${i.issue||''}</div>`;
+        html += `<div style="font-size:12px;color:var(--text-secondary);line-height:1.5;">${i.why||''}</div></div>`;
       });
     }
   } else if (cat === 'practice') {
