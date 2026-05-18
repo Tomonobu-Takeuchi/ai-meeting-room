@@ -827,6 +827,34 @@ LAYER1_TEMPLATES = {
 }
 
 LAYER2_TEMPLATES = {
+    'common': """以下の会議から「議論分析レポート」を作成してください。
+
+以下のJSON形式のみで出力してください：
+{
+  "conclusion": "議論全体の結論を2〜3文で",
+  "persona_views": [
+    {
+      "name": "ペルソナ名",
+      "stance": "推進派または慎重派またはリスク指摘または補足",
+      "opinion": "主な意見を1〜2文で（ペルソナの口調で）"
+    }
+  ],
+  "risks": [
+    {
+      "level": "高または中",
+      "title": "リスク名",
+      "detail": "具体的な理由・影響を2文で"
+    }
+  ],
+  "next_actions": [
+    "具体的なアクション1",
+    "具体的なアクション2"
+  ]
+}
+JSONのみ出力してください。"""
+}
+
+LAYER3_TEMPLATES = {
     'strategy': """以下のビジネス戦略会議から「戦略レポート」を作成してください。
 フレームワーク：ビジョン→SWOT分析→ターゲット市場→実行戦略（4P）→未解決課題→リスク
 
@@ -890,7 +918,7 @@ JSONのみ出力してください。""",
 
 @app.route("/api/meeting/<session_id>/brief", methods=["POST"])
 def generate_brief(session_id):
-    """Layer 1（アクション・ブリーフ）と Layer 2（戦略レポート）をJSON返却"""
+    """Layer1・Layer2・Layer3をJSON返却"""
     summary = meeting_room.get_session_summary(session_id)
     if not summary:
         return jsonify({"error": "セッションが見つかりません"}), 404
@@ -900,13 +928,20 @@ def generate_brief(session_id):
 
         user_id = get_current_user_id()
         plan = 'free'
+        trial_layer2_used = False
+        trial_layer3_used = False
         if user_id:
             from src.database import get_connection
             conn = get_connection()
             try:
-                row = conn.run("SELECT plan FROM users WHERE id = :uid", uid=user_id)
+                row = conn.run(
+                    "SELECT plan, trial_layer2_used, trial_layer3_used FROM users WHERE id = :uid",
+                    uid=user_id
+                )
                 if row:
                     plan = row[0][0] or 'free'
+                    trial_layer2_used = bool(row[0][1])
+                    trial_layer3_used = bool(row[0][2])
             finally:
                 conn.close()
 
@@ -919,7 +954,9 @@ def generate_brief(session_id):
             elif msg["persona_id"] == "facilitator":
                 name = "ファシリテータ"
             else:
-                persona = next((m for m in summary["members"] if m["id"] == msg["persona_id"]), None)
+                persona = next(
+                    (m for m in summary["members"] if m["id"] == msg["persona_id"]), None
+                )
                 name = persona["name"] if persona else msg["persona_id"]
             discussion += f"{name}: {msg['content']}\n\n"
 
@@ -927,6 +964,7 @@ def generate_brief(session_id):
         member_names = ", ".join([m["name"] for m in summary["members"]])
         user_context = "\n".join([f"・{m}" for m in user_messages]) if user_messages else "（なし）"
 
+        # ===== Layer1（全プラン） =====
         l1_tmpl = LAYER1_TEMPLATES.get(category, LAYER1_TEMPLATES['chat'])
         layer1_prompt = f"""{l1_tmpl['prompt_prefix']}
 議題：{summary['topic']}
@@ -948,29 +986,89 @@ JSONのみ出力してください。"""
         layer1_text = layer1_res.content[0].text.strip().replace("```json", "").replace("```", "").strip()
         layer1_data = json.loads(layer1_text)
 
+        # ===== Layer2（standard/pro は常時、free は未使用時のみ、chatカテゴリは除外） =====
         layer2_data = None
-        if plan in ('standard', 'pro') and category != 'chat':
-            l2_tmpl_prompt = LAYER2_TEMPLATES.get(category, LAYER2_TEMPLATES['strategy'])
-            layer2_prompt = f"""{l2_tmpl_prompt}
+        can_use_layer2 = (
+            category != 'chat' and (
+                plan in ('standard', 'pro') or
+                (plan == 'free' and not trial_layer2_used)
+            )
+        )
+        if can_use_layer2:
+            l2_prompt = f"""{LAYER2_TEMPLATES['common']}
 議題：{summary['topic']}
+カテゴリ：{category}
 参加者：{member_names}
 議論内容：
 {discussion if discussion else "（議論なし）"}"""
 
             layer2_res = client.messages.create(
                 model="claude-sonnet-4-20250514",
-                max_tokens=1500,
-                messages=[{"role": "user", "content": layer2_prompt}]
+                max_tokens=1200,
+                messages=[{"role": "user", "content": l2_prompt}]
             )
             layer2_text = layer2_res.content[0].text.strip().replace("```json", "").replace("```", "").strip()
             layer2_data = json.loads(layer2_text)
+
+            # freeプランのお試し使用済みフラグを更新
+            if plan == 'free' and not trial_layer2_used and user_id:
+                from src.database import get_connection
+                conn2 = get_connection()
+                try:
+                    conn2.run(
+                        "UPDATE users SET trial_layer2_used = TRUE WHERE id = :uid",
+                        uid=user_id
+                    )
+                finally:
+                    conn2.close()
+                trial_layer2_used = True
+
+        # ===== Layer3（proは常時、standardは未使用時のみ、chatカテゴリは除外） =====
+        layer3_data = None
+        can_use_layer3 = (
+            category != 'chat' and (
+                plan == 'pro' or
+                (plan == 'standard' and not trial_layer3_used)
+            )
+        )
+        if can_use_layer3:
+            l3_tmpl_prompt = LAYER3_TEMPLATES.get(category, LAYER3_TEMPLATES['strategy'])
+            layer3_prompt = f"""{l3_tmpl_prompt}
+議題：{summary['topic']}
+参加者：{member_names}
+議論内容：
+{discussion if discussion else "（議論なし）"}"""
+
+            layer3_res = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=1500,
+                messages=[{"role": "user", "content": layer3_prompt}]
+            )
+            layer3_text = layer3_res.content[0].text.strip().replace("```json", "").replace("```", "").strip()
+            layer3_data = json.loads(layer3_text)
+
+            # standardプランのお試し使用済みフラグを更新
+            if plan == 'standard' and not trial_layer3_used and user_id:
+                from src.database import get_connection
+                conn3 = get_connection()
+                try:
+                    conn3.run(
+                        "UPDATE users SET trial_layer3_used = TRUE WHERE id = :uid",
+                        uid=user_id
+                    )
+                finally:
+                    conn3.close()
+                trial_layer3_used = True
 
         return jsonify({
             "plan": plan,
             "topic": summary["topic"],
             "category": category,
+            "trial_layer2_used": trial_layer2_used,
+            "trial_layer3_used": trial_layer3_used,
             "layer1": layer1_data,
-            "layer2": layer2_data
+            "layer2": layer2_data,
+            "layer3": layer3_data
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
