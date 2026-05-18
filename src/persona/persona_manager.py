@@ -146,7 +146,7 @@ class PersonaManager:
                 SELECT id, user_id, name, avatar, description, personality,
                        speaking_style, background, color, role, is_default, created_at, voice_id, source_persona_id, category
                 FROM personas
-                WHERE id = ANY(:ids) AND user_id=:user_id
+                WHERE id = ANY(:ids) AND (user_id=:user_id OR user_id IS NULL)
             """, ids=list(ids), user_id=user_id)
         else:
             rows = conn.run("""
