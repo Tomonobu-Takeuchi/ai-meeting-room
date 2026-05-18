@@ -888,7 +888,9 @@ async function showReportModal() {
   DOM.downloadLayer2Btn.style.display = 'none';
 
   try {
-    const data = await API.post(`/api/meeting/${State.sessionId}/brief`, {});
+    const data = await API.post(`/api/meeting/${State.sessionId}/brief`, {
+      category: State.meetingCategory || 'chat'
+    });
     _briefData = data;
 
     const l1 = data.layer1;
@@ -898,19 +900,96 @@ async function showReportModal() {
 
     if (data.layer2) {
       const l2 = data.layer2;
+      const cat = data.category || 'strategy';
       let html = '';
-      html += `<div style="font-size:13px;line-height:1.7;margin-bottom:12px;">${l2.overview || ''}</div>`;
-      html += `<div style="font-size:13px;font-weight:600;margin-bottom:6px;">🧠 各ペルソナの視点</div>`;
-      for (const [name, analysis] of Object.entries(l2.persona_analysis || {})) {
-        html += `<div style="margin-bottom:8px;padding:10px;background:var(--bg-base);border-radius:6px;">
-          <div style="font-weight:600;font-size:12px;color:var(--accent-blue);margin-bottom:4px;">${name}</div>
-          <div style="font-size:12px;line-height:1.6;">${analysis}</div>
-        </div>`;
+
+      if (cat === 'strategy') {
+        html += `<div style="font-size:13px;font-weight:700;color:var(--accent-blue);margin-bottom:8px;">🔭 ビジョン</div>`;
+        html += `<div style="font-size:13px;line-height:1.7;margin-bottom:14px;">${l2.vision || ''}</div>`;
+        html += `<div style="font-size:13px;font-weight:700;margin-bottom:6px;">📊 SWOT分析</div>`;
+        const swot = l2.swot || {};
+        const swotLabels = {strength:'強み💪',weakness:'弱み⚠️',opportunity:'機会🌱',threat:'脅威🔥'};
+        for (const [key, label] of Object.entries(swotLabels)) {
+          html += `<div style="margin-bottom:6px;"><span style="font-size:12px;font-weight:600;color:var(--text-secondary);">${label}</span>`;
+          html += `<div style="font-size:12px;line-height:1.6;">${(swot[key]||[]).map(i=>`・${i}`).join('<br>')}</div></div>`;
+        }
+        html += `<div style="font-size:13px;font-weight:700;margin:12px 0 6px;">🎯 ターゲット市場</div>`;
+        const tm = l2.target_market || {};
+        html += `<div style="font-size:12px;line-height:1.7;margin-bottom:4px;"><b>${tm.primary||''}</b></div>`;
+        html += `<div style="font-size:12px;line-height:1.7;">${tm.reason||''}</div>`;
+        html += `<div style="font-size:13px;font-weight:700;margin:12px 0 6px;">🚀 実行戦略（4P）</div>`;
+        const p4 = l2.strategy_4p || {};
+        for (const [key, label] of [['product','Product'],['price','Price'],['place','Place'],['promotion','Promotion']]) {
+          html += `<div style="margin-bottom:4px;font-size:12px;"><b>${label}：</b>${p4[key]||''}</div>`;
+        }
+        html += `<div style="font-size:13px;font-weight:700;margin:12px 0 6px;">❓ 未解決課題</div>`;
+        (l2.open_issues||[]).forEach(i => {
+          html += `<div style="margin-bottom:6px;padding:8px;background:var(--bg-base);border-radius:6px;font-size:12px;">`;
+          html += `<b>${i.issue||''}</b><br><span style="color:var(--text-secondary);">${i.why||''}</span></div>`;
+        });
+        html += `<div style="font-size:13px;font-weight:700;margin:12px 0 6px;">⚠️ リスクとアドバイス</div>`;
+        (l2.risks||[]).forEach(r => {
+          html += `<div style="margin-bottom:6px;padding:8px;background:var(--bg-base);border-radius:6px;font-size:12px;">`;
+          html += `<b>${r.risk||''}</b><br><span style="color:var(--text-secondary);">${r.advice||''}</span></div>`;
+        });
+
+      } else if (cat === 'practice') {
+        html += `<div style="font-size:13px;line-height:1.7;margin-bottom:12px;">${l2.summary||''}</div>`;
+        html += `<div style="font-size:13px;font-weight:700;margin-bottom:6px;">✅ うまくいった点</div>`;
+        html += (l2.strengths||[]).map(s=>`<div style="font-size:12px;">・${s}</div>`).join('');
+        html += `<div style="font-size:13px;font-weight:700;margin:12px 0 6px;">🔧 改善すべき点</div>`;
+        html += (l2.weaknesses||[]).map(w=>`<div style="font-size:12px;">・${w}</div>`).join('');
+        html += `<div style="font-size:13px;font-weight:700;margin:12px 0 6px;">❓ 想定Q&A</div>`;
+        (l2.qa_list||[]).forEach(q => {
+          html += `<div style="margin-bottom:8px;padding:8px;background:var(--bg-base);border-radius:6px;font-size:12px;">`;
+          html += `<b>Q: ${q.question||''}</b><br>A: ${q.answer||''}</div>`;
+        });
+        html += `<div style="font-size:13px;font-weight:700;margin:12px 0 6px;">📋 本番前チェックリスト</div>`;
+        html += (l2.checklist||[]).map(c=>`<div style="font-size:12px;">□ ${c}</div>`).join('');
+
+      } else if (cat === 'study') {
+        html += `<div style="font-size:13px;font-weight:700;margin-bottom:6px;">📍 現在地</div>`;
+        html += `<div style="font-size:13px;line-height:1.7;margin-bottom:12px;">${l2.current_level||''}</div>`;
+        html += `<div style="font-size:13px;font-weight:700;margin-bottom:6px;">🏁 目標</div>`;
+        html += `<div style="font-size:13px;line-height:1.7;margin-bottom:12px;">${l2.goal||''}</div>`;
+        html += `<div style="font-size:13px;font-weight:700;margin-bottom:6px;">📏 ギャップ</div>`;
+        html += (l2.gap_analysis||[]).map(g=>`<div style="font-size:12px;">・${g}</div>`).join('');
+        html += `<div style="font-size:13px;font-weight:700;margin:12px 0 6px;">🗓️ ロードマップ</div>`;
+        (l2.roadmap||[]).forEach(r => {
+          html += `<div style="margin-bottom:4px;font-size:12px;"><b>${r.period}：</b>${r.action}</div>`;
+        });
+        html += `<div style="font-size:13px;font-weight:700;margin:12px 0 6px;">🧱 障壁と突破策</div>`;
+        (l2.obstacles||[]).forEach(o => {
+          html += `<div style="margin-bottom:6px;padding:8px;background:var(--bg-base);border-radius:6px;font-size:12px;">`;
+          html += `<b>${o.obstacle||''}</b><br><span style="color:var(--text-secondary);">${o.solution||''}</span></div>`;
+        });
+        html += `<div style="font-size:13px;font-weight:700;margin:12px 0 6px;">💪 継続のために</div>`;
+        html += `<div style="font-size:12px;line-height:1.7;">${l2.motivation||''}</div>`;
+
+      } else if (cat === 'consulting') {
+        html += `<div style="font-size:13px;font-weight:700;margin-bottom:6px;">🔍 悩みの本質</div>`;
+        html += `<div style="font-size:13px;line-height:1.7;margin-bottom:12px;">${l2.essence||''}</div>`;
+        html += `<div style="font-size:13px;font-weight:700;margin-bottom:6px;">🔀 選択肢</div>`;
+        (l2.options||[]).forEach(o => {
+          html += `<div style="margin-bottom:8px;padding:8px;background:var(--bg-base);border-radius:6px;font-size:12px;">`;
+          html += `<b>${o.option||''}</b><br>`;
+          html += `✅ ${o.merit||''}<br>⚠️ ${o.demerit||''}</div>`;
+        });
+        html += `<div style="font-size:13px;font-weight:700;margin:12px 0 6px;">⚖️ 判断基準</div>`;
+        html += (l2.criteria||[]).map(c=>`<div style="font-size:12px;">・${c}</div>`).join('');
+        html += `<div style="font-size:13px;font-weight:700;margin:12px 0 6px;">🎯 推奨</div>`;
+        html += `<div style="font-size:13px;line-height:1.7;margin-bottom:8px;">${l2.recommendation||''}</div>`;
+        html += `<div style="font-size:13px;font-weight:700;margin-bottom:6px;">🔄 後悔最小化チェック</div>`;
+        html += `<div style="font-size:12px;line-height:1.7;margin-bottom:8px;">${l2.regret_check||''}</div>`;
+        html += `<div style="font-size:13px;font-weight:700;margin-bottom:6px;">⚠️ 注意点</div>`;
+        html += `<div style="font-size:12px;line-height:1.7;">${l2.caution||''}</div>`;
+
+      } else {
+        html += `<div style="font-size:13px;line-height:1.7;margin-bottom:12px;">${l2.overview||''}</div>`;
+        (l2.risks||[]).forEach(r => { html += `<div style="font-size:12px;">・${r}</div>`; });
+        html += `<div style="font-size:13px;line-height:1.7;margin-top:12px;">${l2.recommendation||''}</div>`;
       }
-      html += `<div style="font-size:13px;font-weight:600;margin:12px 0 6px;">⚠️ 注意すべきリスク</div>`;
-      html += (l2.risks || []).map(r => `<div style="font-size:12px;">・${r}</div>`).join('');
-      html += `<div style="font-size:13px;font-weight:600;margin:12px 0 6px;">🎯 総合推奨</div>`;
-      html += `<div style="font-size:12px;line-height:1.7;">${l2.recommendation || ''}</div>`;
+
       DOM.layer2Content.innerHTML = html;
       DOM.downloadLayer2Btn.style.display = 'block';
     } else {
@@ -1443,7 +1522,11 @@ async function startMeeting() {
   }
   setLoading(true);
   try {
-    const data = await API.post('/api/meeting/start', { topic, member_ids: State.selectedMemberIds });
+    const data = await API.post('/api/meeting/start', {
+      topic,
+      member_ids: State.selectedMemberIds,
+      meeting_category: State.meetingCategory || 'chat'
+    });
     State.sessionId = data.session_id; State.topic = data.topic;
     State.members = data.members; State.facilitator = data.facilitator;
     // ★ 会議開始後もアバターを再セット

@@ -719,7 +719,8 @@ def start_meeting():
     if not member_ids:
         prefetched_members = persona_manager.get_members_only(user_id)
         member_ids = [p["id"] for p in prefetched_members]
-    session_data = meeting_room.create_session(topic, member_ids, user_id, prefetched_members=prefetched_members)
+    category = data.get("meeting_category", "chat")
+    session_data = meeting_room.create_session(topic, member_ids, user_id, prefetched_members=prefetched_members, category=category)
     return jsonify({
         "session_id": session_data["session_id"],
         "topic": session_data["topic"],
@@ -743,6 +744,91 @@ def post_message(session_id):
     msg = meeting_room.add_message(session_id, "user", "user", content)
     return jsonify({"message": msg})
 
+LAYER1_TEMPLATES = {
+    'strategy': {
+        'prompt_prefix': '以下のビジネス戦略会議から「アクション・ブリーフ」を作成してください。',
+        'json_schema': '{"conclusion": "結論を2〜3文で", "actions": ["次にやること1", "次にやること2", "次にやること3"], "user_basis": "ユーザーの発言を踏まえた方針"}',
+    },
+    'practice': {
+        'prompt_prefix': '以下の発表練習会議から「発表前チェックリスト」を作成してください。',
+        'json_schema': '{"conclusion": "発表の全体評価を2〜3文で", "actions": ["改善すべき点1", "改善すべき点2", "本番前にやること"], "user_basis": "発表者の強みと注意点"}',
+    },
+    'study': {
+        'prompt_prefix': '以下の学習・研究会議から「学習アクション・ブリーフ」を作成してください。',
+        'json_schema': '{"conclusion": "今日の学びを2〜3文で", "actions": ["今週やること1", "今週やること2", "今週やること3"], "user_basis": "ユーザーの現在地と次のステップ"}',
+    },
+    'consulting': {
+        'prompt_prefix': '以下の人生相談会議から「今日からできること」を作成してください。',
+        'json_schema': '{"conclusion": "相談の核心を2〜3文で", "actions": ["明日できること1", "明日できること2", "長期的にやること"], "user_basis": "ユーザーの気持ちと決断のポイント"}',
+    },
+    'chat': {
+        'prompt_prefix': '以下の会話から「ハイライト」を作成してください。',
+        'json_schema': '{"conclusion": "会話の要点を2〜3文で", "actions": ["印象に残った話題1", "印象に残った話題2"], "user_basis": "あなたが話していたこと"}',
+    },
+}
+
+LAYER2_TEMPLATES = {
+    'strategy': """以下のビジネス戦略会議から「戦略レポート」を作成してください。
+フレームワーク：ビジョン→SWOT分析→ターゲット市場→実行戦略（4P）→未解決課題→リスク
+
+以下のJSON形式のみで出力してください：
+{
+  "vision": "ユーザーが実現したいことを1〜2文で",
+  "swot": {
+    "strength": ["強み1", "強み2"],
+    "weakness": ["弱み1", "弱み2"],
+    "opportunity": ["機会1", "機会2"],
+    "threat": ["脅威1", "脅威2"]
+  },
+  "target_market": {"primary": "ターゲット顧客像", "reason": "根拠2〜3文"},
+  "strategy_4p": {
+    "product": "提供価値",
+    "price": "価格設定",
+    "place": "流通チャネル",
+    "promotion": "認知獲得方法"
+  },
+  "open_issues": [{"issue": "未解決課題1", "why": "重要な理由"}],
+  "risks": [{"risk": "リスク1", "advice": "対処法"}]
+}
+JSONのみ出力してください。""",
+    'practice': """以下の発表練習会議から「発表分析レポート」を作成してください。
+
+以下のJSON形式のみで出力してください：
+{
+  "summary": "発表内容の要点を2〜3文で",
+  "strengths": ["うまくいった点1", "うまくいった点2"],
+  "weaknesses": ["改善すべき点1", "改善すべき点2"],
+  "qa_list": [{"question": "想定質問1", "answer": "推奨回答1"}],
+  "improvement": "発表全体の改善推奨を2〜3文で",
+  "checklist": ["本番前チェック1", "本番前チェック2", "本番前チェック3"]
+}
+JSONのみ出力してください。""",
+    'study': """以下の学習・研究会議から「学習ロードマップ」を作成してください。
+
+以下のJSON形式のみで出力してください：
+{
+  "current_level": "現在地の評価を2〜3文で",
+  "goal": "目標を1〜2文で明確に",
+  "gap_analysis": ["ギャップ1", "ギャップ2"],
+  "roadmap": [{"period": "1週目", "action": "やること"}],
+  "obstacles": [{"obstacle": "障壁1", "solution": "突破策1"}],
+  "motivation": "継続のためのアドバイスを2〜3文で"
+}
+JSONのみ出力してください。""",
+    'consulting': """以下の人生相談会議から「相談レポート」を作成してください。
+
+以下のJSON形式のみで出力してください：
+{
+  "essence": "悩みの本質を2〜3文で",
+  "options": [{"option": "選択肢1", "merit": "メリット", "demerit": "デメリット"}],
+  "criteria": ["判断基準1", "判断基準2"],
+  "recommendation": "推奨と根拠を2〜3文で",
+  "regret_check": "後悔最小化の視点から一言",
+  "caution": "注意点を1〜2文で"
+}
+JSONのみ出力してください。""",
+}
+
 @app.route("/api/meeting/<session_id>/brief", methods=["POST"])
 def generate_brief(session_id):
     """Layer 1（アクション・ブリーフ）と Layer 2（戦略レポート）をJSON返却"""
@@ -750,6 +836,9 @@ def generate_brief(session_id):
     if not summary:
         return jsonify({"error": "セッションが見つかりません"}), 404
     try:
+        req_data = request.json or {}
+        category = req_data.get('category', 'chat')
+
         user_id = get_current_user_id()
         plan = 'free'
         if user_id:
@@ -779,7 +868,8 @@ def generate_brief(session_id):
         member_names = ", ".join([m["name"] for m in summary["members"]])
         user_context = "\n".join([f"・{m}" for m in user_messages]) if user_messages else "（なし）"
 
-        layer1_prompt = f"""以下の会議から「アクション・ブリーフ」を作成してください。
+        l1_tmpl = LAYER1_TEMPLATES.get(category, LAYER1_TEMPLATES['chat'])
+        layer1_prompt = f"""{l1_tmpl['prompt_prefix']}
 議題：{summary['topic']}
 参加者：{member_names}
 ユーザーの発言：
@@ -788,11 +878,7 @@ def generate_brief(session_id):
 {discussion if discussion else "（議論なし）"}
 
 以下のJSON形式のみで出力してください：
-{{
-  "conclusion": "結論を2〜3文で。ユーザーの発言を踏まえて記述",
-  "actions": ["次にやること1", "次にやること2", "次にやること3"],
-  "user_basis": "ユーザーの発言「〜」を踏まえ、〜を優先する方針"
-}}
+{l1_tmpl['json_schema']}
 JSONのみ出力してください。"""
 
         layer1_res = client.messages.create(
@@ -804,21 +890,13 @@ JSONのみ出力してください。"""
         layer1_data = json.loads(layer1_text)
 
         layer2_data = None
-        if plan in ('standard', 'pro'):
-            layer2_prompt = f"""以下の会議から「戦略レポート」を作成してください。
+        if plan in ('standard', 'pro') and category != 'chat':
+            l2_tmpl_prompt = LAYER2_TEMPLATES.get(category, LAYER2_TEMPLATES['strategy'])
+            layer2_prompt = f"""{l2_tmpl_prompt}
 議題：{summary['topic']}
 参加者：{member_names}
 議論内容：
-{discussion if discussion else "（議論なし）"}
-
-以下のJSON形式のみで出力してください：
-{{
-  "overview": "議論全体の概要を3〜4文で",
-  "persona_analysis": {{"参加者名": "この人物がなぜそう言ったか、背景・価値観・立場を含めて2〜3文で"}},
-  "risks": ["注意すべきリスク1", "注意すべきリスク2"],
-  "recommendation": "総合的な推奨アクションを2〜3文で"
-}}
-JSONのみ出力してください。"""
+{discussion if discussion else "（議論なし）"}"""
 
             layer2_res = client.messages.create(
                 model="claude-sonnet-4-20250514",
@@ -831,6 +909,7 @@ JSONのみ出力してください。"""
         return jsonify({
             "plan": plan,
             "topic": summary["topic"],
+            "category": category,
             "layer1": layer1_data,
             "layer2": layer2_data
         })

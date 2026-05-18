@@ -47,7 +47,7 @@ class MeetingRoom:
                 else:
                     raise
 
-    def create_session(self, topic, member_ids, user_id=None, prefetched_members=None):
+    def create_session(self, topic, member_ids, user_id=None, prefetched_members=None, category=None):
         session_id = str(uuid.uuid4())[:8]
         members = prefetched_members if prefetched_members is not None else self.persona_manager.get_personas_by_ids(member_ids, user_id=user_id)
         facilitator = self.persona_manager.get_facilitator()
@@ -58,6 +58,7 @@ class MeetingRoom:
             "facilitator": facilitator,
             "messages": [],
             "user_id": user_id,
+            "category": category,
             "created_at": datetime.now().isoformat(),
             "status": "active"
         }
