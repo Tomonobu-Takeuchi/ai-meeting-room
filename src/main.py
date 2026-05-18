@@ -659,6 +659,49 @@ TEAM_PATTERNS = {
     },
 }
 
+CATEGORY_PATTERNS = {
+    'strategy': {
+        'name': 'ビジネス戦略・企画',
+        'description': 'ビジョナリー（推進）・戦略家（推進）・批評家（慎重）・実務家（慎重）の4人で議論します',
+        'roles': [
+            {'role': 'ビジョナリー（推進）', 'persona_id': 'hideyoshi'},
+            {'role': '戦略家（推進）',       'persona_id': 'koumei'},
+            {'role': '批評家（慎重）',       'persona_id': 'critic'},
+            {'role': '実務家（慎重）',       'persona_id': 'consultant'},
+        ]
+    },
+    'practice': {
+        'name': '発表・プレゼン練習',
+        'description': '厳格な審査員・友好的な審査員・聴衆代表・天邪鬼の4人が発表を評価します',
+        'roles': [
+            {'role': '厳格な審査員', 'persona_id': 'professor'},
+            {'role': '友好的な審査員', 'persona_id': 'elizabeth1'},
+            {'role': '聴衆代表',     'persona_id': 'critic'},
+            {'role': '天邪鬼',       'persona_id': 'amanojaku'},
+        ]
+    },
+    'study': {
+        'name': '学習・研究',
+        'description': '指導者・査読者・同期・応援者の4人が学習をサポートします',
+        'roles': [
+            {'role': '指導者', 'persona_id': 'professor'},
+            {'role': '査読者', 'persona_id': 'turing'},
+            {'role': '同期',   'persona_id': 'curie'},
+            {'role': '応援者', 'persona_id': 'shisho'},
+        ]
+    },
+    'consulting': {
+        'name': '人生相談',
+        'description': '傾聴者・論理家・経験者・背中押し役の4人が寄り添います',
+        'roles': [
+            {'role': '傾聴者',     'persona_id': 'obaa'},
+            {'role': '論理家',     'persona_id': 'koumei'},
+            {'role': '経験者',     'persona_id': 'yako'},
+            {'role': '背中押し役', 'persona_id': 'amanojaku'},
+        ]
+    },
+}
+
 @app.route("/api/team/suggest", methods=["POST"])
 def suggest_team():
     """議題からパターンを判定して最適なチームを提案する"""
@@ -668,16 +711,32 @@ def suggest_team():
     if not topic:
         return jsonify({"error": "議題を入力してください"}), 400
 
-    # キーワードマッチでパターン判定
-    matched_pattern = 'E'
-    for pattern_key, pattern in TEAM_PATTERNS.items():
-        if pattern_key == 'E':
-            continue
-        if any(kw in topic for kw in pattern['keywords']):
-            matched_pattern = pattern_key
-            break
+    category = data.get("category", "")
 
-    pattern = TEAM_PATTERNS[matched_pattern]
+    # chatカテゴリはチーム提案なし（フロントでスキップ）
+    if category == 'chat':
+        return jsonify({
+            'pattern': 'chat',
+            'pattern_name': '雑談・その他',
+            'description': 'メンバーを自由に選んでください',
+            'roles': [],
+            'skip_suggest': True,
+        })
+
+    # カテゴリが指定されている場合はCATEGORY_PATTERNSを優先
+    if category and category in CATEGORY_PATTERNS:
+        pattern = CATEGORY_PATTERNS[category]
+        matched_pattern = category
+    else:
+        # 既存のキーワードマッチにフォールバック
+        matched_pattern = 'E'
+        for pattern_key, pat in TEAM_PATTERNS.items():
+            if pattern_key == 'E':
+                continue
+            if any(kw in topic for kw in pat['keywords']):
+                matched_pattern = pattern_key
+                break
+        pattern = TEAM_PATTERNS[matched_pattern]
 
     # ペルソナ情報を取得してrolesに付加
     enriched_roles = []

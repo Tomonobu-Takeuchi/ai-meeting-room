@@ -673,7 +673,18 @@ async function showTeamSuggestModal() {
   DOM.teamSuggestModal.classList.remove('hidden');
 
   try {
-    const data = await API.post('/api/team/suggest', { topic });
+    const data = await API.post('/api/team/suggest', {
+      topic,
+      category: State.meetingCategory || ''
+    });
+
+    // chatカテゴリはメンバー選択モーダルに直接飛ばす
+    if (data.skip_suggest) {
+      DOM.teamSuggestModal.classList.add('hidden');
+      showMemberSelectModal();
+      return;
+    }
+
     State.suggestedRoles = data.roles;
 
     DOM.teamSuggestPattern.textContent = `パターン${data.pattern}：${data.pattern_name}`;
