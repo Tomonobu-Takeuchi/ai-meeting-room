@@ -103,8 +103,14 @@ const DOM = {
   briefUserBasis: $('briefUserBasis'),
   downloadLayer1Btn: $('downloadLayer1Btn'),
   layer2Content: $('layer2Content'),
+  layer2Trial: $('layer2Trial'),
   layer2Locked: $('layer2Locked'),
-  downloadLayer2Btn: $('downloadLayer2Btn'),
+  trialLayer2Btn: $('trialLayer2Btn'),
+  layer3Section: $('layer3Section'),
+  layer3Content: $('layer3Content'),
+  layer3Trial: $('layer3Trial'),
+  layer3Locked: $('layer3Locked'),
+  trialLayer3Btn: $('trialLayer3Btn'),
   // チーム提案モーダル
   teamSuggestModal: $('teamSuggestModal'),
   teamSuggestPattern: $('teamSuggestPattern'),
@@ -478,7 +484,6 @@ async function init() {
   DOM.reportBtn.addEventListener('click', showReportModal);
   document.getElementById('minutesEndBtn')?.addEventListener('click', endMeeting);
   DOM.downloadLayer1Btn.addEventListener('click', downloadLayer1PDF);
-  DOM.downloadLayer2Btn?.addEventListener('click', downloadLayer2PDF);
 
   DOM.voiceModeBtn.addEventListener('click', toggleVoiceMode);
   DOM.stopSpeakBtn.addEventListener('click', stopSpeaking);
@@ -891,12 +896,17 @@ let _briefData = null;
 async function showReportModal() {
   if (!State.sessionId) return;
   DOM.reportModal.classList.remove('hidden');
+
+  // 初期化
   DOM.briefConclusion.textContent = '⏳ 生成中...';
-  DOM.briefActions.textContent = '';
+  DOM.briefActions.innerHTML = '';
   DOM.briefUserBasis.textContent = '';
   DOM.layer2Content.innerHTML = '';
+  DOM.layer2Trial.classList.add('hidden');
   DOM.layer2Locked.classList.add('hidden');
-  DOM.downloadLayer2Btn.style.display = 'none';
+  DOM.layer3Content.innerHTML = '';
+  DOM.layer3Trial.classList.add('hidden');
+  DOM.layer3Locked.classList.add('hidden');
 
   try {
     const data = await API.post(`/api/meeting/${State.sessionId}/brief`, {
@@ -904,111 +914,261 @@ async function showReportModal() {
     });
     _briefData = data;
 
+    // ===== Layer1 =====
     const l1 = data.layer1;
     DOM.briefConclusion.textContent = l1.conclusion || '';
     DOM.briefActions.innerHTML = (l1.actions || []).map(a => `<div>・${a}</div>`).join('');
     DOM.briefUserBasis.textContent = l1.user_basis || '';
 
+    // ===== Layer2 =====
+    const isLoggedIn = !!State.currentUser;
     if (data.layer2) {
-      const l2 = data.layer2;
-      const cat = data.category || 'strategy';
-      let html = '';
-
-      if (cat === 'strategy') {
-        html += `<div style="font-size:13px;font-weight:700;color:var(--accent-blue);margin-bottom:8px;">🔭 ビジョン</div>`;
-        html += `<div style="font-size:13px;line-height:1.7;margin-bottom:14px;">${l2.vision || ''}</div>`;
-        html += `<div style="font-size:13px;font-weight:700;margin-bottom:6px;">📊 SWOT分析</div>`;
-        const swot = l2.swot || {};
-        const swotLabels = {strength:'強み💪',weakness:'弱み⚠️',opportunity:'機会🌱',threat:'脅威🔥'};
-        for (const [key, label] of Object.entries(swotLabels)) {
-          html += `<div style="margin-bottom:6px;"><span style="font-size:12px;font-weight:600;color:var(--text-secondary);">${label}</span>`;
-          html += `<div style="font-size:12px;line-height:1.6;">${(swot[key]||[]).map(i=>`・${i}`).join('<br>')}</div></div>`;
-        }
-        html += `<div style="font-size:13px;font-weight:700;margin:12px 0 6px;">🎯 ターゲット市場</div>`;
-        const tm = l2.target_market || {};
-        html += `<div style="font-size:12px;line-height:1.7;margin-bottom:4px;"><b>${tm.primary||''}</b></div>`;
-        html += `<div style="font-size:12px;line-height:1.7;">${tm.reason||''}</div>`;
-        html += `<div style="font-size:13px;font-weight:700;margin:12px 0 6px;">🚀 実行戦略（4P）</div>`;
-        const p4 = l2.strategy_4p || {};
-        for (const [key, label] of [['product','Product'],['price','Price'],['place','Place'],['promotion','Promotion']]) {
-          html += `<div style="margin-bottom:4px;font-size:12px;"><b>${label}：</b>${p4[key]||''}</div>`;
-        }
-        html += `<div style="font-size:13px;font-weight:700;margin:12px 0 6px;">❓ 未解決課題</div>`;
-        (l2.open_issues||[]).forEach(i => {
-          html += `<div style="margin-bottom:6px;padding:8px;background:var(--bg-base);border-radius:6px;font-size:12px;">`;
-          html += `<b>${i.issue||''}</b><br><span style="color:var(--text-secondary);">${i.why||''}</span></div>`;
-        });
-        html += `<div style="font-size:13px;font-weight:700;margin:12px 0 6px;">⚠️ リスクとアドバイス</div>`;
-        (l2.risks||[]).forEach(r => {
-          html += `<div style="margin-bottom:6px;padding:8px;background:var(--bg-base);border-radius:6px;font-size:12px;">`;
-          html += `<b>${r.risk||''}</b><br><span style="color:var(--text-secondary);">${r.advice||''}</span></div>`;
-        });
-
-      } else if (cat === 'practice') {
-        html += `<div style="font-size:13px;line-height:1.7;margin-bottom:12px;">${l2.summary||''}</div>`;
-        html += `<div style="font-size:13px;font-weight:700;margin-bottom:6px;">✅ うまくいった点</div>`;
-        html += (l2.strengths||[]).map(s=>`<div style="font-size:12px;">・${s}</div>`).join('');
-        html += `<div style="font-size:13px;font-weight:700;margin:12px 0 6px;">🔧 改善すべき点</div>`;
-        html += (l2.weaknesses||[]).map(w=>`<div style="font-size:12px;">・${w}</div>`).join('');
-        html += `<div style="font-size:13px;font-weight:700;margin:12px 0 6px;">❓ 想定Q&A</div>`;
-        (l2.qa_list||[]).forEach(q => {
-          html += `<div style="margin-bottom:8px;padding:8px;background:var(--bg-base);border-radius:6px;font-size:12px;">`;
-          html += `<b>Q: ${q.question||''}</b><br>A: ${q.answer||''}</div>`;
-        });
-        html += `<div style="font-size:13px;font-weight:700;margin:12px 0 6px;">📋 本番前チェックリスト</div>`;
-        html += (l2.checklist||[]).map(c=>`<div style="font-size:12px;">□ ${c}</div>`).join('');
-
-      } else if (cat === 'study') {
-        html += `<div style="font-size:13px;font-weight:700;margin-bottom:6px;">📍 現在地</div>`;
-        html += `<div style="font-size:13px;line-height:1.7;margin-bottom:12px;">${l2.current_level||''}</div>`;
-        html += `<div style="font-size:13px;font-weight:700;margin-bottom:6px;">🏁 目標</div>`;
-        html += `<div style="font-size:13px;line-height:1.7;margin-bottom:12px;">${l2.goal||''}</div>`;
-        html += `<div style="font-size:13px;font-weight:700;margin-bottom:6px;">📏 ギャップ</div>`;
-        html += (l2.gap_analysis||[]).map(g=>`<div style="font-size:12px;">・${g}</div>`).join('');
-        html += `<div style="font-size:13px;font-weight:700;margin:12px 0 6px;">🗓️ ロードマップ</div>`;
-        (l2.roadmap||[]).forEach(r => {
-          html += `<div style="margin-bottom:4px;font-size:12px;"><b>${r.period}：</b>${r.action}</div>`;
-        });
-        html += `<div style="font-size:13px;font-weight:700;margin:12px 0 6px;">🧱 障壁と突破策</div>`;
-        (l2.obstacles||[]).forEach(o => {
-          html += `<div style="margin-bottom:6px;padding:8px;background:var(--bg-base);border-radius:6px;font-size:12px;">`;
-          html += `<b>${o.obstacle||''}</b><br><span style="color:var(--text-secondary);">${o.solution||''}</span></div>`;
-        });
-        html += `<div style="font-size:13px;font-weight:700;margin:12px 0 6px;">💪 継続のために</div>`;
-        html += `<div style="font-size:12px;line-height:1.7;">${l2.motivation||''}</div>`;
-
-      } else if (cat === 'consulting') {
-        html += `<div style="font-size:13px;font-weight:700;margin-bottom:6px;">🔍 悩みの本質</div>`;
-        html += `<div style="font-size:13px;line-height:1.7;margin-bottom:12px;">${l2.essence||''}</div>`;
-        html += `<div style="font-size:13px;font-weight:700;margin-bottom:6px;">🔀 選択肢</div>`;
-        (l2.options||[]).forEach(o => {
-          html += `<div style="margin-bottom:8px;padding:8px;background:var(--bg-base);border-radius:6px;font-size:12px;">`;
-          html += `<b>${o.option||''}</b><br>`;
-          html += `✅ ${o.merit||''}<br>⚠️ ${o.demerit||''}</div>`;
-        });
-        html += `<div style="font-size:13px;font-weight:700;margin:12px 0 6px;">⚖️ 判断基準</div>`;
-        html += (l2.criteria||[]).map(c=>`<div style="font-size:12px;">・${c}</div>`).join('');
-        html += `<div style="font-size:13px;font-weight:700;margin:12px 0 6px;">🎯 推奨</div>`;
-        html += `<div style="font-size:13px;line-height:1.7;margin-bottom:8px;">${l2.recommendation||''}</div>`;
-        html += `<div style="font-size:13px;font-weight:700;margin-bottom:6px;">🔄 後悔最小化チェック</div>`;
-        html += `<div style="font-size:12px;line-height:1.7;margin-bottom:8px;">${l2.regret_check||''}</div>`;
-        html += `<div style="font-size:13px;font-weight:700;margin-bottom:6px;">⚠️ 注意点</div>`;
-        html += `<div style="font-size:12px;line-height:1.7;">${l2.caution||''}</div>`;
-
-      } else {
-        html += `<div style="font-size:13px;line-height:1.7;margin-bottom:12px;">${l2.overview||''}</div>`;
-        (l2.risks||[]).forEach(r => { html += `<div style="font-size:12px;">・${r}</div>`; });
-        html += `<div style="font-size:13px;line-height:1.7;margin-top:12px;">${l2.recommendation||''}</div>`;
-      }
-
-      DOM.layer2Content.innerHTML = html;
-      DOM.downloadLayer2Btn.style.display = 'block';
+      DOM.layer2Content.innerHTML = buildLayer2HTML(data.layer2, data.category || 'chat');
+    } else if (!isLoggedIn) {
+      DOM.layer2Locked.classList.remove('hidden');
+    } else if (data.plan === 'free' && !data.trial_layer2_used) {
+      DOM.layer2Trial.classList.remove('hidden');
     } else {
       DOM.layer2Locked.classList.remove('hidden');
     }
+
+    // ===== Layer3 =====
+    if (data.category === 'chat') {
+      DOM.layer3Section.style.display = 'none';
+    } else {
+      DOM.layer3Section.style.display = '';
+      if (data.layer3) {
+        DOM.layer3Content.innerHTML = buildLayer3HTML(data.layer3, data.category || 'strategy');
+      } else if (!isLoggedIn) {
+        DOM.layer3Locked.classList.remove('hidden');
+      } else if (data.plan === 'standard' && !data.trial_layer3_used) {
+        DOM.layer3Trial.classList.remove('hidden');
+      } else if (data.plan === 'free') {
+        DOM.layer3Locked.classList.remove('hidden');
+      } else {
+        DOM.layer3Locked.classList.remove('hidden');
+      }
+    }
+
   } catch (e) {
     DOM.briefConclusion.textContent = 'レポートの生成に失敗しました。';
     showToast(translateApiError(e.message, 'レポートの生成'), 'error');
+  }
+}
+
+function buildLayer2HTML(l2, cat) {
+  let html = '';
+  if (l2.conclusion) {
+    html += `<div style="background:var(--bg-base);border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;line-height:1.7;">${l2.conclusion}</div>`;
+  }
+  if (l2.persona_views && l2.persona_views.length > 0) {
+    html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">👥 参加者の主な意見</div>`;
+    l2.persona_views.forEach(p => {
+      const stanceColors = {'推進派':'#16A34A','慎重派':'#D97706','リスク指摘':'#DC2626','補足':'#2563EB'};
+      const c = stanceColors[p.stance] || '#8B949E';
+      html += `<div style="margin-bottom:8px;padding:10px 12px;background:var(--bg-base);border-radius:8px;border-left:3px solid ${c};">`;
+      html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">`;
+      html += `<span style="font-size:13px;font-weight:600;">${p.name || ''}</span>`;
+      html += `<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:${c}22;color:${c};">${p.stance || ''}</span>`;
+      html += `</div><div style="font-size:12px;line-height:1.6;color:var(--text-secondary);">${p.opinion || ''}</div></div>`;
+    });
+  }
+  if (l2.risks && l2.risks.length > 0) {
+    html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">⚠️ リスク・懸念点</div>`;
+    l2.risks.forEach(r => {
+      const lvlColor = r.level === '高' ? '#DC2626' : '#D97706';
+      html += `<div style="margin-bottom:8px;padding:10px 12px;background:var(--bg-base);border-radius:8px;">`;
+      html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">`;
+      html += `<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:${lvlColor}22;color:${lvlColor};font-weight:600;">${r.level || ''}</span>`;
+      html += `<span style="font-size:13px;font-weight:600;">${r.title || ''}</span></div>`;
+      html += `<div style="font-size:12px;line-height:1.6;color:var(--text-secondary);">${r.detail || ''}</div></div>`;
+    });
+  }
+  if (l2.next_actions && l2.next_actions.length > 0) {
+    html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">🚀 今後のアクション（案）</div>`;
+    l2.next_actions.forEach(a => {
+      html += `<div style="font-size:13px;padding:5px 0;border-bottom:1px solid var(--border-subtle);display:flex;gap:8px;align-items:flex-start;">`;
+      html += `<span style="color:var(--accent-blue);flex-shrink:0;">•</span>${a}</div>`;
+    });
+  }
+  return html;
+}
+
+function buildLayer3HTML(l3, cat) {
+  let html = '';
+  if (l3.summary) {
+    html += `<div style="background:var(--bg-base);border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;line-height:1.7;">${l3.summary}</div>`;
+  }
+  if (l3.vision) {
+    html += `<div style="font-size:13px;font-weight:700;color:var(--accent-purple);margin-bottom:6px;">🔭 目指す姿（ビジョン）</div>`;
+    html += `<div style="font-size:13px;line-height:1.7;margin-bottom:14px;padding:10px 14px;border-left:3px solid var(--accent-purple);background:rgba(124,58,237,0.06);border-radius:0 8px 8px 0;">${l3.vision}</div>`;
+  }
+  if (cat === 'strategy') {
+    if (l3.swot) {
+      html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">📊 SWOT分析</div>`;
+      const swotCfg = [
+        {key:'strength',label:'強み（自社の優位性）',bg:'rgba(22,163,74,0.1)',color:'#16A34A'},
+        {key:'weakness',label:'弱み（内部課題）',bg:'rgba(220,38,38,0.1)',color:'#DC2626'},
+        {key:'opportunity',label:'機会（外部の追い風）',bg:'rgba(37,99,235,0.1)',color:'#2563EB'},
+        {key:'threat',label:'脅威（外部リスク）',bg:'rgba(217,119,6,0.1)',color:'#D97706'},
+      ];
+      html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">`;
+      swotCfg.forEach(s => {
+        html += `<div style="background:${s.bg};border-radius:8px;padding:10px 12px;">`;
+        html += `<div style="font-size:11px;font-weight:600;color:${s.color};margin-bottom:6px;">${s.label}</div>`;
+        html += (l3.swot[s.key]||[]).map(i=>`<div style="font-size:12px;line-height:1.6;">・${i}</div>`).join('');
+        html += `</div>`;
+      });
+      html += `</div>`;
+    }
+    if (l3.target) {
+      html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">🎯 ターゲット顧客</div>`;
+      html += `<div style="padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:14px;">`;
+      html += `<div style="font-size:14px;font-weight:600;margin-bottom:4px;">${l3.target.primary||''}</div>`;
+      html += `<div style="font-size:12px;color:var(--text-secondary);line-height:1.6;">${l3.target.reason||''}</div></div>`;
+    }
+    if (l3.strategy) {
+      html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">🚀 実行戦略（${l3.strategy.framework||''}）</div>`;
+      (l3.strategy.items||[]).forEach(item => {
+        html += `<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 12px;background:var(--bg-base);border-radius:8px;margin-bottom:6px;">`;
+        html += `<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;background:rgba(124,58,237,0.15);color:var(--accent-purple);flex-shrink:0;white-space:nowrap;">${item.label||''}</span>`;
+        html += `<span style="font-size:13px;line-height:1.5;">${item.content||''}</span></div>`;
+      });
+    }
+  } else if (cat === 'practice') {
+    if (l3.evaluation) {
+      html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">`;
+      html += `<div style="background:rgba(22,163,74,0.1);border-radius:8px;padding:10px 12px;"><div style="font-size:11px;font-weight:600;color:#16A34A;margin-bottom:6px;">うまくいった点</div>`;
+      html += (l3.evaluation.strengths||[]).map(s=>`<div style="font-size:12px;line-height:1.6;">・${s}</div>`).join('');
+      html += `</div><div style="background:rgba(220,38,38,0.1);border-radius:8px;padding:10px 12px;"><div style="font-size:11px;font-weight:600;color:#DC2626;margin-bottom:6px;">改善すべき点</div>`;
+      html += (l3.evaluation.weaknesses||[]).map(w=>`<div style="font-size:12px;line-height:1.6;">・${w}</div>`).join('');
+      html += `</div></div>`;
+    }
+    if (l3.qa_list && l3.qa_list.length > 0) {
+      html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">❓ 想定Q&A</div>`;
+      l3.qa_list.forEach(q => {
+        html += `<div style="margin-bottom:8px;padding:8px 12px;background:var(--bg-base);border-radius:8px;font-size:12px;">`;
+        html += `<b>Q: ${q.question||''}</b><br>A: ${q.answer||''}</div>`;
+      });
+    }
+    if (l3.checklist && l3.checklist.length > 0) {
+      html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">✅ 本番前チェックリスト</div>`;
+      l3.checklist.forEach(c => {
+        html += `<div style="font-size:13px;padding:5px 0;border-bottom:1px solid var(--border-subtle);">□ ${c}</div>`;
+      });
+    }
+  } else if (cat === 'study') {
+    if (l3.current_level && l3.current_level.length > 0) {
+      html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">📍 現在地</div>`;
+      l3.current_level.forEach(cl => {
+        html += `<div style="margin-bottom:8px;">`;
+        html += `<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-secondary);margin-bottom:4px;"><span>${cl.skill||''}</span><span>${cl.percent||0}%</span></div>`;
+        html += `<div style="height:6px;background:var(--bg-elevated);border-radius:3px;overflow:hidden;">`;
+        html += `<div style="height:100%;background:var(--accent-purple);border-radius:3px;width:${cl.percent||0}%;"></div></div></div>`;
+      });
+    }
+    if (l3.roadmap && l3.roadmap.length > 0) {
+      html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">🗓️ ロードマップ</div>`;
+      l3.roadmap.forEach(r => {
+        html += `<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px;">`;
+        html += `<span style="font-size:11px;padding:2px 8px;background:rgba(37,99,235,0.15);color:var(--accent-blue);border-radius:4px;flex-shrink:0;white-space:nowrap;">${r.period||''}</span>`;
+        html += `<span style="font-size:13px;line-height:1.5;">${r.action||''}</span></div>`;
+      });
+    }
+    if (l3.obstacles && l3.obstacles.length > 0) {
+      html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">🧱 障壁と突破策</div>`;
+      l3.obstacles.forEach(o => {
+        html += `<div style="margin-bottom:8px;padding:8px 12px;background:var(--bg-base);border-radius:8px;font-size:12px;">`;
+        html += `<b>${o.name||''}</b><br><span style="color:var(--text-secondary);">${o.solution||''}</span></div>`;
+      });
+    }
+  } else if (cat === 'consulting') {
+    if (l3.options && l3.options.length > 0) {
+      html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">🔀 選択肢の比較</div>`;
+      l3.options.forEach(o => {
+        html += `<div style="margin-bottom:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;">`;
+        html += `<div style="font-size:13px;font-weight:600;margin-bottom:6px;">${o.name||''}</div>`;
+        html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">`;
+        html += `<div style="background:rgba(22,163,74,0.1);border-radius:6px;padding:6px 10px;font-size:12px;"><b style="color:#16A34A;font-size:11px;">メリット</b><br>${o.merit||''}</div>`;
+        html += `<div style="background:rgba(220,38,38,0.1);border-radius:6px;padding:6px 10px;font-size:12px;"><b style="color:#DC2626;font-size:11px;">デメリット</b><br>${o.demerit||''}</div>`;
+        html += `</div></div>`;
+      });
+    }
+    if (l3.criteria && l3.criteria.length > 0) {
+      html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">⚖️ 判断基準</div>`;
+      l3.criteria.forEach((c, i) => {
+        html += `<div style="font-size:13px;padding:5px 0;border-bottom:1px solid var(--border-subtle);display:flex;gap:8px;">`;
+        html += `<span style="font-size:11px;font-weight:600;background:rgba(37,99,235,0.15);color:var(--accent-blue);border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${i+1}</span>${c}</div>`;
+      });
+    }
+    if (l3.recommendation) {
+      html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">🎯 推奨</div>`;
+      html += `<div style="padding:10px 14px;border-left:3px solid var(--accent-green);background:rgba(22,163,74,0.06);border-radius:0 8px 8px 0;font-size:13px;line-height:1.7;">${l3.recommendation}</div>`;
+    }
+    if (l3.caution) {
+      html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">⚠️ 注意点</div>`;
+      html += `<div style="padding:10px 14px;border-left:3px solid var(--accent-orange);background:rgba(217,119,6,0.06);border-radius:0 8px 8px 0;font-size:13px;line-height:1.7;">${l3.caution}</div>`;
+    }
+  }
+  if (l3.risks && l3.risks.length > 0) {
+    html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">🛡️ リスクと対策</div>`;
+    l3.risks.forEach(r => {
+      const lvlColor = r.level === '高' ? '#DC2626' : '#D97706';
+      html += `<div style="margin-bottom:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;">`;
+      html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">`;
+      html += `<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:${lvlColor}22;color:${lvlColor};font-weight:600;">${r.level||''}</span>`;
+      html += `<span style="font-size:13px;font-weight:600;">${r.name||''}</span></div>`;
+      html += `<div style="font-size:12px;color:var(--text-secondary);line-height:1.5;margin-bottom:6px;">${r.reason||''}</div>`;
+      html += `<div style="font-size:12px;padding:6px 10px;background:rgba(22,163,74,0.08);border-radius:6px;color:#16A34A;"><b>回避策：</b>${r.advice||''}</div>`;
+      html += `</div>`;
+    });
+  }
+  return html;
+}
+
+async function useTrialLayer2() {
+  if (!State.sessionId) return;
+  const btn = DOM.trialLayer2Btn;
+  btn.disabled = true; btn.textContent = '⏳ 生成中...';
+  DOM.layer2Trial.querySelector('div').textContent = '⏳ 生成中...';
+  try {
+    const data = await API.post(`/api/meeting/${State.sessionId}/brief`, {
+      category: State.meetingCategory || 'chat'
+    });
+    _briefData = { ..._briefData, ...data };
+    if (data.layer2) {
+      DOM.layer2Content.innerHTML = buildLayer2HTML(data.layer2, data.category || 'chat');
+      DOM.layer2Trial.classList.add('hidden');
+    } else {
+      DOM.layer2Trial.classList.add('hidden');
+      DOM.layer2Locked.classList.remove('hidden');
+    }
+  } catch (e) {
+    btn.disabled = false; btn.textContent = '無料で体験する';
+    showToast('生成に失敗しました', 'error');
+  }
+}
+
+async function useTrialLayer3() {
+  if (!State.sessionId) return;
+  const btn = DOM.trialLayer3Btn;
+  btn.disabled = true; btn.textContent = '⏳ 生成中...';
+  DOM.layer3Trial.querySelector('div').textContent = '⏳ 生成中...';
+  try {
+    const data = await API.post(`/api/meeting/${State.sessionId}/brief`, {
+      category: State.meetingCategory || 'chat'
+    });
+    _briefData = { ..._briefData, ...data };
+    if (data.layer3) {
+      DOM.layer3Content.innerHTML = buildLayer3HTML(data.layer3, data.category || 'strategy');
+      DOM.layer3Trial.classList.add('hidden');
+    } else {
+      DOM.layer3Trial.classList.add('hidden');
+      DOM.layer3Locked.classList.remove('hidden');
+    }
+  } catch (e) {
+    btn.disabled = false; btn.textContent = '無料で体験する';
+    showToast('生成に失敗しました', 'error');
   }
 }
 
@@ -1034,27 +1194,6 @@ async function downloadLayer1PDF() {
   }
 }
 
-async function downloadLayer2PDF() {
-  if (!State.sessionId) return;
-  const btn = DOM.downloadLayer2Btn;
-  btn.disabled = true; btn.textContent = '⏳ 生成中...';
-  try {
-    const res = await fetch(`/api/meeting/${State.sessionId}/strategy_pdf`, { method: 'POST' });
-    if (!res.ok) throw new Error('生成失敗');
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `戦略レポート_${State.topic?.slice(0,20)}_${new Date().toISOString().slice(0,10)}.pdf`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    showToast('PDFをダウンロードしました', 'success');
-  } catch (e) {
-    showToast('PDFの生成に失敗しました', 'error');
-  } finally {
-    btn.disabled = false; btn.textContent = '📄 戦略レポートをPDFで保存';
-  }
-}
 
 async function handleLearnFiles(e, mode, type) {
   // モーダル切替によるペルソナ混入を防ぐため、開始時点のペルソナIDを固定する

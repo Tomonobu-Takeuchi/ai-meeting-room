@@ -573,20 +573,47 @@
     <!-- Layer 2 -->
     <div id="layer2Section">
       <div style="font-size:15px;font-weight:700;color:var(--accent-blue);margin-bottom:12px;">
-        📊 戦略レポート
+        🔍 議論分析レポート
       </div>
       <div id="layer2Content"></div>
+      <div id="layer2Trial" class="hidden" style="text-align:center;padding:16px;background:rgba(37,99,235,0.06);border-radius:8px;margin-bottom:8px;">
+        <div style="font-size:13px;font-weight:600;margin-bottom:8px;">🎁 議論分析レポートを1回無料で体験できます</div>
+        <button class="btn btn-primary" id="trialLayer2Btn" onclick="useTrialLayer2()">
+          無料で体験する
+        </button>
+      </div>
       <div id="layer2Locked" class="hidden" style="text-align:center;padding:20px;">
         <div style="font-size:32px;margin-bottom:8px;">🔒</div>
         <div style="font-size:14px;font-weight:600;margin-bottom:4px;">スタンダード以上で利用可能</div>
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">各ペルソナの背景・価値観まで掘り下げた詳細分析</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">議論の要点・各ペルソナの意見・リスク・次のアクションを分析</div>
         <button class="btn btn-green" onclick="document.getElementById('reportModal').classList.add('hidden');document.getElementById('pricingModal')?.classList.remove('hidden');">
           プランをアップグレード
         </button>
       </div>
-      <button class="btn btn-green" id="downloadLayer2Btn" style="width:100%;margin-top:14px;display:none;">
-        📄 戦略レポートをPDFで保存
-      </button>
+    </div>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:20px 0;">
+
+    <!-- Layer 3 -->
+    <div id="layer3Section">
+      <div style="font-size:15px;font-weight:700;color:var(--accent-blue);margin-bottom:12px;">
+        📊 戦略フレームワーク・レポート
+      </div>
+      <div id="layer3Content"></div>
+      <div id="layer3Trial" class="hidden" style="text-align:center;padding:16px;background:rgba(124,58,237,0.06);border-radius:8px;margin-bottom:8px;">
+        <div style="font-size:13px;font-weight:600;margin-bottom:8px;">🎁 戦略フレームワーク・レポートを1回無料で体験できます</div>
+        <button class="btn btn-purple" id="trialLayer3Btn" onclick="useTrialLayer3()">
+          無料で体験する
+        </button>
+      </div>
+      <div id="layer3Locked" class="hidden" style="text-align:center;padding:20px;">
+        <div style="font-size:32px;margin-bottom:8px;">🔒</div>
+        <div style="font-size:14px;font-weight:600;margin-bottom:4px;">プロプラン以上で利用可能</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">SWOT分析・ターゲット市場・実行戦略・リスク対策を網羅</div>
+        <button class="btn btn-green" onclick="document.getElementById('reportModal').classList.add('hidden');document.getElementById('pricingModal')?.classList.remove('hidden');">
+          プランをアップグレード
+        </button>
+      </div>
     </div>
   </div>
 </div>
