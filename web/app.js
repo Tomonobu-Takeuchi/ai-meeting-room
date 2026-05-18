@@ -943,8 +943,6 @@ async function showReportModal() {
         DOM.layer3Locked.classList.remove('hidden');
       } else if (data.plan === 'standard' && !data.trial_layer3_used) {
         DOM.layer3Trial.classList.remove('hidden');
-      } else if (data.plan === 'free') {
-        DOM.layer3Locked.classList.remove('hidden');
       } else {
         DOM.layer3Locked.classList.remove('hidden');
       }
@@ -1133,7 +1131,8 @@ async function useTrialLayer2() {
   DOM.layer2Trial.querySelector('div').textContent = '⏳ 生成中...';
   try {
     const data = await API.post(`/api/meeting/${State.sessionId}/brief`, {
-      category: State.meetingCategory || 'chat'
+      category: State.meetingCategory || 'chat',
+      trial_layer: 'layer2'
     });
     _briefData = { ..._briefData, ...data };
     if (data.layer2) {
@@ -1156,7 +1155,8 @@ async function useTrialLayer3() {
   DOM.layer3Trial.querySelector('div').textContent = '⏳ 生成中...';
   try {
     const data = await API.post(`/api/meeting/${State.sessionId}/brief`, {
-      category: State.meetingCategory || 'chat'
+      category: State.meetingCategory || 'chat',
+      trial_layer: 'layer3'
     });
     _briefData = { ..._briefData, ...data };
     if (data.layer3) {

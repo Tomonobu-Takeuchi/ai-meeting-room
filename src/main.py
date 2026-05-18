@@ -988,10 +988,11 @@ JSONのみ出力してください。"""
 
         # ===== Layer2（standard/pro は常時、free は未使用時のみ、chatカテゴリは除外） =====
         layer2_data = None
+        is_trial_request = req_data.get('trial_layer', '')
         can_use_layer2 = (
             category != 'chat' and (
                 plan in ('standard', 'pro') or
-                (plan == 'free' and not trial_layer2_used)
+                (plan == 'free' and not trial_layer2_used and is_trial_request == 'layer2')
             )
         )
         if can_use_layer2:
@@ -1028,7 +1029,7 @@ JSONのみ出力してください。"""
         can_use_layer3 = (
             category != 'chat' and (
                 plan == 'pro' or
-                (plan == 'standard' and not trial_layer3_used)
+                (plan == 'standard' and not trial_layer3_used and is_trial_request == 'layer3')
             )
         )
         if can_use_layer3:
