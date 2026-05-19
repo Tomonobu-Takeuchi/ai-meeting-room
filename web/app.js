@@ -102,6 +102,8 @@ const DOM = {
   briefActions: $('briefActions'),
   briefUserBasis: $('briefUserBasis'),
   downloadLayer1Btn: $('downloadLayer1Btn'),
+  downloadLayer2Btn: $('downloadLayer2Btn'),
+  downloadLayer3Btn: $('downloadLayer3Btn'),
   layer2Content: $('layer2Content'),
   layer2Trial: $('layer2Trial'),
   layer2Locked: $('layer2Locked'),
@@ -484,6 +486,8 @@ async function init() {
   DOM.reportBtn.addEventListener('click', showReportModal);
   document.getElementById('minutesEndBtn')?.addEventListener('click', endMeeting);
   DOM.downloadLayer1Btn.addEventListener('click', downloadLayer1PDF);
+  DOM.downloadLayer2Btn.addEventListener('click', downloadLayer2PDF);
+  DOM.downloadLayer3Btn.addEventListener('click', downloadLayer3PDF);
 
   DOM.voiceModeBtn.addEventListener('click', toggleVoiceMode);
   DOM.stopSpeakBtn.addEventListener('click', stopSpeaking);
@@ -907,6 +911,8 @@ async function showReportModal() {
   DOM.layer3Content.innerHTML = '';
   DOM.layer3Trial.classList.add('hidden');
   DOM.layer3Locked.classList.add('hidden');
+  DOM.downloadLayer2Btn.style.display = 'none';
+  DOM.downloadLayer3Btn.style.display = 'none';
 
   try {
     const data = await API.post(`/api/meeting/${State.sessionId}/brief`, {
@@ -924,11 +930,14 @@ async function showReportModal() {
     const isLoggedIn = !!State.currentUser;
     if (data.layer2) {
       DOM.layer2Content.innerHTML = buildLayer2HTML(data.layer2, data.category || 'chat');
+      DOM.downloadLayer2Btn.style.display = 'inline-block';
     } else if (!isLoggedIn) {
+      DOM.downloadLayer2Btn.style.display = 'none';
       DOM.layer2Locked.classList.remove('hidden');
     } else if (data.plan === 'free' && !data.trial_layer2_used) {
       DOM.layer2Trial.classList.remove('hidden');
     } else {
+      DOM.downloadLayer2Btn.style.display = 'none';
       DOM.layer2Locked.classList.remove('hidden');
     }
 
@@ -939,11 +948,14 @@ async function showReportModal() {
       DOM.layer3Section.style.display = '';
       if (data.layer3) {
         DOM.layer3Content.innerHTML = buildLayer3HTML(data.layer3, data.category || 'strategy');
+        DOM.downloadLayer3Btn.style.display = 'inline-block';
       } else if (!isLoggedIn) {
+        DOM.downloadLayer3Btn.style.display = 'none';
         DOM.layer3Locked.classList.remove('hidden');
       } else if (data.plan === 'standard' && !data.trial_layer3_used) {
         DOM.layer3Trial.classList.remove('hidden');
       } else {
+        DOM.downloadLayer3Btn.style.display = 'none';
         DOM.layer3Locked.classList.remove('hidden');
       }
     }
@@ -1151,9 +1163,11 @@ async function useTrialLayer2() {
     _briefData = { ..._briefData, ...data };
     if (data.layer2) {
       DOM.layer2Content.innerHTML = buildLayer2HTML(data.layer2, data.category || 'chat');
+      DOM.downloadLayer2Btn.style.display = 'inline-block';
       DOM.layer2Trial.classList.add('hidden');
     } else {
       DOM.layer2Trial.classList.add('hidden');
+      DOM.downloadLayer2Btn.style.display = 'none';
       DOM.layer2Locked.classList.remove('hidden');
     }
   } catch (e) {
@@ -1175,9 +1189,11 @@ async function useTrialLayer3() {
     _briefData = { ..._briefData, ...data };
     if (data.layer3) {
       DOM.layer3Content.innerHTML = buildLayer3HTML(data.layer3, data.category || 'strategy');
+      DOM.downloadLayer3Btn.style.display = 'inline-block';
       DOM.layer3Trial.classList.add('hidden');
     } else {
       DOM.layer3Trial.classList.add('hidden');
+      DOM.downloadLayer3Btn.style.display = 'none';
       DOM.layer3Locked.classList.remove('hidden');
     }
   } catch (e) {
@@ -1205,6 +1221,66 @@ async function downloadLayer1PDF() {
     showToast('PDFの生成に失敗しました', 'error');
   } finally {
     btn.disabled = false; btn.textContent = '📄 アクション・ブリーフをPDFで保存';
+  }
+}
+
+async function downloadLayer2PDF() {
+  if (!State.sessionId || !_briefData?.layer2) return;
+  const btn = DOM.downloadLayer2Btn;
+  btn.disabled = true; btn.textContent = '⏳ 生成中...';
+  try {
+    const res = await fetch(`/api/meeting/${State.sessionId}/brief_pdf_layer2`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        layer2: _briefData.layer2,
+        category: _briefData.category || 'chat',
+        topic: State.topic || ''
+      })
+    });
+    if (!res.ok) throw new Error('生成失敗');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `議論分析レポート_${State.topic?.slice(0,20)}_${new Date().toISOString().slice(0,10)}.pdf`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('PDFをダウンロードしました', 'success');
+  } catch (e) {
+    showToast('PDFの生成に失敗しました', 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '📄 議論分析レポートをPDF保存';
+  }
+}
+
+async function downloadLayer3PDF() {
+  if (!State.sessionId || !_briefData?.layer3) return;
+  const btn = DOM.downloadLayer3Btn;
+  btn.disabled = true; btn.textContent = '⏳ 生成中...';
+  try {
+    const res = await fetch(`/api/meeting/${State.sessionId}/brief_pdf_layer3`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        layer3: _briefData.layer3,
+        category: _briefData.category || 'strategy',
+        topic: State.topic || ''
+      })
+    });
+    if (!res.ok) throw new Error('生成失敗');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `戦略レポート_${State.topic?.slice(0,20)}_${new Date().toISOString().slice(0,10)}.pdf`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('PDFをダウンロードしました', 'success');
+  } catch (e) {
+    showToast('PDFの生成に失敗しました', 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '📄 戦略レポートをPDF保存';
   }
 }
 

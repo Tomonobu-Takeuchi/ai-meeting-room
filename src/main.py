@@ -1187,6 +1187,169 @@ JSONのみ出力してください。"""
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/meeting/<session_id>/brief_pdf_layer2", methods=["POST"])
+def generate_brief_pdf_layer2(session_id):
+    """Layer2（議論分析レポート）をPDF化して返す。フロントからJSONを受け取る"""
+    data = request.get_json()
+    l2 = data.get('layer2', {})
+    topic = data.get('topic', '議論分析')
+    try:
+        import io
+        from datetime import datetime
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.lib.units import mm
+        from reportlab.lib.colors import HexColor
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+
+        pdfmetrics.registerFont(UnicodeCIDFont('HeiseiMin-W3'))
+        buf = io.BytesIO()
+        doc = SimpleDocTemplate(buf, pagesize=A4,
+            leftMargin=20*mm, rightMargin=20*mm,
+            topMargin=20*mm, bottomMargin=20*mm)
+
+        styles_base = ParagraphStyle('base', fontName='HeiseiMin-W3', fontSize=10, leading=16)
+        styles_title = ParagraphStyle('title', fontName='HeiseiMin-W3', fontSize=16, leading=24, textColor=HexColor('#2563EB'))
+        styles_h2 = ParagraphStyle('h2', fontName='HeiseiMin-W3', fontSize=12, leading=18, textColor=HexColor('#1C2333'), spaceAfter=4)
+        styles_small = ParagraphStyle('small', fontName='HeiseiMin-W3', fontSize=9, leading=14, textColor=HexColor('#8B949E'))
+
+        story = []
+        story.append(Paragraph('🔍 議論分析レポート', styles_title))
+        story.append(Paragraph(f'議題：{topic}', styles_small))
+        story.append(Paragraph(datetime.now().strftime('%Y年%m月%d日'), styles_small))
+        story.append(Spacer(1, 6*mm))
+        story.append(HRFlowable(width='100%', color=HexColor('#30363D')))
+        story.append(Spacer(1, 4*mm))
+
+        if l2.get('conclusion'):
+            story.append(Paragraph('■ 結論', styles_h2))
+            story.append(Paragraph(l2['conclusion'], styles_base))
+            story.append(Spacer(1, 4*mm))
+
+        if l2.get('persona_views'):
+            story.append(Paragraph('■ ペルソナ別意見', styles_h2))
+            for pv in l2['persona_views']:
+                story.append(Paragraph(f"【{pv.get('name','')}】{pv.get('stance','')}：{pv.get('opinion','')}", styles_base))
+                story.append(Spacer(1, 2*mm))
+            story.append(Spacer(1, 2*mm))
+
+        if l2.get('risks'):
+            story.append(Paragraph('■ リスク・懸念点', styles_h2))
+            for r in l2['risks']:
+                story.append(Paragraph(f"[{r.get('level','')}] {r.get('title','')}：{r.get('detail','')}", styles_base))
+                story.append(Spacer(1, 2*mm))
+            story.append(Spacer(1, 2*mm))
+
+        if l2.get('next_actions'):
+            story.append(Paragraph('■ 今後のアクション', styles_h2))
+            for a in l2['next_actions']:
+                story.append(Paragraph(f'・{a}', styles_base))
+
+        doc.build(story)
+        buf.seek(0)
+        filename = f"議論分析レポート_{datetime.now().strftime('%Y%m%d')}.pdf"
+        return send_file(buf, mimetype='application/pdf',
+            as_attachment=True, download_name=filename)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/meeting/<session_id>/brief_pdf_layer3", methods=["POST"])
+def generate_brief_pdf_layer3(session_id):
+    """Layer3（戦略フレームワーク）をPDF化して返す。フロントからJSONを受け取る"""
+    data = request.get_json()
+    l3 = data.get('layer3', {})
+    topic = data.get('topic', '戦略分析')
+    try:
+        import io
+        from datetime import datetime
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.lib.units import mm
+        from reportlab.lib.colors import HexColor
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+
+        pdfmetrics.registerFont(UnicodeCIDFont('HeiseiMin-W3'))
+        buf = io.BytesIO()
+        doc = SimpleDocTemplate(buf, pagesize=A4,
+            leftMargin=20*mm, rightMargin=20*mm,
+            topMargin=20*mm, bottomMargin=20*mm)
+
+        styles_base = ParagraphStyle('base', fontName='HeiseiMin-W3', fontSize=10, leading=16)
+        styles_title = ParagraphStyle('title', fontName='HeiseiMin-W3', fontSize=16, leading=24, textColor=HexColor('#7C3AED'))
+        styles_h2 = ParagraphStyle('h2', fontName='HeiseiMin-W3', fontSize=12, leading=18, textColor=HexColor('#1C2333'), spaceAfter=4)
+        styles_small = ParagraphStyle('small', fontName='HeiseiMin-W3', fontSize=9, leading=14, textColor=HexColor('#8B949E'))
+
+        story = []
+        story.append(Paragraph('📊 戦略フレームワーク・レポート', styles_title))
+        story.append(Paragraph(f'議題：{topic}', styles_small))
+        story.append(Paragraph(datetime.now().strftime('%Y年%m月%d日'), styles_small))
+        story.append(Spacer(1, 6*mm))
+        story.append(HRFlowable(width='100%', color=HexColor('#30363D')))
+        story.append(Spacer(1, 4*mm))
+
+        if l3.get('summary'):
+            story.append(Paragraph('■ 議論概要', styles_h2))
+            story.append(Paragraph(l3['summary'], styles_base))
+            story.append(Spacer(1, 4*mm))
+
+        if l3.get('vision'):
+            story.append(Paragraph('■ 目指す姿', styles_h2))
+            story.append(Paragraph(l3['vision'], styles_base))
+            story.append(Spacer(1, 4*mm))
+
+        swot = l3.get('swot', {})
+        if any(swot.get(k) for k in ['strength','weakness','opportunity','threat']):
+            story.append(Paragraph('■ SWOT分析', styles_h2))
+            for label, key in [('強み','strength'),('弱み','weakness'),('機会','opportunity'),('脅威','threat')]:
+                items = swot.get(key, [])
+                if items:
+                    story.append(Paragraph(f'【{label}】', styles_base))
+                    for item in items:
+                        story.append(Paragraph(f'・{item}', styles_base))
+            story.append(Spacer(1, 4*mm))
+
+        tm = l3.get('target_market', {})
+        if tm.get('primary'):
+            story.append(Paragraph('■ ターゲット市場', styles_h2))
+            story.append(Paragraph(f"{tm.get('primary','')}　{tm.get('reason','')}", styles_base))
+            story.append(Spacer(1, 4*mm))
+
+        s4p = l3.get('strategy_4p', {})
+        if any(s4p.get(k) for k in ['product','price','place','promotion']):
+            story.append(Paragraph('■ 4P戦略', styles_h2))
+            for label, key in [('製品','product'),('価格','price'),('流通','place'),('販促','promotion')]:
+                if s4p.get(key):
+                    story.append(Paragraph(f'【{label}】{s4p[key]}', styles_base))
+            story.append(Spacer(1, 4*mm))
+
+        if l3.get('open_issues'):
+            story.append(Paragraph('■ 未解決課題', styles_h2))
+            for issue in l3['open_issues']:
+                story.append(Paragraph(f"・{issue.get('issue','')}　{issue.get('why','')}", styles_base))
+            story.append(Spacer(1, 4*mm))
+
+        if l3.get('risks'):
+            story.append(Paragraph('■ リスクと対策', styles_h2))
+            for r in l3['risks']:
+                story.append(Paragraph(f"[{r.get('level','')}] {r.get('name','')}：{r.get('reason','')}", styles_base))
+                if r.get('advice'):
+                    story.append(Paragraph(f'　回避策：{r["advice"]}', styles_base))
+                story.append(Spacer(1, 2*mm))
+
+        doc.build(story)
+        buf.seek(0)
+        filename = f"戦略レポート_{datetime.now().strftime('%Y%m%d')}.pdf"
+        return send_file(buf, mimetype='application/pdf',
+            as_attachment=True, download_name=filename)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/meeting/<session_id>/strategy_pdf", methods=["POST"])
 def generate_strategy_pdf(session_id):
     """Layer 2（戦略レポート）をPDF化して返す"""
