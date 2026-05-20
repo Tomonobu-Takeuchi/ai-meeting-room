@@ -3174,56 +3174,57 @@ function initMobileActionBar() {
 
 
 function initNavTips() {
-  // タッチデバイスのみ動作
   if (!('ontouchstart' in window)) return;
 
-  const buttons = [
-    { id: 'howToBtn',     label: '使い方',   action: () => openHowToModal() },
-    { id: 'planBtn',      label: '料金プラン', action: () => openPricingModal() },
-    { id: 'voiceModeBtn', label: '音声モード', action: () => toggleVoiceMode() }
+  const navBtns = [
+    { id: 'howToBtn',  labelId: 'howToBtnLabel', action: () => openHowToModal() },
+    { id: 'planBtn',   labelId: 'planBtnLabel',  action: () => openPricingModal() }
   ];
 
-  buttons.forEach(({ id, label, action }) => {
+  navBtns.forEach(({ id, labelId, action }) => {
     const btn = document.getElementById(id);
-    if (!btn) return;
+    const label = document.getElementById(labelId);
+    if (!btn || !label) return;
 
-    let tapCount = 0;
-    let tapTimer = null;
-    let bubble = null;
+    let isLabelVisible = false;
+    let pressTimer = null;
 
-    function showBubble() {
-      // 既存の吹き出しを削除
-      if (bubble) bubble.remove();
-      bubble = document.createElement('div');
-      bubble.className = 'nav-tip-bubble';
-      bubble.textContent = label;
-      btn.appendChild(bubble);
-      // 1.5秒後に自動消去
-      setTimeout(() => {
-        if (bubble) { bubble.remove(); bubble = null; }
-      }, 1500);
-    }
-
-    function hideBubble() {
-      if (bubble) { bubble.remove(); bubble = null; }
-    }
-
-    btn.addEventListener('click', function(e) {
-      tapCount++;
-      if (tapCount === 1) {
-        // 1回目タップ：吹き出し表示
-        showBubble();
-        tapTimer = setTimeout(() => {
-          tapCount = 0;
-        }, 2000);
-      } else {
-        // 2回目タップ：吹き出し消去・モーダル開く
-        clearTimeout(tapTimer);
-        tapCount = 0;
-        hideBubble();
+    // 長押し判定
+    btn.addEventListener('touchstart', function(e) {
+      pressTimer = setTimeout(() => {
+        pressTimer = null;
+        isLabelVisible = false;
+        label.style.display = 'none';
         action();
+      }, 600);
+    }, { passive: true });
+
+    btn.addEventListener('touchend', function(e) {
+      if (pressTimer) {
+        // 短タップ：ラベル表示トグル
+        clearTimeout(pressTimer);
+        pressTimer = null;
+        if (isLabelVisible) {
+          label.style.display = 'none';
+          isLabelVisible = false;
+        } else {
+          label.style.display = 'inline';
+          isLabelVisible = true;
+          // 3秒後に自動消去
+          setTimeout(() => {
+            label.style.display = 'none';
+            isLabelVisible = false;
+          }, 3000);
+        }
       }
-    });
+    }, { passive: true });
+
+    btn.addEventListener('touchmove', function(e) {
+      if (pressTimer) {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+      }
+    }, { passive: true });
   });
 }
 
