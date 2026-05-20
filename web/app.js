@@ -3166,9 +3166,51 @@ function initMobileActionBar() {
   if (DOM.mobileFacilitatorBtn) DOM.mobileFacilitatorBtn.addEventListener('click', invokeFacilitator);
 }
 
+function initMobileTips() {
+  // data-tip属性を持つnav-linkボタンにタップトグルを設定
+  const tipBtns = document.querySelectorAll('.nav-link[data-tip]');
+  let activeTip = null;
+
+  tipBtns.forEach(btn => {
+    btn.addEventListener('touchstart', function(e) {
+      // すでにtip-activeなら消して終わり（2回目タップで消す）
+      if (this.classList.contains('tip-active')) {
+        this.classList.remove('tip-active');
+        activeTip = null;
+        // ボタンのクリックイベントは発火させない
+        e.preventDefault();
+        return;
+      }
+      // 他のtipを閉じる
+      if (activeTip && activeTip !== this) {
+        activeTip.classList.remove('tip-active');
+      }
+      // tip表示
+      this.classList.add('tip-active');
+      activeTip = this;
+      // 1.5秒後に自動消去
+      setTimeout(() => {
+        this.classList.remove('tip-active');
+        if (activeTip === this) activeTip = null;
+      }, 1500);
+      // 1回目タップではボタン本来のclickを発火させない（tipを見せるだけ）
+      e.preventDefault();
+    }, { passive: false });
+  });
+
+  // tip以外の場所をタップしたら閉じる
+  document.addEventListener('touchstart', function(e) {
+    if (activeTip && !activeTip.contains(e.target)) {
+      activeTip.classList.remove('tip-active');
+      activeTip = null;
+    }
+  }, { passive: true });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   init();
   initMobileActionBar();
+  initMobileTips();
   // 決済確認モーダル
   $('purchaseConfirmCancel')?.addEventListener('click', () => {
     $('purchaseConfirmOverlay').classList.add('hidden');
