@@ -491,8 +491,10 @@ async function init() {
   DOM.downloadLayer2Btn.addEventListener('click', downloadLayer2PDF);
   DOM.downloadLayer3Btn.addEventListener('click', downloadLayer3PDF);
 
-  DOM.howToBtn?.addEventListener('click', () => openHowToModal());
-  DOM.planBtn?.addEventListener('click', () => openPricingModal());
+  if (!('ontouchstart' in window)) {
+    DOM.howToBtn?.addEventListener('click', () => openHowToModal());
+    DOM.planBtn?.addEventListener('click', () => openPricingModal());
+  }
   DOM.voiceModeBtn.addEventListener('click', toggleVoiceMode);
   DOM.stopSpeakBtn.addEventListener('click', stopSpeaking);
   DOM.micBtn.addEventListener('click', () => startVoiceInput(DOM.chatInput, DOM.micBtn));
