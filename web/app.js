@@ -85,6 +85,8 @@ const DOM = {
   summarizeBtn: $('summarizeBtn'),
   minutesBar: $('minutesBar'),
   minutesBtn: $('minutesBtn'),
+  howToBtn: $('howToBtn'),
+  planBtn: $('planBtn'),
   voiceModeBtn: $('voiceModeBtn'),
   voiceModeBar: $('voiceModeBar'),
   stopSpeakBtn: $('stopSpeakBtn'),
@@ -489,6 +491,8 @@ async function init() {
   DOM.downloadLayer2Btn.addEventListener('click', downloadLayer2PDF);
   DOM.downloadLayer3Btn.addEventListener('click', downloadLayer3PDF);
 
+  DOM.howToBtn?.addEventListener('click', () => openHowToModal());
+  DOM.planBtn?.addEventListener('click', () => openPricingModal());
   DOM.voiceModeBtn.addEventListener('click', toggleVoiceMode);
   DOM.stopSpeakBtn.addEventListener('click', stopSpeaking);
   DOM.micBtn.addEventListener('click', () => startVoiceInput(DOM.chatInput, DOM.micBtn));
@@ -3167,39 +3171,61 @@ function initMobileActionBar() {
 }
 
 function initMobileTips() {
-  // data-tip属性を持つnav-linkボタンにタップトグルを設定
   const tipBtns = document.querySelectorAll('.nav-link[data-tip]');
-  let activeTip = null;
+
+  const longPressActions = {
+    'howToBtn':     () => openHowToModal(),
+    'planBtn':      () => openPricingModal(),
+    'voiceModeBtn': () => toggleVoiceMode()
+  };
 
   tipBtns.forEach(btn => {
+    let pressTimer = null;
+
     btn.addEventListener('touchstart', function(e) {
-      // すでにtip-activeなら消して終わり（2回目タップで消す）
-      if (this.classList.contains('tip-active')) {
-        this.classList.remove('tip-active');
-        activeTip = null;
-        return;
+      const self = this;
+      // 吹き出し表示
+      self.classList.add('tip-active');
+      // 既存タイマークリア
+      if (pressTimer) clearTimeout(pressTimer);
+      // 長押し判定（500ms）
+      pressTimer = setTimeout(() => {
+        self.classList.remove('tip-active');
+        const action = longPressActions[self.id];
+        if (action) action();
+        pressTimer = null;
+      }, 500);
+    }, { passive: true });
+
+    btn.addEventListener('touchend', function(e) {
+      // 短タップ：長押しタイマーキャンセル・吹き出しは1.5秒後消去
+      if (pressTimer) {
+        clearTimeout(pressTimer);
+        pressTimer = null;
       }
-      // 他のtipを閉じる
-      if (activeTip && activeTip !== this) {
-        activeTip.classList.remove('tip-active');
-      }
-      // tip表示
-      this.classList.add('tip-active');
-      activeTip = this;
-      // 1.5秒後に自動消去
+      const self = this;
       setTimeout(() => {
-        this.classList.remove('tip-active');
-        if (activeTip === this) activeTip = null;
+        self.classList.remove('tip-active');
       }, 1500);
+    }, { passive: true });
+
+    btn.addEventListener('touchmove', function(e) {
+      // スクロール中はキャンセル
+      if (pressTimer) {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+      }
+      this.classList.remove('tip-active');
     }, { passive: true });
   });
 
-  // tip以外の場所をタップしたら閉じる
+  // tip以外をタップしたら全て閉じる
   document.addEventListener('touchstart', function(e) {
-    if (activeTip && !activeTip.contains(e.target)) {
-      activeTip.classList.remove('tip-active');
-      activeTip = null;
-    }
+    tipBtns.forEach(btn => {
+      if (!btn.contains(e.target)) {
+        btn.classList.remove('tip-active');
+      }
+    });
   }, { passive: true });
 }
 
