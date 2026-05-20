@@ -3172,6 +3172,7 @@ function initMobileActionBar() {
 
 
 document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('touchstart', function(){}, {passive:true});
   init();
   initMobileActionBar();
   // 決済確認モーダル
