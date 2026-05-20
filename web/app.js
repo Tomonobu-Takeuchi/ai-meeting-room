@@ -3220,9 +3220,9 @@ function initMobileTips() {
   });
 
   // tip以外をタップしたら全て閉じる
-  document.addEventListener('touchstart', function(e) {
+  document.addEventListener('touchend', function(e) {
     tipBtns.forEach(btn => {
-      if (!btn.contains(e.target)) {
+      if (btn !== e.target && !btn.contains(e.target)) {
         btn.classList.remove('tip-active');
       }
     });
