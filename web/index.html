@@ -271,14 +271,17 @@
       .header-user{flex:none;gap:3px;justify-content:flex-end;display:flex;align-items:center;}
       .nav-text{display:none;}
       .nav-link{padding:4px 6px;font-size:14px;position:relative;}
-      .nav-link[data-tip]:focus::after,
-      .nav-link[data-tip]:active::after{
-        content:attr(data-tip);
-        position:absolute;top:36px;left:50%;transform:translateX(-50%);
+      .nav-tip-bubble{
+        position:absolute;top:40px;left:50%;transform:translateX(-50%);
         background:#2a2a3a;color:#e0e0e0;font-size:11px;
         padding:4px 10px;border-radius:6px;white-space:nowrap;
-        border:1px solid #3a3a4a;z-index:200;
+        border:1px solid #3a3a4a;z-index:1000;
         pointer-events:none;
+        animation:tipFadeIn 0.15s ease;
+      }
+      @keyframes tipFadeIn{
+        from{opacity:0;transform:translateX(-50%) translateY(-4px);}
+        to{opacity:1;transform:translateX(-50%) translateY(0);}
       }
       #logoutBtn{padding:3px 6px;font-size:9px;}
       #loginBtnHeader{padding:3px 6px;font-size:9px;}
