@@ -1217,9 +1217,9 @@ def generate_brief_pdf_layer2(session_id):
             leftMargin=20*mm, rightMargin=20*mm,
             topMargin=20*mm, bottomMargin=20*mm)
 
-        styles_base = ParagraphStyle('base', fontName='HeiseiMin-W3', fontSize=10, leading=16)
+        styles_base = ParagraphStyle('base', fontName='HeiseiMin-W3', fontSize=11, leading=16)
         styles_title = ParagraphStyle('title', fontName='HeiseiMin-W3', fontSize=16, leading=24, textColor=HexColor('#2563EB'))
-        styles_h2 = ParagraphStyle('h2', fontName='HeiseiMin-W3', fontSize=12, leading=18, textColor=HexColor('#1C2333'), spaceAfter=4)
+        styles_h2 = ParagraphStyle('h2', fontName='HeiseiMin-W3', fontSize=13, leading=18, textColor=HexColor('#E6EDF3'), spaceAfter=4)
         styles_small = ParagraphStyle('small', fontName='HeiseiMin-W3', fontSize=9, leading=14, textColor=HexColor('#8B949E'))
 
         story = []
@@ -1238,15 +1238,21 @@ def generate_brief_pdf_layer2(session_id):
         if l2.get('persona_views'):
             story.append(Paragraph('■ ペルソナ別意見', styles_h2))
             for pv in l2['persona_views']:
-                story.append(Paragraph(f"【{pv.get('name','')}】{pv.get('stance','')}：{pv.get('opinion','')}", styles_base))
-                story.append(Spacer(1, 2*mm))
+                styles_persona_name = ParagraphStyle('pname', fontName='HeiseiMin-W3', fontSize=11, leading=16, textColor=HexColor('#60A5FA'))
+                story.append(Paragraph(f"◆ {pv.get('name','')}　【{pv.get('stance','')}】", styles_persona_name))
+                story.append(Paragraph(pv.get('opinion',''), styles_base))
+                story.append(Spacer(1, 3*mm))
             story.append(Spacer(1, 2*mm))
 
         if l2.get('risks'):
             story.append(Paragraph('■ リスク・懸念点', styles_h2))
             for r in l2['risks']:
-                story.append(Paragraph(f"[{r.get('level','')}] {r.get('title','')}：{r.get('detail','')}", styles_base))
-                story.append(Spacer(1, 2*mm))
+                level = r.get('level','')
+                color = '#DC2626' if level == '高' else '#D97706'
+                styles_risk_level = ParagraphStyle('rlevel', fontName='HeiseiMin-W3', fontSize=10, leading=16, textColor=HexColor(color))
+                story.append(Paragraph(f"[{level}] {r.get('title','')}", styles_risk_level))
+                story.append(Paragraph(r.get('detail',''), styles_base))
+                story.append(Spacer(1, 3*mm))
             story.append(Spacer(1, 2*mm))
 
         if l2.get('next_actions'):
@@ -1268,6 +1274,7 @@ def generate_brief_pdf_layer3(session_id):
     """Layer3（戦略フレームワーク）をPDF化して返す。フロントからJSONを受け取る"""
     data = request.get_json()
     l3 = data.get('layer3', {})
+    category = data.get('category', 'strategy')
     topic = data.get('topic', '戦略分析')
     try:
         import io
@@ -1304,49 +1311,148 @@ def generate_brief_pdf_layer3(session_id):
             story.append(Paragraph(l3['summary'], styles_base))
             story.append(Spacer(1, 4*mm))
 
-        if l3.get('vision'):
-            story.append(Paragraph('■ 目指す姿', styles_h2))
-            story.append(Paragraph(l3['vision'], styles_base))
-            story.append(Spacer(1, 4*mm))
-
-        swot = l3.get('swot', {})
-        if any(swot.get(k) for k in ['strength','weakness','opportunity','threat']):
-            story.append(Paragraph('■ SWOT分析', styles_h2))
-            for label, key in [('強み','strength'),('弱み','weakness'),('機会','opportunity'),('脅威','threat')]:
-                items = swot.get(key, [])
-                if items:
-                    story.append(Paragraph(f'【{label}】', styles_base))
-                    for item in items:
-                        story.append(Paragraph(f'・{item}', styles_base))
-            story.append(Spacer(1, 4*mm))
-
-        tm = l3.get('target_market', {})
-        if tm.get('primary'):
-            story.append(Paragraph('■ ターゲット市場', styles_h2))
-            story.append(Paragraph(f"{tm.get('primary','')}　{tm.get('reason','')}", styles_base))
-            story.append(Spacer(1, 4*mm))
-
-        s4p = l3.get('strategy_4p', {})
-        if any(s4p.get(k) for k in ['product','price','place','promotion']):
-            story.append(Paragraph('■ 4P戦略', styles_h2))
-            for label, key in [('製品','product'),('価格','price'),('流通','place'),('販促','promotion')]:
-                if s4p.get(key):
-                    story.append(Paragraph(f'【{label}】{s4p[key]}', styles_base))
-            story.append(Spacer(1, 4*mm))
-
-        if l3.get('open_issues'):
-            story.append(Paragraph('■ 未解決課題', styles_h2))
-            for issue in l3['open_issues']:
-                story.append(Paragraph(f"・{issue.get('issue','')}　{issue.get('why','')}", styles_base))
-            story.append(Spacer(1, 4*mm))
-
-        if l3.get('risks'):
-            story.append(Paragraph('■ リスクと対策', styles_h2))
-            for r in l3['risks']:
-                story.append(Paragraph(f"[{r.get('level','')}] {r.get('name','')}：{r.get('reason','')}", styles_base))
-                if r.get('advice'):
-                    story.append(Paragraph(f'　回避策：{r["advice"]}', styles_base))
+        if category == 'practice':
+            evaluation = l3.get('evaluation', {})
+            strengths = evaluation.get('strengths', [])
+            weaknesses = evaluation.get('weaknesses', [])
+            if strengths or weaknesses:
+                story.append(Paragraph('■ 評価', styles_h2))
+                if strengths:
+                    story.append(Paragraph('【うまくいった点】', styles_base))
+                    for s in strengths:
+                        story.append(Paragraph(f'・{s}', styles_base))
+                    story.append(Spacer(1, 2*mm))
+                if weaknesses:
+                    story.append(Paragraph('【改善すべき点】', styles_base))
+                    for w in weaknesses:
+                        story.append(Paragraph(f'・{w}', styles_base))
+                story.append(Spacer(1, 4*mm))
+            qa_list = l3.get('qa_list', [])
+            if qa_list:
+                story.append(Paragraph('■ 想定Q&A', styles_h2))
+                for q in qa_list:
+                    styles_q = ParagraphStyle('q', fontName='HeiseiMin-W3', fontSize=11, leading=16, textColor=HexColor('#60A5FA'))
+                    story.append(Paragraph(f"Q: {q.get('question','')}", styles_q))
+                    story.append(Paragraph(f"A: {q.get('answer','')}", styles_base))
+                    story.append(Spacer(1, 3*mm))
                 story.append(Spacer(1, 2*mm))
+            if l3.get('improvement'):
+                story.append(Paragraph('■ 総合改善アドバイス', styles_h2))
+                story.append(Paragraph(l3['improvement'], styles_base))
+                story.append(Spacer(1, 4*mm))
+            checklist = l3.get('checklist', [])
+            if checklist:
+                story.append(Paragraph('■ 本番前チェックリスト', styles_h2))
+                for c in checklist:
+                    story.append(Paragraph(f'□ {c}', styles_base))
+                    story.append(Spacer(1, 1*mm))
+
+        elif category == 'study':
+            current_level = l3.get('current_level', '')
+            if current_level:
+                story.append(Paragraph('■ 現在地の評価', styles_h2))
+                story.append(Paragraph(current_level, styles_base))
+                story.append(Spacer(1, 4*mm))
+            if l3.get('goal'):
+                story.append(Paragraph('■ 目標', styles_h2))
+                story.append(Paragraph(l3['goal'], styles_base))
+                story.append(Spacer(1, 4*mm))
+            gap = l3.get('gap_analysis', [])
+            if gap:
+                story.append(Paragraph('■ ギャップ分析', styles_h2))
+                for g in gap:
+                    story.append(Paragraph(f'・{g}', styles_base))
+                story.append(Spacer(1, 4*mm))
+            roadmap = l3.get('roadmap', [])
+            if roadmap:
+                story.append(Paragraph('■ ロードマップ', styles_h2))
+                for r in roadmap:
+                    story.append(Paragraph(f"【{r.get('period','')}】{r.get('action','')}", styles_base))
+                    story.append(Spacer(1, 2*mm))
+                story.append(Spacer(1, 2*mm))
+            obstacles = l3.get('obstacles', [])
+            if obstacles:
+                story.append(Paragraph('■ 障壁と突破策', styles_h2))
+                for o in obstacles:
+                    story.append(Paragraph(f"・{o.get('obstacle','')}", styles_base))
+                    story.append(Paragraph(f"  → {o.get('solution','')}", styles_base))
+                    story.append(Spacer(1, 2*mm))
+                story.append(Spacer(1, 2*mm))
+            if l3.get('motivation'):
+                story.append(Paragraph('■ 継続のアドバイス', styles_h2))
+                story.append(Paragraph(l3['motivation'], styles_base))
+
+        elif category == 'consulting':
+            if l3.get('essence'):
+                story.append(Paragraph('■ 悩みの本質', styles_h2))
+                story.append(Paragraph(l3['essence'], styles_base))
+                story.append(Spacer(1, 4*mm))
+            options = l3.get('options', [])
+            if options:
+                story.append(Paragraph('■ 選択肢の比較', styles_h2))
+                for o in options:
+                    story.append(Paragraph(f"【{o.get('option','')}】", styles_base))
+                    story.append(Paragraph(f"  メリット：{o.get('merit','')}", styles_base))
+                    story.append(Paragraph(f"  デメリット：{o.get('demerit','')}", styles_base))
+                    story.append(Spacer(1, 3*mm))
+                story.append(Spacer(1, 2*mm))
+            criteria = l3.get('criteria', [])
+            if criteria:
+                story.append(Paragraph('■ 判断基準', styles_h2))
+                for c in criteria:
+                    story.append(Paragraph(f'・{c}', styles_base))
+                story.append(Spacer(1, 4*mm))
+            if l3.get('recommendation'):
+                story.append(Paragraph('■ 推奨と根拠', styles_h2))
+                story.append(Paragraph(l3['recommendation'], styles_base))
+                story.append(Spacer(1, 4*mm))
+            if l3.get('regret_check'):
+                story.append(Paragraph('■ 後悔最小化の視点', styles_h2))
+                story.append(Paragraph(l3['regret_check'], styles_base))
+                story.append(Spacer(1, 4*mm))
+            if l3.get('caution'):
+                story.append(Paragraph('■ 注意点', styles_h2))
+                story.append(Paragraph(l3['caution'], styles_base))
+
+        else:  # strategy（デフォルト）
+            if l3.get('vision'):
+                story.append(Paragraph('■ 目指す姿', styles_h2))
+                story.append(Paragraph(l3['vision'], styles_base))
+                story.append(Spacer(1, 4*mm))
+            swot = l3.get('swot', {})
+            if any(swot.get(k) for k in ['strength','weakness','opportunity','threat']):
+                story.append(Paragraph('■ SWOT分析', styles_h2))
+                for label, key in [('強み','strength'),('弱み','weakness'),('機会','opportunity'),('脅威','threat')]:
+                    items = swot.get(key, [])
+                    if items:
+                        story.append(Paragraph(f'【{label}】', styles_base))
+                        for item in items:
+                            story.append(Paragraph(f'・{item}', styles_base))
+                story.append(Spacer(1, 4*mm))
+            tm = l3.get('target_market', {})
+            if tm.get('primary'):
+                story.append(Paragraph('■ ターゲット市場', styles_h2))
+                story.append(Paragraph(f"{tm.get('primary','')}　{tm.get('reason','')}", styles_base))
+                story.append(Spacer(1, 4*mm))
+            s4p = l3.get('strategy_4p', {})
+            if any(s4p.get(k) for k in ['product','price','place','promotion']):
+                story.append(Paragraph('■ 4P戦略', styles_h2))
+                for label, key in [('製品','product'),('価格','price'),('流通','place'),('販促','promotion')]:
+                    if s4p.get(key):
+                        story.append(Paragraph(f'【{label}】{s4p[key]}', styles_base))
+                story.append(Spacer(1, 4*mm))
+            if l3.get('open_issues'):
+                story.append(Paragraph('■ 未解決課題', styles_h2))
+                for issue in l3['open_issues']:
+                    story.append(Paragraph(f"・{issue.get('issue','')}　{issue.get('why','')}", styles_base))
+                story.append(Spacer(1, 4*mm))
+            if l3.get('risks'):
+                story.append(Paragraph('■ リスクと対策', styles_h2))
+                for r in l3['risks']:
+                    story.append(Paragraph(f"[{r.get('level','')}] {r.get('name','')}：{r.get('reason','')}", styles_base))
+                    if r.get('advice'):
+                        story.append(Paragraph(f'　回避策：{r["advice"]}', styles_base))
+                    story.append(Spacer(1, 2*mm))
 
         doc.build(story)
         buf.seek(0)
