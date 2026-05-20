@@ -3177,8 +3177,6 @@ function initMobileTips() {
       if (this.classList.contains('tip-active')) {
         this.classList.remove('tip-active');
         activeTip = null;
-        // ボタンのクリックイベントは発火させない
-        e.preventDefault();
         return;
       }
       // 他のtipを閉じる
@@ -3193,9 +3191,7 @@ function initMobileTips() {
         this.classList.remove('tip-active');
         if (activeTip === this) activeTip = null;
       }, 1500);
-      // 1回目タップではボタン本来のclickを発火させない（tipを見せるだけ）
-      e.preventDefault();
-    }, { passive: false });
+    }, { passive: true });
   });
 
   // tip以外の場所をタップしたら閉じる
