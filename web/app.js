@@ -3170,69 +3170,10 @@ function initMobileActionBar() {
   if (DOM.mobileFacilitatorBtn) DOM.mobileFacilitatorBtn.addEventListener('click', invokeFacilitator);
 }
 
-function initMobileTips() {
-  const tipBtns = document.querySelectorAll('.nav-link[data-tip]');
-
-  const longPressActions = {
-    'howToBtn':     () => openHowToModal(),
-    'planBtn':      () => openPricingModal(),
-    'voiceModeBtn': () => toggleVoiceMode()
-  };
-
-  tipBtns.forEach(btn => {
-    let pressTimer = null;
-
-    btn.addEventListener('touchstart', function(e) {
-      const self = this;
-      // 吹き出し表示
-      self.classList.add('tip-active');
-      // 既存タイマークリア
-      if (pressTimer) clearTimeout(pressTimer);
-      // 長押し判定（500ms）
-      pressTimer = setTimeout(() => {
-        self.classList.remove('tip-active');
-        const action = longPressActions[self.id];
-        if (action) action();
-        pressTimer = null;
-      }, 500);
-    }, { passive: true });
-
-    btn.addEventListener('touchend', function(e) {
-      // 短タップ：長押しタイマーキャンセル・吹き出しは1.5秒後消去
-      if (pressTimer) {
-        clearTimeout(pressTimer);
-        pressTimer = null;
-      }
-      const self = this;
-      setTimeout(() => {
-        self.classList.remove('tip-active');
-      }, 1500);
-    }, { passive: true });
-
-    btn.addEventListener('touchmove', function(e) {
-      // スクロール中はキャンセル
-      if (pressTimer) {
-        clearTimeout(pressTimer);
-        pressTimer = null;
-      }
-      this.classList.remove('tip-active');
-    }, { passive: true });
-  });
-
-  // tip以外をタップしたら全て閉じる
-  document.addEventListener('touchend', function(e) {
-    tipBtns.forEach(btn => {
-      if (btn !== e.target && !btn.contains(e.target)) {
-        btn.classList.remove('tip-active');
-      }
-    });
-  }, { passive: true });
-}
 
 document.addEventListener('DOMContentLoaded', () => {
   init();
   initMobileActionBar();
-  initMobileTips();
   // 決済確認モーダル
   $('purchaseConfirmCancel')?.addEventListener('click', () => {
     $('purchaseConfirmOverlay').classList.add('hidden');
