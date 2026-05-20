@@ -271,6 +271,7 @@
       .header-user{flex:none;gap:3px;justify-content:flex-end;display:flex;align-items:center;}
       .nav-text{display:none;}
       .nav-link{padding:4px 6px;font-size:14px;position:relative;}
+      .nav-link[data-tip]:focus::after,
       .nav-link[data-tip]:active::after{
         content:attr(data-tip);
         position:absolute;top:36px;left:50%;transform:translateX(-50%);
