@@ -9,14 +9,17 @@ DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
 def get_conn_params():
     url = urlparse(DATABASE_URL)
-    return {
+    params = {
         'host': url.hostname,
         'port': url.port or 5432,
         'database': url.path.lstrip('/'),
         'user': url.username,
         'password': url.password,
-        'ssl_context': True,
     }
+    # ローカル開発環境（localhost）はSSL不要
+    if url.hostname != 'localhost':
+        params['ssl_context'] = True
+    return params
 
 def get_connection():
     return pg8000.native.Connection(**get_conn_params())
