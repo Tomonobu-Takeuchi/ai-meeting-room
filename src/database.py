@@ -244,8 +244,13 @@ def create_user(email, password_hash, name=''):
             VALUES (:email, :password_hash, :name)
         """, email=email, password_hash=password_hash, name=encrypt_value(conn, name))
         rows = conn.run("SELECT id, email, name, plan FROM users WHERE email=:email", email=email)
+        if not rows:
+            conn.close()
+            return None
+        d = row_to_dict(['id','email','name','plan'], rows[0])
+        d['name'] = decrypt_value(conn, d['name'])
         conn.close()
-        return row_to_dict(['id','email','name','plan'], rows[0]) if rows else None
+        return d
     except Exception as e:
         conn.close()
         raise e
