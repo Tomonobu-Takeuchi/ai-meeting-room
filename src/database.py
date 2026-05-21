@@ -6,6 +6,7 @@ import pg8000.native
 from urllib.parse import urlparse
 
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
+SECRET_MODE_KEY = os.environ.get('SECRET_MODE_KEY', '')
 
 def get_conn_params():
     url = urlparse(DATABASE_URL)
@@ -29,6 +30,32 @@ def row_to_dict(columns, row):
 
 def rows_to_dicts(columns, rows):
     return [row_to_dict(columns, r) for r in rows]
+
+
+def encrypt_value(conn, value):
+    """平文 → 暗号文。空文字・Noneはそのまま返す"""
+    if not value or not SECRET_MODE_KEY:
+        return value
+    rows = conn.run(
+        "SELECT pgp_sym_encrypt(:val, :key)",
+        val=str(value), key=SECRET_MODE_KEY
+    )
+    return rows[0][0] if rows else value
+
+
+def decrypt_value(conn, value):
+    """暗号文 → 平文。空文字・None・復号失敗はそのまま返す"""
+    if not value or not SECRET_MODE_KEY:
+        return value
+    try:
+        rows = conn.run(
+            "SELECT pgp_sym_decrypt(:val::bytea, :key)",
+            val=value, key=SECRET_MODE_KEY
+        )
+        return rows[0][0] if rows else value
+    except Exception:
+        return value  # 移行期の平文データはそのまま返す
+
 
 def init_db():
     """テーブル初期化"""
@@ -215,7 +242,7 @@ def create_user(email, password_hash, name=''):
         conn.run("""
             INSERT INTO users (email, password_hash, name)
             VALUES (:email, :password_hash, :name)
-        """, email=email, password_hash=password_hash, name=name)
+        """, email=email, password_hash=password_hash, name=encrypt_value(conn, name))
         rows = conn.run("SELECT id, email, name, plan FROM users WHERE email=:email", email=email)
         conn.close()
         return row_to_dict(['id','email','name','plan'], rows[0]) if rows else None
@@ -228,8 +255,13 @@ def get_user_by_email(email):
     rows = conn.run("""
         SELECT id, email, name, plan, password_hash, avatar FROM users WHERE email=:email
     """, email=email)
+    if not rows:
+        conn.close()
+        return None
+    d = row_to_dict(['id','email','name','plan','password_hash','avatar'], rows[0])
+    d['name'] = decrypt_value(conn, d['name'])
     conn.close()
-    return row_to_dict(['id','email','name','plan','password_hash','avatar'], rows[0]) if rows else None
+    return d
 
 def get_user_by_id(user_id):
     conn = get_connection()
@@ -245,6 +277,7 @@ def get_user_by_id(user_id):
         r = rows[0]
         d = row_to_dict(['id','email','name','plan','credits','plan_expires_at',
                          'monthly_meeting_count','monthly_reset_at','avatar'], r)
+        d['name'] = decrypt_value(conn, d['name'])
         conn.close()
         d['credits'] = d['credits'] or 0
         d['monthly_meeting_count'] = d['monthly_meeting_count'] or 0
@@ -258,8 +291,13 @@ def get_user_by_id(user_id):
             pass
         conn2 = get_connection()
         rows = conn2.run("SELECT id, email, name, plan, avatar FROM users WHERE id=:id", id=user_id)
+        if not rows:
+            conn2.close()
+            return None
+        d = row_to_dict(['id','email','name','plan','avatar'], rows[0])
+        d['name'] = decrypt_value(conn2, d['name'])
         conn2.close()
-        return row_to_dict(['id','email','name','plan','avatar'], rows[0]) if rows else None
+        return d
 
 def update_user_avatar(user_id, avatar):
     conn = get_connection()
@@ -501,18 +539,20 @@ def save_learn_data(persona_id, user_id, content, source, embedding_vector=None)
     if existing:
         conn.close()
         return
+    enc_content = encrypt_value(conn, content)
+    enc_source = encrypt_value(conn, source)
     if embedding_vector:
         vec_str = '[' + ','.join(str(v) for v in embedding_vector) + ']'
         conn.run("""
             INSERT INTO persona_learn (persona_id, user_id, content, source, embedding)
             VALUES (:persona_id, :user_id, :content, :source, :embedding::vector)
-        """, persona_id=persona_id, user_id=user_id, content=content,
-            source=source, embedding=vec_str)
+        """, persona_id=persona_id, user_id=user_id, content=enc_content,
+            source=enc_source, embedding=vec_str)
     else:
         conn.run("""
             INSERT INTO persona_learn (persona_id, user_id, content, source)
             VALUES (:persona_id, :user_id, :content, :source)
-        """, persona_id=persona_id, user_id=user_id, content=content, source=source)
+        """, persona_id=persona_id, user_id=user_id, content=enc_content, source=enc_source)
     conn.close()
 
 def update_learn_data_embedding(persona_id, user_id, content, embedding_vector):
@@ -541,8 +581,15 @@ def search_learn_data(persona_id, user_id, query_embedding, limit=3):
         ORDER BY embedding <=> :query_vec::vector
         LIMIT :limit
     """, persona_id=persona_id, user_id=user_id, query_vec=vec_str, limit=limit)
+    result = []
+    for r in rows:
+        result.append({
+            'content': decrypt_value(conn, r[0]),
+            'source': decrypt_value(conn, r[1]),
+            'similarity': float(r[2])
+        })
     conn.close()
-    return [{'content': r[0], 'source': r[1], 'similarity': float(r[2])} for r in rows]
+    return result
 
 def get_learn_data_simple(persona_id, user_id, limit=5):
     conn = get_connection()
@@ -552,8 +599,10 @@ def get_learn_data_simple(persona_id, user_id, limit=5):
           AND (user_id = :user_id OR user_id IS NULL)
         ORDER BY created_at DESC LIMIT :limit
     """, persona_id=persona_id, user_id=user_id, limit=limit)
+    result = [{'content': decrypt_value(conn, r[0]),
+               'source': decrypt_value(conn, r[1])} for r in rows]
     conn.close()
-    return [{'content': r[0], 'source': r[1]} for r in rows]
+    return result
 
 def get_learn_data_count(persona_id, user_id=None):
     conn = get_connection()
@@ -613,10 +662,18 @@ def get_all_learn_data(persona_id, user_id):
             ORDER BY content, source, created_at DESC
             LIMIT 100
         """, persona_id=persona_id)
+    result = []
+    for r in rows:
+        dec = decrypt_value(conn, r[1])
+        dec_src = decrypt_value(conn, r[2])
+        result.append({
+            'id': r[0],
+            'content': dec[:100]+'...' if dec and len(dec)>100 else dec,
+            'source': dec_src,
+            'created_at': str(r[3])
+        })
     conn.close()
-    return [{'id': r[0],
-             'content': r[1][:100]+'...' if len(r[1])>100 else r[1],
-             'source': r[2], 'created_at': str(r[3])} for r in rows]
+    return result
 
 def delete_learn_data(persona_id, user_id, learn_id):
     conn = get_connection()
@@ -972,7 +1029,8 @@ def save_feedback_record(persona_id, user_id, session_id, rating, detail_categor
             VALUES
                 (:persona_id, :user_id, :session_id, :rating, :detail_category, :correct_response)
         """, persona_id=persona_id, user_id=user_id, session_id=session_id,
-             rating=rating, detail_category=detail_category, correct_response=correct_response)
+             rating=rating, detail_category=detail_category,
+             correct_response=encrypt_value(conn, correct_response))
 
         # persona_growthのfeedback_count・positive_countを更新
         conn.run("""

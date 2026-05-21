@@ -6,6 +6,7 @@ import os
 import threading
 from src.database import (
     get_connection, rows_to_dicts, row_to_dict,
+    encrypt_value, decrypt_value,
     save_learn_data, update_learn_data_embedding,
     search_learn_data, get_learn_data_simple,
     get_learn_data_count, get_learn_data_counts_batch, get_all_learn_data, delete_learn_data,
@@ -28,6 +29,17 @@ def serialize_persona(d):
         d['created_at'] = str(d['created_at'])
     if 'base_created_at' in d and d['base_created_at'] is not None:
         d['base_created_at'] = str(d['base_created_at'])
+    return d
+
+
+_PERSONA_ENC_FIELDS = ['name', 'avatar', 'description', 'personality', 'speaking_style', 'background']
+
+
+def _decrypt_persona(conn, d):
+    """ペルソナdictの暗号化フィールドを復号する（平文はそのまま返す）"""
+    for f in _PERSONA_ENC_FIELDS:
+        if d.get(f):
+            d[f] = decrypt_value(conn, d[f])
     return d
 
 
@@ -69,8 +81,11 @@ class PersonaManager:
                 WHERE p.role='member' AND p.user_id IS NULL
                 ORDER BY p.created_at ASC
             """)
+        result = []
+        for r in rows:
+            d = _decrypt_persona(conn, row_to_dict(COLUMNS, r))
+            result.append(serialize_persona(d))
         conn.close()
-        result = [serialize_persona(row_to_dict(COLUMNS, r)) for r in rows]
         if result:
             counts = get_learn_data_counts_batch([p['id'] for p in result], user_id)
             for p in result:
@@ -93,8 +108,12 @@ class PersonaManager:
                 WHERE role='facilitator' AND user_id IS NULL
                 ORDER BY created_at ASC LIMIT 1
             """)
+        if rows:
+            d = _decrypt_persona(conn, row_to_dict(COLUMNS, rows[0]))
+            conn.close()
+            return serialize_persona(d)
         conn.close()
-        return serialize_persona(row_to_dict(COLUMNS, rows[0])) if rows else None
+        return None
 
     def get_all_personas(self, user_id=None):
         conn = get_connection()
@@ -118,8 +137,12 @@ class PersonaManager:
                 SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id, source_persona_id, category FROM personas WHERE user_id IS NULL
                 ORDER BY role DESC, created_at ASC
             """)
+        result = []
+        for r in rows:
+            d = _decrypt_persona(conn, row_to_dict(COLUMNS, r))
+            result.append(serialize_persona(d))
         conn.close()
-        return [serialize_persona(row_to_dict(COLUMNS, r)) for r in rows]
+        return result
 
     def get_persona_by_id(self, persona_id, user_id=None):
         conn = get_connection()
@@ -130,8 +153,12 @@ class PersonaManager:
             """, id=persona_id, user_id=user_id)
         else:
             rows = conn.run("SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id, source_persona_id, category FROM personas WHERE id=:id", id=persona_id)
+        if rows:
+            d = _decrypt_persona(conn, row_to_dict(COLUMNS, rows[0]))
+            conn.close()
+            return serialize_persona(d)
         conn.close()
-        return serialize_persona(row_to_dict(COLUMNS, rows[0])) if rows else None
+        return None
 
     # meeting_room.py との互換性
     def get_persona(self, persona_id, user_id=None):
@@ -155,8 +182,11 @@ class PersonaManager:
                 FROM personas
                 WHERE id = ANY(:ids)
             """, ids=list(ids))
+        by_id = {}
+        for r in rows:
+            d = _decrypt_persona(conn, row_to_dict(COLUMNS, r))
+            by_id[r[0]] = serialize_persona(d)
         conn.close()
-        by_id = {r[0]: serialize_persona(row_to_dict(COLUMNS, r)) for r in rows}
         return [by_id[i] for i in ids if i in by_id]
 
     # ===== ペルソナ追加・更新・削除 =====
@@ -167,6 +197,7 @@ class PersonaManager:
         # base64画像はそのまま保持、絵文字のみ4文字制限
         avatar_val = avatar_raw if avatar_raw.startswith('data:') else avatar_raw[:4]
         conn = get_connection()
+        _enc = (lambda v: encrypt_value(conn, v)) if user_id is not None else (lambda v: v)
         conn.run("""
             INSERT INTO personas (id, user_id, name, avatar, description, personality,
                 speaking_style, background, color, role, is_default, voice_id, is_deceased_confirmed)
@@ -175,12 +206,12 @@ class PersonaManager:
             ON CONFLICT DO NOTHING
         """,
         id=persona_id, user_id=user_id,
-        name=data.get('name','').strip(),
-        avatar=avatar_val,
-        description=data.get('description','').strip(),
-        personality=data.get('personality','').strip(),
-        speaking_style=data.get('speaking_style','').strip(),
-        background=data.get('background','').strip(),
+        name=_enc(data.get('name','').strip()),
+        avatar=_enc(avatar_val),
+        description=_enc(data.get('description','').strip()),
+        personality=_enc(data.get('personality','').strip()),
+        speaking_style=_enc(data.get('speaking_style','').strip()),
+        background=_enc(data.get('background','').strip()),
         color=data.get('color','#8B5CF6'),
         role=data.get('role','member'),
         voice_id=data.get('voice_id') or None,
@@ -193,8 +224,12 @@ class PersonaManager:
             rows = conn.run("""
                 SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id, source_persona_id, category FROM personas WHERE id=:id AND user_id IS NULL
             """, id=persona_id)
+        if rows:
+            d = _decrypt_persona(conn, row_to_dict(COLUMNS, rows[0]))
+            conn.close()
+            return serialize_persona(d)
         conn.close()
-        return serialize_persona(row_to_dict(COLUMNS, rows[0])) if rows else None
+        return None
 
     def update_persona(self, persona_id, data, user_id=None):
         avatar_raw = data.get('avatar', '👤').strip() or '👤'
@@ -202,6 +237,7 @@ class PersonaManager:
         avatar_val = avatar_raw if avatar_raw.startswith('data:') else avatar_raw[:4]
         conn = get_connection()
         if user_id:
+            _enc = lambda v: encrypt_value(conn, v)
             conn.run("""
                 UPDATE personas SET
                     name=:name, avatar=:avatar, description=:description,
@@ -210,12 +246,12 @@ class PersonaManager:
                 WHERE id=:id AND user_id=:user_id
             """,
             id=persona_id, user_id=user_id,
-            name=data.get('name','').strip(),
-            avatar=avatar_val,
-            description=data.get('description','').strip(),
-            personality=data.get('personality','').strip(),
-            speaking_style=data.get('speaking_style','').strip(),
-            background=data.get('background','').strip(),
+            name=_enc(data.get('name','').strip()),
+            avatar=_enc(avatar_val),
+            description=_enc(data.get('description','').strip()),
+            personality=_enc(data.get('personality','').strip()),
+            speaking_style=_enc(data.get('speaking_style','').strip()),
+            background=_enc(data.get('background','').strip()),
             color=data.get('color','#8B5CF6'),
             voice_id=data.get('voice_id') or None)
             rows = conn.run("""
@@ -239,8 +275,12 @@ class PersonaManager:
             color=data.get('color','#8B5CF6'),
             voice_id=data.get('voice_id') or None)
             rows = conn.run("SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id, source_persona_id, category FROM personas WHERE id=:id", id=persona_id)
+        if rows:
+            d = _decrypt_persona(conn, row_to_dict(COLUMNS, rows[0]))
+            conn.close()
+            return serialize_persona(d)
         conn.close()
-        return serialize_persona(row_to_dict(COLUMNS, rows[0])) if rows else None
+        return None
 
     def copy_default_persona(self, default_persona_id, user_id):
         """
@@ -253,8 +293,9 @@ class PersonaManager:
             src=default_persona_id, uid=user_id
         )
         if existing:
+            d = _decrypt_persona(conn, row_to_dict(COLUMNS, existing[0]))
             conn.close()
-            return serialize_persona(row_to_dict(COLUMNS, existing[0]))
+            return serialize_persona(d)
 
         rows = conn.run(
             "SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id, source_persona_id, category FROM personas WHERE id=:id AND user_id IS NULL",
@@ -263,9 +304,11 @@ class PersonaManager:
         if not rows:
             conn.close()
             return None
+        # デフォルトペルソナは平文のためそのまま使用
         src = row_to_dict(COLUMNS, rows[0])
 
         new_id = f"{default_persona_id}_{str(user_id)[-6:]}"
+        _enc = lambda v: encrypt_value(conn, v)
         conn.run(
             """INSERT INTO personas
                (id, user_id, name, avatar, description, personality,
@@ -278,12 +321,12 @@ class PersonaManager:
                ON CONFLICT DO NOTHING
             """,
             id=new_id, user_id=user_id,
-            name=src['name'],
-            avatar=src.get('avatar', ''),
-            description=src.get('description', ''),
-            personality=src.get('personality', ''),
-            speaking_style=src.get('speaking_style', ''),
-            background=src.get('background', ''),
+            name=_enc(src['name']),
+            avatar=_enc(src.get('avatar', '')),
+            description=_enc(src.get('description', '')),
+            personality=_enc(src.get('personality', '')),
+            speaking_style=_enc(src.get('speaking_style', '')),
+            background=_enc(src.get('background', '')),
             color=src.get('color', '#667eea'),
             role=src.get('role', ''),
             voice_id=src.get('voice_id') or None,
@@ -294,8 +337,12 @@ class PersonaManager:
             "SELECT id, user_id, name, avatar, description, personality, speaking_style, background, color, role, is_default, created_at, voice_id, source_persona_id, category FROM personas WHERE id=:id AND user_id=:uid",
             id=new_id, uid=user_id
         )
+        if copied:
+            d = _decrypt_persona(conn, row_to_dict(COLUMNS, copied[0]))
+            conn.close()
+            return serialize_persona(d)
         conn.close()
-        return serialize_persona(row_to_dict(COLUMNS, copied[0])) if copied else None
+        return None
 
     def delete_persona(self, persona_id, user_id=None):
         protected = {'koumei', 'hideyoshi', 'professor', 'facilitator', 'elizabeth1'}
