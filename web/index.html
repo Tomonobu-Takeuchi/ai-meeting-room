@@ -459,6 +459,8 @@
       #planBtnRow2{display:block;}  /* 3段目料金プランをスマホで表示 */
       #planBtnRow2 .nav-label{display:inline !important;}
       #logoutBtn{display:block !important;}
+      #planBtn{display:none;}  /* スマホでは3段目planBtnRow2で代替 */
+      .credits-badge{display:none;}
     }
   </style>
 </head>
@@ -1422,7 +1424,11 @@
 <!-- ===== 認証モーダル ===== -->
 <!-- 料金プランモーダル -->
 <div class="auth-modal-overlay hidden" id="pricingModalOverlay" onclick="if(event.target===this)closePricingModal()">
-  <div class="pricing-modal">
+  <div class="pricing-modal" style="position:relative;">
+    <button onclick="closePricingModal()"
+      style="position:absolute;top:12px;right:12px;background:none;border:none;
+             color:var(--text-secondary);font-size:20px;cursor:pointer;
+             line-height:1;padding:4px 8px;">×</button>
     <h2>プランを選択</h2>
     <p class="pricing-subtitle">会議の使用頻度に合わせてプランをお選びください</p>
     <div id="pricingCurrentPlan" class="pricing-current hidden"></div>
