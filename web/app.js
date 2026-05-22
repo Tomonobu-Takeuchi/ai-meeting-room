@@ -2901,8 +2901,8 @@ function renderAuthArea() {
         <span class="user-name">${escapeHtml(u.name || u.email)}</span>
         <span class="plan-badge ${plan}">${planLabel}</span>
         ${creditsHtml}
-        <button class="btn btn-account-settings" id="accountSettingsBtn" onclick="openAccountSettingsModal()" title="アカウント設定">⚙️<span id="accountSettingsBtnLabel" style="display:none;color:#A5B4FC;font-size:11px;margin-left:2px;">設定</span></button>
       </div>
+      <button class="btn btn-account-settings" id="accountSettingsBtn" onclick="openAccountSettingsModal()" title="アカウント設定">⚙️<span id="accountSettingsBtnLabel" style="display:none;color:#A5B4FC;font-size:11px;margin-left:2px;">設定</span></button>
       ${upgradeHtml}
       <button class="btn" id="logoutBtn" onclick="logout()">ログアウト</button>
     `;
