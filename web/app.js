@@ -2902,11 +2902,17 @@ function renderAuthArea() {
         <span class="plan-badge ${plan}">${planLabel}</span>
         ${creditsHtml}
       </div>
-      <button class="btn btn-account-settings" id="accountSettingsBtn" onclick="openAccountSettingsModal()" title="アカウント設定">⚙️<span id="accountSettingsBtnLabel" style="display:none;color:#A5B4FC;font-size:11px;margin-left:2px;">設定</span></button>
+      <button class="btn btn-account-settings" id="accountSettingsBtn" title="アカウント設定">⚙️<span class="nav-label" id="accountSettingsBtnLabel" style="color:#A5B4FC;font-size:11px;margin-left:2px;"> アカウント設定</span></button>
       ${upgradeHtml}
       <button class="btn" id="logoutBtn" onclick="logout()">ログアウト</button>
     `;
-    setTimeout(() => initNavTips(), 50);
+    setTimeout(() => {
+      initNavTips();
+      if (!('ontouchstart' in window)) {
+        document.getElementById('accountSettingsBtn')
+          ?.addEventListener('click', () => openAccountSettingsModal());
+      }
+    }, 50);
   } else {
     area.innerHTML = `<button class="btn btn-green" id="freeStartBtn" onclick="startFree()">🚀 <span class="btn-full-text">無料で始める</span><span class="btn-short-text">無料</span></button><button class="btn" id="loginBtnHeader" onclick="openAuthModal()">🔑<span class="btn-login-text"> ログイン</span></button>`;
   }
@@ -3302,8 +3308,9 @@ function initNavTips() {
   if (!('ontouchstart' in window)) return;
 
   const navBtns = [
-    { id: 'howToBtn', labelId: 'howToBtnLabel', action: () => openHowToModal() },
-    { id: 'planBtn',  labelId: 'planBtnLabel',  action: () => openPricingModal() }
+    { id: 'howToBtn',           labelId: 'howToBtnLabel',           action: () => openHowToModal() },
+    { id: 'planBtn',            labelId: 'planBtnLabel',            action: () => openPricingModal() },
+    { id: 'accountSettingsBtn', labelId: 'accountSettingsBtnLabel', action: () => openAccountSettingsModal() }
   ];
 
   navBtns.forEach(({ id, labelId, action }) => {
