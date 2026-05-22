@@ -171,8 +171,10 @@ const API = {
       clearTimeout(timer);
     }
   },
-  async delete(path) {
-    const res = await fetch(path, { method: 'DELETE' });
+  async delete(path, body) {
+    const opts = { method: 'DELETE' };
+    if (body !== undefined) { opts.headers = { 'Content-Type': 'application/json' }; opts.body = JSON.stringify(body); }
+    const res = await fetch(path, opts);
     if (!res.ok) { const e = await res.json().catch(() => ({ error: res.statusText })); throw new Error(e.error || res.statusText); }
     return res.json();
   },
@@ -2901,6 +2903,7 @@ function renderAuthArea() {
         ${creditsHtml}
       </div>
       ${upgradeHtml}
+      <button class="btn btn-account-settings" onclick="openAccountSettingsModal()" title="アカウント設定">⚙️</button>
       <button class="btn" id="logoutBtn" onclick="logout()">ログアウト</button>
     `;
   } else {
@@ -2989,6 +2992,127 @@ async function submitRegister() {
   } finally {
     const btn = $('registerSubmitBtn');
     if (btn) { btn.textContent = '登録する'; btn.disabled = false; }
+  }
+}
+
+// ===== アカウント設定モーダル =====
+
+function openAccountSettingsModal() {
+  const u = State.currentUser;
+  if (!u) return;
+  $('currentNameDisplay').textContent = u.name || '';
+  $('currentEmailDisplay').textContent = u.email || '';
+  ['newNameInput','nameChangePasswordInput','newEmailInput','emailChangePasswordInput',
+   'currentPasswordInput','newPasswordInput','confirmPasswordInput'].forEach(id => { const el = $(id); if (el) el.value = ''; });
+  ['nameChangeMsg','emailChangeMsg','passwordChangeMsg'].forEach(id => setAcctMsg(id, '', ''));
+  $('accountSettingsOverlay').classList.remove('hidden');
+}
+
+function closeAccountSettingsModal() {
+  $('accountSettingsOverlay').classList.add('hidden');
+}
+
+function setAcctMsg(id, text, type) {
+  const el = $(id);
+  if (!el) return;
+  el.textContent = text;
+  el.className = 'acct-msg' + (type ? ' ' + type : '');
+}
+
+async function updateProfileName() {
+  const newName = $('newNameInput').value.trim();
+  const currentPassword = $('nameChangePasswordInput').value;
+  const btn = $('changeNameBtn');
+  if (!newName) { setAcctMsg('nameChangeMsg', '新しい名前を入力してください', 'error'); return; }
+  if (!currentPassword) { setAcctMsg('nameChangeMsg', 'パスワードを入力してください', 'error'); return; }
+  btn.disabled = true;
+  setAcctMsg('nameChangeMsg', '', '');
+  try {
+    await API.put('/api/auth/profile', { type: 'name', new_value: newName, current_password: currentPassword });
+    State.currentUser.name = newName;
+    renderAuthArea();
+    $('currentNameDisplay').textContent = newName;
+    $('newNameInput').value = '';
+    $('nameChangePasswordInput').value = '';
+    setAcctMsg('nameChangeMsg', '名前を更新しました', 'success');
+  } catch (e) {
+    setAcctMsg('nameChangeMsg', e.message || '更新に失敗しました', 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function updateProfilePassword() {
+  const currentPassword = $('currentPasswordInput').value;
+  const newPassword = $('newPasswordInput').value;
+  const confirmPassword = $('confirmPasswordInput').value;
+  const btn = $('changePasswordBtn');
+  if (!currentPassword) { setAcctMsg('passwordChangeMsg', '現パスワードを入力してください', 'error'); return; }
+  if (!newPassword || newPassword.length < 8) { setAcctMsg('passwordChangeMsg', '新パスワードは8文字以上で入力してください', 'error'); return; }
+  if (newPassword !== confirmPassword) { setAcctMsg('passwordChangeMsg', '新パスワードが一致しません', 'error'); return; }
+  btn.disabled = true;
+  setAcctMsg('passwordChangeMsg', '', '');
+  try {
+    await API.put('/api/auth/profile', { type: 'password', new_value: newPassword, confirm_value: confirmPassword, current_password: currentPassword });
+    $('currentPasswordInput').value = '';
+    $('newPasswordInput').value = '';
+    $('confirmPasswordInput').value = '';
+    setAcctMsg('passwordChangeMsg', 'パスワードを更新しました', 'success');
+  } catch (e) {
+    setAcctMsg('passwordChangeMsg', e.message || '更新に失敗しました', 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function requestEmailChange() {
+  const newEmail = $('newEmailInput').value.trim();
+  const currentPassword = $('emailChangePasswordInput').value;
+  const btn = $('changeEmailBtn');
+  if (!newEmail) { setAcctMsg('emailChangeMsg', '新しいメールアドレスを入力してください', 'error'); return; }
+  if (!currentPassword) { setAcctMsg('emailChangeMsg', 'パスワードを入力してください', 'error'); return; }
+  btn.disabled = true;
+  setAcctMsg('emailChangeMsg', '', '');
+  try {
+    await API.post('/api/auth/email-change-request', { new_email: newEmail, current_password: currentPassword });
+    $('newEmailInput').value = '';
+    $('emailChangePasswordInput').value = '';
+    setAcctMsg('emailChangeMsg', '確認メールを送信しました。メールのリンクをクリックして変更を確定してください。', 'success');
+  } catch (e) {
+    setAcctMsg('emailChangeMsg', e.message || '送信に失敗しました', 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function openDeleteAccountDialog() {
+  const u = State.currentUser;
+  if (!u) return;
+  const msg = (u.plan === 'pro')
+    ? 'proプランを解約し、アカウントを削除します。この操作は取り消せません。よろしいですか？'
+    : 'アカウントを削除します。この操作は取り消せません。よろしいですか？';
+  $('deleteAccountConfirmText').textContent = msg;
+  $('deleteAccountPasswordInput').value = '';
+  setAcctMsg('deleteAccountMsg', '', '');
+  $('deleteAccountOverlay').classList.remove('hidden');
+}
+
+function closeDeleteAccountDialog() {
+  $('deleteAccountOverlay').classList.add('hidden');
+}
+
+async function deleteAccount() {
+  const currentPassword = $('deleteAccountPasswordInput').value;
+  const btn = $('deleteAccountBtn');
+  if (!currentPassword) { setAcctMsg('deleteAccountMsg', 'パスワードを入力してください', 'error'); return; }
+  btn.disabled = true;
+  setAcctMsg('deleteAccountMsg', '', '');
+  try {
+    await API.delete('/api/auth/account', { current_password: currentPassword });
+    window.location.href = '/';
+  } catch (e) {
+    setAcctMsg('deleteAccountMsg', e.message || '削除に失敗しました', 'error');
+    btn.disabled = false;
   }
 }
 

@@ -440,6 +440,20 @@
     .category-btn-icon{font-size:22px;flex-shrink:0;}
     .category-btn-label{font-size:14px;font-weight:600;}
     .category-btn-desc{font-size:12px;color:var(--text-secondary);margin-top:2px;}
+    .acct-section{padding:18px 0;}
+    .acct-section:first-child{padding-top:0;}
+    .acct-section-title{font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:12px;}
+    .acct-current-info{font-size:12px;color:var(--text-secondary);margin-bottom:12px;}
+    .acct-divider{height:1px;background:var(--border);margin:0;}
+    .acct-danger-section{border-top:2px solid rgba(220,38,38,0.3);padding-top:20px;}
+    .acct-danger-title{color:#F87171;}
+    .acct-danger-btn{background:var(--accent-red);border-color:var(--accent-red);color:#fff;}
+    .acct-danger-btn:hover{filter:brightness(1.15);}
+    .acct-msg{font-size:12px;min-height:18px;margin-bottom:10px;line-height:1.5;}
+    .acct-msg.success{color:#86EFAC;}
+    .acct-msg.error{color:#FCA5A5;}
+    .btn-account-settings{padding:3px 8px;font-size:11px;}
+    @media(max-width:480px){.btn-account-settings{font-size:10px;padding:3px 6px;}}
   </style>
 </head>
 <body>
@@ -955,6 +969,105 @@
     <div class="modal-footer">
       <button class="btn" onclick="closeUserAvatarModal()">キャンセル</button>
       <button class="btn btn-primary" onclick="saveUserAvatar()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== アカウント設定モーダル ===== -->
+<div class="modal-overlay hidden" id="accountSettingsOverlay" onclick="if(event.target===this)closeAccountSettingsModal()">
+  <div class="modal" style="width:500px;max-width:94vw;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <h2 style="margin:0;">⚙️ アカウント設定</h2>
+      <button class="btn" onclick="closeAccountSettingsModal()" style="padding:4px 10px;font-size:13px;">✕</button>
+    </div>
+
+    <!-- 名前変更セクション -->
+    <div class="acct-section">
+      <h3 class="acct-section-title">名前の変更</h3>
+      <p class="acct-current-info">現在の名前: <span id="currentNameDisplay"></span></p>
+      <div class="form-group">
+        <label>新しい名前</label>
+        <input type="text" id="newNameInput" placeholder="新しい名前を入力">
+      </div>
+      <div class="form-group">
+        <label>現パスワード</label>
+        <input type="password" id="nameChangePasswordInput" placeholder="現在のパスワード">
+      </div>
+      <div class="acct-msg" id="nameChangeMsg"></div>
+      <div style="text-align:right;">
+        <button class="btn btn-primary" id="changeNameBtn" onclick="updateProfileName()">名前を変更する</button>
+      </div>
+    </div>
+
+    <div class="acct-divider"></div>
+
+    <!-- メールアドレス変更セクション -->
+    <div class="acct-section">
+      <h3 class="acct-section-title">メールアドレスの変更</h3>
+      <p class="acct-current-info">現在のメール: <span id="currentEmailDisplay"></span></p>
+      <div class="form-group">
+        <label>新しいメールアドレス</label>
+        <input type="email" id="newEmailInput" placeholder="新しいメールアドレスを入力">
+      </div>
+      <div class="form-group">
+        <label>現パスワード</label>
+        <input type="password" id="emailChangePasswordInput" placeholder="現在のパスワード">
+      </div>
+      <div class="acct-msg" id="emailChangeMsg"></div>
+      <div style="text-align:right;">
+        <button class="btn btn-primary" id="changeEmailBtn" onclick="requestEmailChange()">確認メールを送信する</button>
+      </div>
+    </div>
+
+    <div class="acct-divider"></div>
+
+    <!-- パスワード変更セクション -->
+    <div class="acct-section">
+      <h3 class="acct-section-title">パスワードの変更</h3>
+      <div class="form-group">
+        <label>現パスワード</label>
+        <input type="password" id="currentPasswordInput" placeholder="現在のパスワード">
+      </div>
+      <div class="form-group">
+        <label>新パスワード（8文字以上）</label>
+        <input type="password" id="newPasswordInput" placeholder="新しいパスワード（8文字以上）">
+      </div>
+      <div class="form-group">
+        <label>新パスワード（確認）</label>
+        <input type="password" id="confirmPasswordInput" placeholder="新しいパスワードを再入力">
+      </div>
+      <div class="acct-msg" id="passwordChangeMsg"></div>
+      <div style="text-align:right;">
+        <button class="btn btn-primary" id="changePasswordBtn" onclick="updateProfilePassword()">パスワードを変更する</button>
+      </div>
+    </div>
+
+    <div class="acct-divider"></div>
+
+    <!-- アカウント削除セクション -->
+    <div class="acct-section acct-danger-section">
+      <h3 class="acct-section-title acct-danger-title">アカウントの削除</h3>
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px;line-height:1.6;">アカウントを削除すると、すべてのデータが失われます。この操作は取り消せません。</p>
+      <div style="text-align:right;">
+        <button class="btn acct-danger-btn" onclick="openDeleteAccountDialog()">アカウントを削除する</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== アカウント削除確認ダイアログ ===== -->
+<div class="modal-overlay hidden" id="deleteAccountOverlay">
+  <div class="modal" style="width:420px;max-width:92vw;">
+    <h2 style="color:#F87171;font-size:16px;margin-bottom:14px;">⚠️ アカウントの削除</h2>
+    <p id="deleteAccountConfirmText" style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;line-height:1.6;"></p>
+    <div class="form-group">
+      <label>現パスワード</label>
+      <input type="password" id="deleteAccountPasswordInput" placeholder="現在のパスワードを入力">
+    </div>
+    <div class="acct-msg" id="deleteAccountMsg"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeDeleteAccountDialog()">キャンセル</button>
+      <button class="btn acct-danger-btn" id="deleteAccountBtn" onclick="deleteAccount()">削除する</button>
     </div>
   </div>
 </div>
