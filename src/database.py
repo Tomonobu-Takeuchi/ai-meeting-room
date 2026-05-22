@@ -273,7 +273,7 @@ def get_user_by_id(user_id):
     try:
         rows = conn.run("""
             SELECT id, email, name, plan, credits, plan_expires_at,
-                   monthly_meeting_count, monthly_reset_at, avatar
+                   monthly_meeting_count, monthly_reset_at, avatar, password_hash
             FROM users WHERE id=:id
         """, id=user_id)
         if not rows:
@@ -281,7 +281,7 @@ def get_user_by_id(user_id):
             return None
         r = rows[0]
         d = row_to_dict(['id','email','name','plan','credits','plan_expires_at',
-                         'monthly_meeting_count','monthly_reset_at','avatar'], r)
+                         'monthly_meeting_count','monthly_reset_at','avatar','password_hash'], r)
         d['name'] = decrypt_value(conn, d['name'])
         conn.close()
         d['credits'] = d['credits'] or 0

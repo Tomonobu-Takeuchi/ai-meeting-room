@@ -2412,19 +2412,26 @@ def delete_account():
         conn = get_connection()
         try:
             rows = conn.run(
-                "SELECT stripe_subscription_id FROM users WHERE id=:id",
+                "SELECT stripe_customer_id FROM users WHERE id=:id",
                 id=user_id
             )
-            sub_id = rows[0][0] if rows and rows[0][0] else None
+            customer_id = rows[0][0] if rows and rows[0][0] else None
         except Exception:
-            sub_id = None
+            customer_id = None
         finally:
             conn.close()
-        if sub_id:
+        if customer_id:
+            sub_id = None
             try:
-                stripe.Subscription.cancel(sub_id)
-            except Exception as e:
-                return jsonify({"error": f"Stripeサブスクリプションのキャンセルに失敗しました: {e}"}), 500
+                subs = stripe.Subscription.list(customer=customer_id, limit=1)
+                sub_id = subs.data[0].id if subs.data else None
+            except Exception:
+                pass
+            if sub_id:
+                try:
+                    stripe.Subscription.cancel(sub_id)
+                except Exception as e:
+                    return jsonify({"error": f"Stripeサブスクリプションのキャンセルに失敗しました: {e}"}), 500
 
     # DB削除（FK制約順）
     conn = get_connection()
@@ -2440,19 +2447,25 @@ def delete_account():
             conn.run("DELETE FROM meetings WHERE user_id=:uid", uid=user_id)
         except Exception:
             pass
-        conn.run("""
-            DELETE FROM persona_learn
-            WHERE persona_id IN (SELECT id FROM personas WHERE user_id=:uid)
-        """, uid=user_id)
         try:
             conn.run("""
-                DELETE FROM persona_feedback
+                DELETE FROM persona_learn
                 WHERE persona_id IN (SELECT id FROM personas WHERE user_id=:uid)
             """, uid=user_id)
         except Exception:
             pass
-        conn.run("DELETE FROM personas WHERE user_id=:uid", uid=user_id)
-        conn.run("DELETE FROM users WHERE id=:uid", uid=user_id)
+        try:
+            conn.run("DELETE FROM persona_feedback WHERE user_id=:uid", uid=user_id)
+        except Exception:
+            pass
+        try:
+            conn.run("DELETE FROM personas WHERE user_id=:uid", uid=user_id)
+        except Exception:
+            pass
+        try:
+            conn.run("DELETE FROM users WHERE id=:uid", uid=user_id)
+        except Exception:
+            pass
     finally:
         conn.close()
 
