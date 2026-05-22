@@ -2896,7 +2896,7 @@ function renderAuthArea() {
       ? `<button class="btn btn-upgrade" onclick="openPricingModal()">アップグレード</button>`
       : '';
     area.innerHTML = `
-      <div class="user-badge">
+      <div class="user-badge" onclick="openAccountSettingsModal()" title="アカウント設定（長押し）" style="cursor:pointer;">
         <span>👤</span>
         <span class="user-name">${escapeHtml(u.name || u.email)}</span>
         <span class="plan-badge ${plan}">${planLabel}</span>
@@ -3302,9 +3302,8 @@ function initNavTips() {
   if (!('ontouchstart' in window)) return;
 
   const navBtns = [
-    { id: 'howToBtn',          labelId: 'howToBtnLabel',          action: () => openHowToModal() },
-    { id: 'planBtn',           labelId: 'planBtnLabel',           action: () => openPricingModal() },
-    { id: 'accountSettingsBtn', labelId: 'accountSettingsBtnLabel', action: () => openAccountSettingsModal() }
+    { id: 'howToBtn', labelId: 'howToBtnLabel', action: () => openHowToModal() },
+    { id: 'planBtn',  labelId: 'planBtnLabel',  action: () => openPricingModal() }
   ];
 
   navBtns.forEach(({ id, labelId, action }) => {
