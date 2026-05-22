@@ -2901,11 +2901,12 @@ function renderAuthArea() {
         <span class="user-name">${escapeHtml(u.name || u.email)}</span>
         <span class="plan-badge ${plan}">${planLabel}</span>
         ${creditsHtml}
+        <button class="btn btn-account-settings" id="accountSettingsBtn" title="アカウント設定">⚙️<span id="accountSettingsBtnLabel" style="display:none;color:#A5B4FC;font-size:11px;margin-left:2px;">設定</span></button>
       </div>
       ${upgradeHtml}
-      <button class="btn btn-account-settings" onclick="openAccountSettingsModal()" title="アカウント設定">⚙️</button>
       <button class="btn" id="logoutBtn" onclick="logout()">ログアウト</button>
     `;
+    setTimeout(() => initNavTips(), 50);
   } else {
     area.innerHTML = `<button class="btn btn-green" id="freeStartBtn" onclick="startFree()">🚀 <span class="btn-full-text">無料で始める</span><span class="btn-short-text">無料</span></button><button class="btn" id="loginBtnHeader" onclick="openAuthModal()">🔑<span class="btn-login-text"> ログイン</span></button>`;
   }
@@ -3301,14 +3302,17 @@ function initNavTips() {
   if (!('ontouchstart' in window)) return;
 
   const navBtns = [
-    { id: 'howToBtn',  labelId: 'howToBtnLabel', action: () => openHowToModal() },
-    { id: 'planBtn',   labelId: 'planBtnLabel',  action: () => openPricingModal() }
+    { id: 'howToBtn',          labelId: 'howToBtnLabel',          action: () => openHowToModal() },
+    { id: 'planBtn',           labelId: 'planBtnLabel',           action: () => openPricingModal() },
+    { id: 'accountSettingsBtn', labelId: 'accountSettingsBtnLabel', action: () => openAccountSettingsModal() }
   ];
 
   navBtns.forEach(({ id, labelId, action }) => {
     const btn = document.getElementById(id);
     const label = document.getElementById(labelId);
     if (!btn || !label) return;
+    if (btn.dataset.tipInit) return;
+    btn.dataset.tipInit = '1';
 
     let isLabelVisible = false;
     let pressTimer = null;
