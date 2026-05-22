@@ -2896,10 +2896,13 @@ function renderAuthArea() {
       ? `<button class="btn btn-upgrade" onclick="openPricingModal()">アップグレード</button>`
       : '';
     area.innerHTML = `
-      <div class="user-badge" id="userBadge">
+      <div class="user-badge" id="userBadge" title="ユーザー情報">
         <span>👤</span>
-        <span class="user-name">${escapeHtml(u.name || u.email)}</span>
-        <span class="plan-badge ${plan}">${planLabel}</span>
+        <span class="user-info-label" id="userInfoLabel"
+          style="display:none;font-size:11px;margin-left:2px;color:var(--text-secondary);">
+          ${escapeHtml(u.name || u.email)}
+          <span class="plan-badge ${plan}" style="font-size:9px;">${planLabel}</span>
+        </span>
         ${creditsHtml}
         <button class="btn btn-account-settings" id="accountSettingsBtn"
           title="アカウント設定">⚙️<span class="nav-label"
@@ -2908,7 +2911,11 @@ function renderAuthArea() {
           アカウント設定</span></button>
       </div>
       ${upgradeHtml}
-      <button class="btn" id="logoutBtn" onclick="logout()">ログアウト</button>
+      <button class="nav-link" id="logoutBtn" title="ログアウト">
+        🚪<span class="nav-label" id="logoutBtnLabel"
+        style="color:#FCA5A5;font-size:11px;margin-left:2px;">
+        ログアウト</span>
+      </button>
     `;
     setTimeout(() => {
       initNavTips();
@@ -3312,9 +3319,12 @@ function initNavTips() {
   if (!('ontouchstart' in window)) return;
 
   const navBtns = [
+    { id: 'userBadge',          labelId: 'userInfoLabel',           action: () => openAccountSettingsModal() },
     { id: 'howToBtn',           labelId: 'howToBtnLabel',           action: () => openHowToModal() },
     { id: 'planBtn',            labelId: 'planBtnLabel',            action: () => openPricingModal() },
-    { id: 'accountSettingsBtn', labelId: 'accountSettingsBtnLabel', action: () => openAccountSettingsModal() }
+    { id: 'accountSettingsBtn', labelId: 'accountSettingsBtnLabel', action: () => openAccountSettingsModal() },
+    { id: 'logoutBtn',          labelId: 'logoutBtnLabel',
+      action: () => { if (confirm('ログアウトしますか？')) logout(); } }
   ];
 
   navBtns.forEach(({ id, labelId, action }) => {
