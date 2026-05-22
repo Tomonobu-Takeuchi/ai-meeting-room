@@ -3323,6 +3323,7 @@ function initNavTips() {
     { id: 'howToBtn',           labelId: 'howToBtnLabel',           action: () => openHowToModal() },
     { id: 'planBtn',            labelId: 'planBtnLabel',            action: () => openPricingModal() },
     { id: 'accountSettingsBtn', labelId: 'accountSettingsBtnLabel', action: () => openAccountSettingsModal() },
+    { id: 'planBtnRow2',        labelId: 'planBtnRow2Label',        action: () => openPricingModal() },
     { id: 'logoutBtn',          labelId: 'logoutBtnLabel',
       action: () => { if (confirm('ログアウトしますか？')) logout(); } }
   ];
@@ -3337,33 +3338,20 @@ function initNavTips() {
     let isLabelVisible = false;
     let pressTimer = null;
 
-    // 長押し判定
+    // 長押し→テキスト表示、短タップ→action
     btn.addEventListener('touchstart', function(e) {
       pressTimer = setTimeout(() => {
         pressTimer = null;
-        isLabelVisible = false;
-        label.style.display = 'none';
-        action();
+        label.style.display = 'inline';
+        setTimeout(() => { label.style.display = 'none'; }, 3000);
       }, 600);
     }, { passive: true });
 
     btn.addEventListener('touchend', function(e) {
       if (pressTimer) {
-        // 短タップ：ラベル表示トグル
         clearTimeout(pressTimer);
         pressTimer = null;
-        if (isLabelVisible) {
-          label.style.display = 'none';
-          isLabelVisible = false;
-        } else {
-          label.style.display = 'inline';
-          isLabelVisible = true;
-          // 3秒後に自動消去
-          setTimeout(() => {
-            label.style.display = 'none';
-            isLabelVisible = false;
-          }, 3000);
-        }
+        action();
       }
     }, { passive: true });
 
