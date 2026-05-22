@@ -2896,13 +2896,17 @@ function renderAuthArea() {
       ? `<button class="btn btn-upgrade" onclick="openPricingModal()">アップグレード</button>`
       : '';
     area.innerHTML = `
-      <div class="user-badge" onclick="openAccountSettingsModal()" title="アカウント設定（長押し）" style="cursor:pointer;">
+      <div class="user-badge" id="userBadge">
         <span>👤</span>
         <span class="user-name">${escapeHtml(u.name || u.email)}</span>
         <span class="plan-badge ${plan}">${planLabel}</span>
         ${creditsHtml}
+        <button class="btn btn-account-settings" id="accountSettingsBtn"
+          title="アカウント設定">⚙️<span class="nav-label"
+          id="accountSettingsBtnLabel"
+          style="color:#A5B4FC;font-size:11px;margin-left:2px;">
+          アカウント設定</span></button>
       </div>
-      <button class="btn btn-account-settings" id="accountSettingsBtn" title="アカウント設定">⚙️<span class="nav-label" id="accountSettingsBtnLabel" style="color:#A5B4FC;font-size:11px;margin-left:2px;"> アカウント設定</span></button>
       ${upgradeHtml}
       <button class="btn" id="logoutBtn" onclick="logout()">ログアウト</button>
     `;

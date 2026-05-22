@@ -453,7 +453,11 @@
     .acct-msg.success{color:#86EFAC;}
     .acct-msg.error{color:#FCA5A5;}
     .btn-account-settings{padding:3px 8px;font-size:11px;}
-    @media(max-width:480px){.btn-account-settings{font-size:10px;padding:3px 6px;}}
+    #planBtnRow2{display:none;}
+    @media(max-width:480px){
+      /* ⚙️はuser-badge内に移動したため非表示不要 */
+      #planBtnRow2{display:block;}  /* 3段目料金プランをスマホで表示 */
+    }
   </style>
 </head>
 <body>
@@ -480,6 +484,12 @@
       <input type="file" id="fileInput" accept=".pdf,.docx,.doc" style="display:none" multiple />
     </label>
     <button class="btn btn-green" id="startMeetingBtn">▶ 会議開始</button>
+    <button class="nav-link" id="planBtnRow2"
+      onclick="openPricingModal()">
+      🏷️<span class="nav-label" id="planBtnRow2Label"
+      style="color:#C4B5FD;font-size:11px;margin-left:2px;">
+      料金プラン</span>
+    </button>
   </div>
   <!-- 第2行：会議中 -->
   <div class="header-row2 hidden" id="headerRow2In">
