@@ -5,6 +5,7 @@ import io
 import os
 import sys
 import json
+import secrets
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -12,6 +13,7 @@ from flask import Flask, Response, jsonify, request, send_from_directory, send_f
 from dotenv import load_dotenv
 import anthropic
 import bcrypt
+from src.email_sender import send_email_change_confirmation
 
 from src.persona.persona_manager import PersonaManager
 from src.meeting.meeting_room import MeetingRoom
@@ -20,7 +22,7 @@ from src.database import (
     init_db, get_connection, get_user_by_email, get_user_by_id, create_user,
     get_user_payment_status, check_and_use_meeting,
     add_user_credits, update_user_plan, save_payment, complete_payment,
-    get_user_by_stripe_customer, update_user_avatar,
+    get_user_by_stripe_customer, update_user_avatar, encrypt_value,
 )
 
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
@@ -28,6 +30,7 @@ load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file_
 STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
 STRIPE_PUBLIC_KEY = os.environ.get('STRIPE_PUBLIC_KEY', '')
 STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+APP_BASE_URL = os.environ.get('APP_BASE_URL', 'http://localhost:5000')
 if STRIPE_SECRET_KEY:
     stripe.api_key = STRIPE_SECRET_KEY
 
@@ -2257,6 +2260,204 @@ def health():
         "user_id": user_id,
         "version": "v0.9-auth"
     })
+
+
+# ===== アカウント管理API =====
+
+@app.route("/api/auth/profile", methods=["PUT"])
+@login_required
+def update_profile():
+    user_id = get_current_user_id()
+    data = request.json or {}
+    change_type = data.get("type")
+    current_password = data.get("current_password", "")
+
+    user = get_user_by_id(user_id)
+    if not user:
+        return jsonify({"error": "ユーザーが見つかりません"}), 404
+    if not bcrypt.checkpw(current_password.encode('utf-8'), user['password_hash'].encode('utf-8')):
+        return jsonify({"error": "現在のパスワードが正しくありません"}), 400
+
+    if change_type == "name":
+        new_name = data.get("new_value", "").strip()
+        if not new_name or len(new_name) < 1 or len(new_name) > 50:
+            return jsonify({"error": "名前は1〜50文字で入力してください"}), 400
+        conn = get_connection()
+        try:
+            encrypted = encrypt_value(conn, new_name)
+            conn.run("UPDATE users SET name=:name WHERE id=:id", name=encrypted, id=user_id)
+        finally:
+            conn.close()
+        session['user_name'] = new_name
+        return jsonify({"message": "名前を更新しました"})
+
+    elif change_type == "password":
+        new_value = data.get("new_value", "")
+        confirm_value = data.get("confirm_value", "")
+        if len(new_value) < 8:
+            return jsonify({"error": "パスワードは8文字以上にしてください"}), 400
+        if new_value != confirm_value:
+            return jsonify({"error": "パスワードが一致しません"}), 400
+        new_hash = bcrypt.hashpw(new_value.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        conn = get_connection()
+        try:
+            conn.run("UPDATE users SET password_hash=:ph WHERE id=:id", ph=new_hash, id=user_id)
+        finally:
+            conn.close()
+        return jsonify({"message": "パスワードを更新しました"})
+
+    else:
+        return jsonify({"error": "typeはnameまたはpasswordを指定してください"}), 400
+
+
+@app.route("/api/auth/email-change-request", methods=["POST"])
+@login_required
+def email_change_request():
+    user_id = get_current_user_id()
+    data = request.json or {}
+    current_password = data.get("current_password", "")
+    new_email = data.get("new_email", "").strip().lower()
+
+    user = get_user_by_id(user_id)
+    if not user:
+        return jsonify({"error": "ユーザーが見つかりません"}), 404
+    if not bcrypt.checkpw(current_password.encode('utf-8'), user['password_hash'].encode('utf-8')):
+        return jsonify({"error": "現在のパスワードが正しくありません"}), 400
+    if "@" not in new_email:
+        return jsonify({"error": "有効なメールアドレスを入力してください"}), 400
+    if get_user_by_email(new_email):
+        return jsonify({"error": "このメールアドレスはすでに使用されています"}), 400
+
+    token = secrets.token_urlsafe(32)
+    confirm_url = f"{APP_BASE_URL}/api/auth/email-change-confirm/{token}"
+    conn = get_connection()
+    try:
+        conn.run("""
+            UPDATE users
+            SET email_change_token=:token,
+                email_change_new=:new_email,
+                email_change_expires=NOW() + INTERVAL '24 hours'
+            WHERE id=:id
+        """, token=token, new_email=new_email, id=user_id)
+    finally:
+        conn.close()
+
+    ok = send_email_change_confirmation(new_email, confirm_url)
+    if not ok:
+        return jsonify({"error": "確認メールの送信に失敗しました。しばらくしてから再試行してください"}), 500
+    return jsonify({"message": "確認メールを送信しました。24時間以内にメール内のリンクをクリックしてください"})
+
+
+@app.route("/api/auth/email-change-confirm/<token>", methods=["GET"])
+def email_change_confirm(token):
+    conn = get_connection()
+    try:
+        rows = conn.run("""
+            SELECT id, email_change_new, email_change_expires
+            FROM users
+            WHERE email_change_token=:token
+        """, token=token)
+    finally:
+        conn.close()
+
+    if not rows:
+        return """<html><body style="font-family:sans-serif;padding:40px">
+<h2 style="color:#DC2626">リンクが無効です</h2>
+<p>このリンクは無効または有効期限切れです。再度メールアドレス変更をお試しください。</p>
+</body></html>""", 400
+
+    user_id, new_email, expires = rows[0]
+    from datetime import datetime, timezone
+    if expires is None or datetime.now(timezone.utc) > expires.replace(tzinfo=timezone.utc):
+        return """<html><body style="font-family:sans-serif;padding:40px">
+<h2 style="color:#DC2626">リンクの有効期限が切れています</h2>
+<p>有効期限が切れています。再度メールアドレス変更をお試しください。</p>
+</body></html>""", 400
+
+    conn = get_connection()
+    try:
+        conn.run("""
+            UPDATE users
+            SET email=:new_email,
+                email_change_token=NULL,
+                email_change_new=NULL,
+                email_change_expires=NULL
+            WHERE id=:id
+        """, new_email=new_email, id=user_id)
+    finally:
+        conn.close()
+    session['user_email'] = new_email
+    return """<html><body style="font-family:sans-serif;padding:40px;color:#333">
+<h2 style="color:#7C3AED">メールアドレスを変更しました</h2>
+<p>新しいメールアドレスへの変更が完了しました。</p>
+<p><a href="/" style="color:#7C3AED">AI-PERSONA会議室に戻る</a></p>
+</body></html>"""
+
+
+@app.route("/api/auth/account", methods=["DELETE"])
+@login_required
+def delete_account():
+    user_id = get_current_user_id()
+    data = request.json or {}
+    current_password = data.get("current_password", "")
+
+    user = get_user_by_id(user_id)
+    if not user:
+        return jsonify({"error": "ユーザーが見つかりません"}), 404
+    if not bcrypt.checkpw(current_password.encode('utf-8'), user['password_hash'].encode('utf-8')):
+        return jsonify({"error": "パスワードが正しくありません"}), 400
+
+    # proプランのStripeサブスクリプションをキャンセル
+    if user.get('plan') == 'pro' and STRIPE_SECRET_KEY:
+        conn = get_connection()
+        try:
+            rows = conn.run(
+                "SELECT stripe_subscription_id FROM users WHERE id=:id",
+                id=user_id
+            )
+            sub_id = rows[0][0] if rows and rows[0][0] else None
+        except Exception:
+            sub_id = None
+        finally:
+            conn.close()
+        if sub_id:
+            try:
+                stripe.Subscription.cancel(sub_id)
+            except Exception as e:
+                return jsonify({"error": f"Stripeサブスクリプションのキャンセルに失敗しました: {e}"}), 500
+
+    # DB削除（FK制約順）
+    conn = get_connection()
+    try:
+        try:
+            conn.run("""
+                DELETE FROM meeting_messages
+                WHERE meeting_id IN (SELECT id FROM meetings WHERE user_id=:uid)
+            """, uid=user_id)
+        except Exception:
+            pass
+        try:
+            conn.run("DELETE FROM meetings WHERE user_id=:uid", uid=user_id)
+        except Exception:
+            pass
+        conn.run("""
+            DELETE FROM persona_learn
+            WHERE persona_id IN (SELECT id FROM personas WHERE user_id=:uid)
+        """, uid=user_id)
+        try:
+            conn.run("""
+                DELETE FROM persona_feedback
+                WHERE persona_id IN (SELECT id FROM personas WHERE user_id=:uid)
+            """, uid=user_id)
+        except Exception:
+            pass
+        conn.run("DELETE FROM personas WHERE user_id=:uid", uid=user_id)
+        conn.run("DELETE FROM users WHERE id=:uid", uid=user_id)
+    finally:
+        conn.close()
+
+    session.clear()
+    return jsonify({"message": "アカウントを削除しました"})
 
 
 if __name__ == "__main__":
