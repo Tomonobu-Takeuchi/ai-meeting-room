@@ -3347,6 +3347,7 @@ function initNavTips() {
     let startY = 0;
 
     btn.addEventListener('touchstart', function(e) {
+      e.stopPropagation();
       debugLog('touchstart: ' + id);
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
@@ -3359,6 +3360,7 @@ function initNavTips() {
     }, { passive: true });
 
     btn.addEventListener('touchend', function(e) {
+      e.stopPropagation();
       if (pressTimer) {
         clearTimeout(pressTimer);
         pressTimer = null;
