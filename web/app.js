@@ -2919,9 +2919,13 @@ function renderAuthArea() {
     `;
     setTimeout(() => {
       initNavTips();
-      if (!('ontouchstart' in window)) {
+      if (!('ontouchstart' in window) && navigator.maxTouchPoints === 0) {
         document.getElementById('accountSettingsBtn')
           ?.addEventListener('click', () => openAccountSettingsModal());
+        document.getElementById('logoutBtn')
+          ?.addEventListener('click', () => {
+            if (confirm('ログアウトしますか？')) logout();
+          });
       }
     }, 50);
   } else {
