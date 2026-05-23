@@ -493,7 +493,8 @@ async function init() {
   DOM.downloadLayer2Btn.addEventListener('click', downloadLayer2PDF);
   DOM.downloadLayer3Btn.addEventListener('click', downloadLayer3PDF);
 
-  if (!('ontouchstart' in window)) {
+  const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
+  if (!isTouch) {
     DOM.howToBtn?.addEventListener('click', () => openHowToModal());
     DOM.planBtn?.addEventListener('click', () => openPricingModal());
   }
@@ -2919,7 +2920,8 @@ function renderAuthArea() {
     `;
     setTimeout(() => {
       initNavTips();
-      if (!('ontouchstart' in window) && navigator.maxTouchPoints === 0) {
+      const isTouch2 = ('ontouchstart' in window) || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
+      if (!isTouch2) {
         document.getElementById('accountSettingsBtn')
           ?.addEventListener('click', () => openAccountSettingsModal());
         document.getElementById('logoutBtn')
@@ -3320,7 +3322,8 @@ function initMobileActionBar() {
 
 
 function initNavTips() {
-  if (!('ontouchstart' in window)) return;
+  const isTouch3 = ('ontouchstart' in window) || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
+  if (!isTouch3) return;
 
   const navBtns = [
     { id: 'userBadge',          labelId: 'userInfoLabel',           action: () => openAccountSettingsModal() },
