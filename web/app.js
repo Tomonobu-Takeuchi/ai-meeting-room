@@ -3361,6 +3361,7 @@ function initNavTips() {
 
     btn.addEventListener('touchend', function(e) {
       e.stopPropagation();
+      e.preventDefault();
       if (pressTimer) {
         clearTimeout(pressTimer);
         pressTimer = null;
@@ -3371,7 +3372,7 @@ function initNavTips() {
       } else {
         debugLog('touchend(skip): ' + id);
       }
-    }, { passive: true });
+    }, { passive: false });
 
     btn.addEventListener('touchmove', function(e) {
       if (pressTimer) {
