@@ -3345,6 +3345,7 @@ function initNavTips() {
     let pressTimer = null;
     let startX = 0;
     let startY = 0;
+    let tapped = false;
 
     btn.addEventListener('touchstart', function(e) {
       e.stopPropagation();
@@ -3354,19 +3355,18 @@ function initNavTips() {
       pressTimer = setTimeout(() => {
         pressTimer = null;
         debugLog('longpress: ' + id);
-        // 長押し → モーダルを開く
         action();
       }, 600);
     }, { passive: false });
 
     btn.addEventListener('touchend', function(e) {
       e.stopPropagation();
-      e.preventDefault();
+      tapped = true;
+      setTimeout(() => { tapped = false; }, 500);
       if (pressTimer) {
         clearTimeout(pressTimer);
         pressTimer = null;
         debugLog('touchend(tap): ' + id);
-        // 短タップ → テキスト表示（3秒後消去）
         label.style.display = 'inline';
         setTimeout(() => { label.style.display = 'none'; }, 3000);
       } else {
@@ -3374,11 +3374,20 @@ function initNavTips() {
       }
     }, { passive: false });
 
+    btn.addEventListener('click', function(e) {
+      debugLog('click: ' + id + ' tapped:' + tapped);
+      if (tapped) {
+        e.stopPropagation();
+        e.preventDefault();
+        return;
+      }
+      action();
+    });
+
     btn.addEventListener('touchmove', function(e) {
       if (pressTimer) {
         const dx = e.touches[0].clientX - startX;
         const dy = e.touches[0].clientY - startY;
-        // 10px以上動いた場合のみキャンセル（スクロール対策）
         if (Math.sqrt(dx*dx + dy*dy) > 10) {
           clearTimeout(pressTimer);
           pressTimer = null;
