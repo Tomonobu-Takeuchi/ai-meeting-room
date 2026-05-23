@@ -3357,7 +3357,7 @@ function initNavTips() {
         // 長押し → モーダルを開く
         action();
       }, 600);
-    }, { passive: true });
+    }, { passive: false });
 
     btn.addEventListener('touchend', function(e) {
       e.stopPropagation();
