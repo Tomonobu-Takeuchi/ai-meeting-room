@@ -3349,12 +3349,10 @@ function initNavTips() {
 
     btn.addEventListener('touchstart', function(e) {
       e.stopPropagation();
-      debugLog('touchstart: ' + id);
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
       pressTimer = setTimeout(() => {
         pressTimer = null;
-        debugLog('longpress: ' + id);
         action();
       }, 600);
     }, { passive: false });
@@ -3366,16 +3364,12 @@ function initNavTips() {
       if (pressTimer) {
         clearTimeout(pressTimer);
         pressTimer = null;
-        debugLog('touchend(tap): ' + id);
         label.style.display = 'inline';
         setTimeout(() => { label.style.display = 'none'; }, 3000);
-      } else {
-        debugLog('touchend(skip): ' + id);
       }
     }, { passive: false });
 
     btn.addEventListener('click', function(e) {
-      debugLog('click: ' + id + ' tapped:' + tapped);
       if (tapped) {
         e.stopPropagation();
         e.preventDefault();
@@ -3396,27 +3390,6 @@ function initNavTips() {
     }, { passive: true });
   });
 }
-
-// ===== デバッグパネル =====
-function debugLog(msg) {
-  let panel = document.getElementById('__debugPanel');
-  if (!panel) {
-    panel = document.createElement('div');
-    panel.id = '__debugPanel';
-    panel.style.cssText = `
-      position:fixed; top:0; left:0; right:0; z-index:99999;
-      background:rgba(0,0,0,0.85); color:#0f0; font-size:11px;
-      font-family:monospace; padding:4px; max-height:180px;
-      overflow-y:auto; pointer-events:none;
-    `;
-    document.body.appendChild(panel);
-  }
-  const line = document.createElement('div');
-  line.textContent = new Date().toISOString().slice(11,23) + ' ' + msg;
-  panel.appendChild(line);
-  panel.scrollTop = panel.scrollHeight;
-}
-// ===== デバッグパネルここまで =====
 
 document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('touchstart', function(){}, {passive:true});
