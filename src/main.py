@@ -3,9 +3,11 @@ AI-PERSONA会議室 - メインサーバー（ユーザー認証対応版）
 """
 import io
 import os
+import re
 import sys
 import json
 import secrets
+from datetime import timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -44,6 +46,7 @@ app = Flask(
     static_url_path=""
 )
 app.secret_key = os.environ.get('SECRET_KEY', 'ai-persona-secret-key-2026')
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 app.json.ensure_ascii = False  # 日本語をUnicodeエスケープしない（Flask 2.2以降）
 
 init_db()
@@ -105,6 +108,7 @@ def register():
             _c.close()
         except Exception:
             pass
+        session.permanent = True
         session['user_id'] = user['id']
         session['user_email'] = user['email']
         session['user_name'] = user['name']
@@ -125,6 +129,7 @@ def login():
     if not bcrypt.checkpw(password.encode('utf-8'), user['password_hash'].encode('utf-8')):
         return jsonify({"error": "メールアドレスまたはパスワードが違います"}), 401
 
+    session.permanent = True
     session['user_id'] = user['id']
     session['user_email'] = user['email']
     session['user_name'] = user['name']
@@ -170,6 +175,8 @@ def me():
 @app.route("/api/personas", methods=["GET"])
 def get_personas():
     user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"personas": []})
     return jsonify({"personas": persona_manager.get_all_personas(user_id)})
 
 @app.route("/api/personas/members", methods=["GET"])
@@ -582,7 +589,7 @@ def extract_pdf():
                         text += page_text + "\n"
                 except Exception:
                     continue  # ページ単位の失敗はスキップして続行
-        text = text.strip()[:8000]
+        text = re.sub(r'\(cid:\d+\)', '', text).strip()[:8000]
         if not text:
             return jsonify({"error": "このPDFからテキストを抽出できませんでした。スキャン画像のPDFはテキスト抽出に対応していません。手動でテキストを入力してください。"}), 422
         pages_extracted = min(total_pages, MAX_PAGES)

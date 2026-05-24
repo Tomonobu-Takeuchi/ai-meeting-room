@@ -51,6 +51,14 @@ STRIPE_PRICE_STANDARD      # Price ID for standard plan (¥480/50チケット)
 STRIPE_PRICE_PRO           # Price ID for pro plan (¥980/月)
 ```
 
+### ANTHROPIC_API_KEY 運用管理ルール（BUG-06対応）
+- APIキーはAnthropicコンソール（console.anthropic.com）で発行・ローテーション
+- 設定場所：Railway → プロジェクト → Variables タブ → `ANTHROPIC_API_KEY`
+- ローカル開発：`.env` ファイルに設定（Git管理外・`.gitignore`に記載済み）
+- **キーを再発行した際は Railway Variables を必ず同時に更新すること**
+- 有効期限切れ・クォータ超過時は `500 Internal Server Error` でAI応答が止まる
+  → Railwayのログで `AuthenticationError` または `RateLimitError` を確認してキーを更新する
+
 ## Architecture
 
 ### Stack

@@ -870,6 +870,7 @@ async function summarizeMeeting() {
       fullText += data.text;
     } else if (data.type === 'done') {
       evtSource.close(); State.isStreaming = false; setStreamingButtons(false);
+      _briefSessionId = State.sessionId;
       DOM.minutesBar.classList.remove('hidden');
       scrollToBottom();
       if (State.voiceMode && fullText) speakText(fullText, 'facilitator', streamEl?.querySelector('.facilitator-banner'));
@@ -880,7 +881,13 @@ async function summarizeMeeting() {
       showToast(translateApiError(data.message, '会議のまとめ'), 'error');
     }
   };
-  evtSource.onerror = () => { typingEl?.remove(); evtSource.close(); State.isStreaming = false; setStreamingButtons(false); DOM.summarizeBtn.disabled = false; };
+  evtSource.onerror = () => {
+    typingEl?.remove(); evtSource.close(); State.isStreaming = false; setStreamingButtons(false); DOM.summarizeBtn.disabled = false;
+    if (streamEl && DOM.minutesBar.classList.contains('hidden')) {
+      _briefSessionId = State.sessionId;
+      DOM.minutesBar.classList.remove('hidden');
+    }
+  };
 }
 
 async function downloadMinutes() {
@@ -905,9 +912,11 @@ async function downloadMinutes() {
 }
 
 let _briefData = null;
+let _briefSessionId = null;
 
 async function showReportModal() {
-  if (!State.sessionId) return;
+  const sid = State.sessionId || _briefSessionId;
+  if (!sid) return;
   DOM.reportModal.classList.remove('hidden');
 
   // 初期化
@@ -924,7 +933,7 @@ async function showReportModal() {
   DOM.downloadLayer3Btn.style.display = 'none';
 
   try {
-    const data = await API.post(`/api/meeting/${State.sessionId}/brief`, {
+    const data = await API.post(`/api/meeting/${sid}/brief`, {
       category: State.meetingCategory || 'chat'
     }, 120000);
     _briefData = data;
@@ -1453,7 +1462,7 @@ function renderMemberList() {
       </div>
       <div class="member-card-actions">
         <button class="btn-icon" title="設定" data-action="settings" data-id="${member.id}">⚙</button>
-        <button class="btn-icon danger" title="削除" data-action="delete" data-id="${member.id}">🗑</button>
+        ${!member.is_default && member.user_id ? `<button class="btn-icon danger" title="削除" data-action="delete" data-id="${member.id}">🗑</button>` : ''}
       </div>`;
     card.querySelector('.member-card-main').addEventListener('click', () => toggleMemberSelection(member.id));
     card.querySelector('[data-action="settings"]').addEventListener('click', (e) => { e.stopPropagation(); openEditModal(member.id); });
@@ -1742,16 +1751,23 @@ function openDeleteConfirm(memberId) {
   DOM.deleteConfirmOverlay.classList.remove('hidden');
 }
 
-function executeDeletion() {
+async function executeDeletion() {
   const memberId = State.deletePendingId; if (!memberId) return;
   const member = State.members.find(m => m.id === memberId);
   const memberName = member ? member.name : 'メンバー';
-  State.members = State.members.filter(m => m.id !== memberId);
-  State.selectedMemberIds = State.selectedMemberIds.filter(id => id !== memberId);
-  delete State.avatarImages[memberId];
-  if (State.selectedMemberIds.length === 0 && State.members.length > 0) State.selectedMemberIds = [State.members[0].id];
-  renderMemberList(); DOM.deleteConfirmOverlay.classList.add('hidden'); State.deletePendingId = null;
-  showToast(`${memberName} を削除しました`, 'success');
+  DOM.deleteConfirmOverlay.classList.add('hidden');
+  State.deletePendingId = null;
+  try {
+    await API.delete(`/api/personas/${memberId}`);
+    State.members = State.members.filter(m => m.id !== memberId);
+    State.selectedMemberIds = State.selectedMemberIds.filter(id => id !== memberId);
+    delete State.avatarImages[memberId];
+    if (State.selectedMemberIds.length === 0 && State.members.length > 0) State.selectedMemberIds = [State.members[0].id];
+    renderMemberList();
+    showToast(`${memberName} を削除しました`, 'success');
+  } catch (e) {
+    showToast(translateApiError(e.message, 'ペルソナの削除'), 'error');
+  }
 }
 
 async function startMeeting() {
@@ -2900,7 +2916,7 @@ function renderAuthArea() {
       <div class="user-badge" id="userBadge" title="ユーザー情報">
         <span>👤</span>
         <span class="user-info-label" id="userInfoLabel"
-          style="display:none;font-size:11px;margin-left:2px;color:var(--text-secondary);">
+          style="font-size:11px;margin-left:2px;color:var(--text-secondary);">
           ${escapeHtml(u.name || u.email)}
           <span class="plan-badge ${plan}" style="font-size:9px;">${planLabel}</span>
         </span>
@@ -3326,7 +3342,6 @@ function initNavTips() {
   if (!isTouch3) return;
 
   const navBtns = [
-    { id: 'userBadge',          labelId: 'userInfoLabel',           action: () => openAccountSettingsModal() },
     { id: 'howToBtn',           labelId: 'howToBtnLabel',           action: () => openHowToModal() },
     { id: 'planBtn',            labelId: 'planBtnLabel',            action: () => openPricingModal() },
     { id: 'accountSettingsBtn', labelId: 'accountSettingsBtnLabel', action: () => openAccountSettingsModal() },
