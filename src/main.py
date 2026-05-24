@@ -167,7 +167,13 @@ def me():
     if not user:
         session.clear()
         return jsonify({"user": None})
-    return jsonify({"user": {"id": user['id'], "email": user['email'], "name": user['name'], "plan": user['plan'], "avatar": user.get('avatar') or '👤'}})
+    return jsonify({"user": {
+        "id": user['id'], "email": user['email'], "name": user['name'],
+        "plan": user['plan'], "avatar": user.get('avatar') or '👤',
+        "credits": user.get('credits') or 0,
+        "monthly_meeting_count": user.get('monthly_meeting_count') or 0,
+        "plan_expires_at": user.get('plan_expires_at'),
+    }})
 
 
 # ===== ペルソナAPI =====

@@ -1924,9 +1924,26 @@ async function triggerMemberResponse(personaId, trigger = null) {
   if (trigger) url += `?trigger=${encodeURIComponent(trigger)}`;
   const evtSource = new EventSource(url);
   let streamEl = null, fullText = '';
+  let watchdog = null;
 
   return new Promise((resolve) => {
+    function armWatchdog() {
+      if (watchdog) clearTimeout(watchdog);
+      watchdog = setTimeout(() => {
+        if (State.isStreaming) {
+          evtSource.close();
+          typingEl?.remove();
+          if (streamEl) streamEl.querySelector('.msg-bubble')?.classList.remove('streaming');
+          State.isStreaming = false; setStreamingButtons(false); setMemberSpeaking(personaId, false);
+          showToast('発言がタイムアウトしました', 'warning');
+          resolve();
+        }
+      }, 30000);
+    }
+    armWatchdog();
+
     evtSource.onmessage = async (e) => {
+      armWatchdog();
       const data = JSON.parse(e.data);
       if (data.type === 'chunk') {
         typingEl?.remove();
@@ -1934,6 +1951,7 @@ async function triggerMemberResponse(personaId, trigger = null) {
         appendToStreamingBubble(streamEl, data.text);
         fullText += data.text;
       } else if (data.type === 'done') {
+        clearTimeout(watchdog);
         if (fullText.includes('【質問】')) {
           showPersonaQuestionBadge(streamEl);
           State.waitingForUser = true;  // ユーザー返答待ちに設定
@@ -1952,6 +1970,7 @@ async function triggerMemberResponse(personaId, trigger = null) {
         setStreamingButtons(false);
         resolve();
       } else if (data.type === 'error') {
+        clearTimeout(watchdog);
         typingEl?.remove(); streamEl?.remove(); evtSource.close();
         State.isStreaming = false; setStreamingButtons(false); setMemberSpeaking(personaId, false);
         showToast(translateApiError(data.message, 'AIの応答'), 'error');
@@ -1959,6 +1978,7 @@ async function triggerMemberResponse(personaId, trigger = null) {
       }
     };
     evtSource.onerror = async () => {
+      clearTimeout(watchdog);
       typingEl?.remove(); evtSource.close();
       State.isStreaming = false; setStreamingButtons(false); setMemberSpeaking(personaId, false);
       if (fullText.trim().length > 0) {
@@ -2909,8 +2929,22 @@ function renderAuthArea() {
     const plan = u.plan || 'free';
     const planLabels = { free: '無料', standard: 'スタンダード', pro: 'PRO' };
     const planLabel = planLabels[plan] || plan;
-    const creditsHtml = (plan === 'standard')
-      ? `<span class="credits-badge">${u.credits || 0}回</span>`
+    let remainingLabel = '';
+    if (plan === 'free') {
+      const remaining = Math.max(0, 5 - (u.monthly_meeting_count || 0));
+      remainingLabel = `残り${remaining}回`;
+    } else if (plan === 'standard') {
+      remainingLabel = `残り${u.credits || 0}枚`;
+    } else if (plan === 'pro') {
+      if (u.plan_expires_at) {
+        const days = Math.ceil((new Date(u.plan_expires_at) - new Date()) / (1000 * 60 * 60 * 24));
+        remainingLabel = days > 0 ? `あと${days}日` : '無制限';
+      } else {
+        remainingLabel = '無制限';
+      }
+    }
+    const remainingHtml = remainingLabel
+      ? `<span style="font-size:10px;color:var(--accent);margin-left:4px;">${escapeHtml(remainingLabel)}</span>`
       : '';
     const upgradeHtml = (plan === 'free')
       ? `<button class="btn btn-upgrade" onclick="openPricingModal()">アップグレード</button>`
@@ -2922,8 +2956,8 @@ function renderAuthArea() {
           style="font-size:11px;margin-left:2px;color:var(--text-secondary);">
           ${escapeHtml(u.name || u.email)}
           <span class="plan-badge ${plan}" style="font-size:9px;">${planLabel}</span>
+          ${remainingHtml}
         </span>
-        ${creditsHtml}
         <button class="btn btn-account-settings" id="accountSettingsBtn"
           title="アカウント設定">⚙️<span class="nav-label"
           id="accountSettingsBtnLabel"

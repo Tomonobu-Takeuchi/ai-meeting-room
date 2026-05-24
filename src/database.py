@@ -400,9 +400,8 @@ def check_and_use_meeting(user_id):
             conn.close()
         except Exception:
             pass
-        # DBエラー時はフォールスルー（会議を許可）
-        print(f"check_and_use_meeting エラー（フォールスルー）: {e}")
-        return True, "ok"
+        print(f"check_and_use_meeting エラー: {e}")
+        return False, "会議の開始に失敗しました。しばらく後に再度お試しください。"
 
 
 def add_user_credits(user_id, amount):
