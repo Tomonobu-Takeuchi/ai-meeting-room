@@ -1466,7 +1466,10 @@ function renderMemberList() {
       </div>`;
     card.querySelector('.member-card-main').addEventListener('click', () => toggleMemberSelection(member.id));
     card.querySelector('[data-action="settings"]').addEventListener('click', (e) => { e.stopPropagation(); openEditModal(member.id); });
-    card.querySelector('[data-action="delete"]').addEventListener('click', (e) => { e.stopPropagation(); openDeleteConfirm(member.id); });
+    const deleteBtn = card.querySelector('[data-action="delete"]');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', (e) => { e.stopPropagation(); openDeleteConfirm(member.id); });
+    }
     DOM.memberList.appendChild(card);
   });
   renderMemberTriggers();
