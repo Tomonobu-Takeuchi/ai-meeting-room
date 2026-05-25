@@ -1174,12 +1174,13 @@ function buildLayer3HTML(l3, cat) {
 }
 
 async function useTrialLayer2() {
-  if (!State.sessionId) return;
+  const sid = State.sessionId || _briefSessionId;
+  if (!sid) return;
   const btn = DOM.trialLayer2Btn;
   btn.disabled = true; btn.textContent = '⏳ 生成中...';
   DOM.layer2Trial.querySelector('div').textContent = '⏳ 生成中...';
   try {
-    const data = await API.post(`/api/meeting/${State.sessionId}/brief`, {
+    const data = await API.post(`/api/meeting/${sid}/brief`, {
       category: State.meetingCategory || 'chat',
       trial_layer: 'layer2'
     }, 120000);
@@ -1195,17 +1196,20 @@ async function useTrialLayer2() {
     }
   } catch (e) {
     btn.disabled = false; btn.textContent = '無料で体験する';
+    DOM.layer2Trial.querySelector('div').textContent =
+      '🎁 議論分析レポートを1回無料で体験できます';
     showToast('生成に失敗しました', 'error');
   }
 }
 
 async function useTrialLayer3() {
-  if (!State.sessionId) return;
+  const sid = State.sessionId || _briefSessionId;
+  if (!sid) return;
   const btn = DOM.trialLayer3Btn;
   btn.disabled = true; btn.textContent = '⏳ 生成中...';
   DOM.layer3Trial.querySelector('div').textContent = '⏳ 生成中...';
   try {
-    const data = await API.post(`/api/meeting/${State.sessionId}/brief`, {
+    const data = await API.post(`/api/meeting/${sid}/brief`, {
       category: State.meetingCategory || 'chat',
       trial_layer: 'layer3'
     }, 120000);
@@ -1221,6 +1225,8 @@ async function useTrialLayer3() {
     }
   } catch (e) {
     btn.disabled = false; btn.textContent = '無料で体験する';
+    DOM.layer3Trial.querySelector('div').textContent =
+      '🎁 戦略フレームワーク・レポートを1回無料で体験できます';
     showToast('生成に失敗しました', 'error');
   }
 }
