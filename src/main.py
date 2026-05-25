@@ -791,7 +791,13 @@ def start_meeting():
     if user_id:
         ok, reason = check_and_use_meeting(user_id)
         if not ok:
-            return jsonify({"error": reason, "code": "PLAN_LIMIT"}), 403
+            from src.database import get_user_payment_status
+            status = get_user_payment_status(user_id)
+            return jsonify({
+                "error": reason,
+                "code": "PLAN_LIMIT",
+                "monthly_count": status.get('monthly_meeting_count', 0)
+            }), 403
     prefetched_members = None
     if not member_ids:
         prefetched_members = persona_manager.get_members_only(user_id)

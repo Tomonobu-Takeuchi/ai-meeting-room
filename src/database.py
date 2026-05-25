@@ -335,7 +335,7 @@ def get_user_payment_status(user_id):
 
 def check_and_use_meeting(user_id):
     """会議開始時のプラン制限チェック＆消費。Returns (ok, reason)"""
-    from datetime import datetime
+    from datetime import datetime, timezone
     conn = get_connection()
     try:
         rows = conn.run("""
@@ -351,7 +351,15 @@ def check_and_use_meeting(user_id):
         credits = credits or 0
         monthly_count = monthly_count or 0
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
+
+        # monthly_reset_atをtimezone-awareに統一
+        if monthly_reset_at is not None and monthly_reset_at.tzinfo is None:
+            monthly_reset_at = monthly_reset_at.replace(tzinfo=timezone.utc)
+
+        # plan_expires_atもtimezone-awareに統一
+        if plan_expires_at is not None and plan_expires_at.tzinfo is None:
+            plan_expires_at = plan_expires_at.replace(tzinfo=timezone.utc)
 
         # 月初リセット判定
         needs_reset = (
