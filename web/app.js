@@ -917,6 +917,11 @@ let _briefSessionId = null;
 async function showReportModal() {
   const sid = State.sessionId || _briefSessionId;
   if (!sid) return;
+  const meRes = await fetch('/api/auth/me');
+  if (meRes.ok) {
+    const meData = await meRes.json();
+    State.currentUser = meData.user;
+  }
   DOM.reportModal.classList.remove('hidden');
 
   // 初期化
@@ -1885,6 +1890,12 @@ async function endMeeting() {
   if (DOM.mobileSummarizeBtn) DOM.mobileSummarizeBtn.disabled = true;
   if (DOM.mobileFacilitatorBtn) DOM.mobileFacilitatorBtn.disabled = true;
   await reloadPersonas();
+  const meRes = await fetch('/api/auth/me');
+  if (meRes.ok) {
+    const meData = await meRes.json();
+    State.currentUser = meData.user;
+    updateNavDisplay();
+  }
 }
 
 async function sendUserMessage() {

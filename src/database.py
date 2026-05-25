@@ -273,7 +273,8 @@ def get_user_by_id(user_id):
     try:
         rows = conn.run("""
             SELECT id, email, name, plan, credits, plan_expires_at,
-                   monthly_meeting_count, monthly_reset_at, avatar, password_hash
+                   monthly_meeting_count, monthly_reset_at, avatar, password_hash,
+                   trial_layer2_used, trial_layer3_used
             FROM users WHERE id=:id
         """, id=user_id)
         if not rows:
@@ -281,7 +282,8 @@ def get_user_by_id(user_id):
             return None
         r = rows[0]
         d = row_to_dict(['id','email','name','plan','credits','plan_expires_at',
-                         'monthly_meeting_count','monthly_reset_at','avatar','password_hash'], r)
+                         'monthly_meeting_count','monthly_reset_at','avatar','password_hash',
+                         'trial_layer2_used','trial_layer3_used'], r)
         d['name'] = decrypt_value(conn, d['name'])
         conn.close()
         d['credits'] = d['credits'] or 0
@@ -379,7 +381,9 @@ def check_and_use_meeting(user_id):
             if credits <= 0:
                 conn.close()
                 return False, "チケットが不足しています。チケットを購入してください。"
-            conn.run("UPDATE users SET credits=credits-1 WHERE id=:id", id=user_id)
+            conn.run("""UPDATE users SET credits=credits-1,
+                monthly_meeting_count=monthly_meeting_count+1
+                WHERE id=:id""", id=user_id)
             conn.close()
             return True, "ok"
 

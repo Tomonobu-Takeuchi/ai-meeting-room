@@ -173,6 +173,8 @@ def me():
         "credits": user.get('credits') or 0,
         "monthly_meeting_count": user.get('monthly_meeting_count') or 0,
         "plan_expires_at": user.get('plan_expires_at'),
+        "trial_layer2_used": bool(user.get('trial_layer2_used') or False),
+        "trial_layer3_used": bool(user.get('trial_layer3_used') or False),
     }})
 
 
