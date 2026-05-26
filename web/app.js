@@ -979,7 +979,7 @@ async function showReportModal() {
       } else if (!isLoggedIn) {
         DOM.downloadLayer3Btn.style.display = 'none';
         DOM.layer3Locked.classList.remove('hidden');
-      } else if (data.plan === 'standard' && !data.trial_layer3_used) {
+      } else if ((data.plan === 'free' || data.plan === 'standard') && !data.trial_layer3_used) {
         DOM.layer3Trial.classList.remove('hidden');
       } else {
         DOM.downloadLayer3Btn.style.display = 'none';
