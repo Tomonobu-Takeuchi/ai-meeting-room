@@ -1063,6 +1063,11 @@ JSONのみ出力してください。"""
                 (plan == 'standard' and not trial_layer3_used and is_trial_request == 'layer3')
             )
         )
+        if not can_use_layer3 and plan == 'standard' and trial_layer3_used:
+            return jsonify({
+                "error": "戦略レポートはproプランでご利用いただけます",
+                "code": "PLAN_LIMIT"
+            }), 403
         if can_use_layer3:
             l3_tmpl_prompt = LAYER3_TEMPLATES.get(category, LAYER3_TEMPLATES['strategy'])
             layer3_prompt = f"""{l3_tmpl_prompt}
