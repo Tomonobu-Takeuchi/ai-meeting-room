@@ -2228,7 +2228,7 @@ function addMessage(msg) {
   } else {
     // ★ ユーザーアバターもDEFAULT_AVATARSから取得
     const avatarContent = msg.persona_id === 'user'
-      ? (DEFAULT_AVATARS['user'] ? `<img src="${DEFAULT_AVATARS['user']}" alt="あなた" />` : '👤')
+      ? (State.userAvatar && State.userAvatar.startsWith('data:') ? `<img src="${State.userAvatar}" alt="あなた" />` : (State.userAvatar || '👤'))
       : (getAvatarImg(persona) ? `<img src="${getAvatarImg(persona)}" alt="${persona.name}" />` : (persona.avatar || '👤'));
     row.innerHTML = `
       <div class="msg-avatar" style="background:${persona.color||'#888'}22;border:2px solid ${persona.color||'#888'}44;">${avatarContent}</div>
