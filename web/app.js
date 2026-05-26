@@ -445,6 +445,10 @@ async function init() {
   await checkAuthStatus();
 
   try {
+    const me = await API.get('/api/auth/me');
+    if (me.user) State.currentUser = me.user;
+  } catch(e) {}
+  try {
     const data = await API.get('/api/personas/members');
     State.members = data.members;
     if (data.facilitator) State.facilitator = data.facilitator;
@@ -1832,6 +1836,7 @@ async function startMeeting() {
     DOM.facilitatorBtn.disabled = false; DOM.autoDiscussBtn.disabled = false; DOM.summarizeBtn.disabled = false;
     DOM.endMeetingBtn.disabled = false;
     DOM.topicInput.disabled = true; DOM.startMeetingBtn.disabled = true;
+    DOM.newMeetingBtn.style.display = 'inline-flex';
     DOM.inMeetingTopic.textContent = `📋 ${State.topic}`;
     DOM.headerRow2Pre.classList.add('hidden'); DOM.headerRow2In.classList.remove('hidden');
     if (State.voiceMode) DOM.micBtn.classList.remove('hidden');
@@ -1866,6 +1871,7 @@ async function resetMeeting() {
   DOM.topicInput.disabled = false; DOM.topicInput.value = '';
   sessionStorage.removeItem('ai_topic');
   DOM.inMeetingTopic.textContent = '';
+  DOM.newMeetingBtn.style.display = 'none';
   DOM.startMeetingBtn.disabled = false; DOM.facilitatorBtn.disabled = true;
   DOM.autoDiscussBtn.disabled = true; DOM.summarizeBtn.disabled = true; DOM.endMeetingBtn.disabled = true;
   DOM.headerRow2In.classList.add('hidden'); DOM.headerRow2Pre.classList.remove('hidden');
@@ -2209,8 +2215,10 @@ function renderAttachments() {
 }
 
 function addMessage(msg) {
-  const persona = msg.persona_id === 'user' ? { name: 'あなた', avatar: '👤', color: '#2563EB' }
-    : (State.members.find(m => m.id === msg.persona_id) || State.facilitator || {});
+  const persona = msg.persona_id === 'user'
+    ? { name: 'あなた', avatar: State.currentUser?.avatar || '👤', color: '#2563EB' }
+    : (State.members.find(m => m.id === msg.persona_id)
+        || { name: 'メンバー', avatar: '👤', color: '#888' });
   const row = document.createElement('div');
   row.className = `message-row ${msg.role}`; row.dataset.msgId = msg.id;
   if (msg.role === 'facilitator') {
