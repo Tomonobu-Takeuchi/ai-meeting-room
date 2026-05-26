@@ -1063,7 +1063,7 @@ JSONのみ出力してください。"""
                 (plan == 'standard' and not trial_layer3_used and is_trial_request == 'layer3')
             )
         )
-        if not can_use_layer3 and plan == 'standard' and trial_layer3_used:
+        if not can_use_layer3 and plan == 'standard' and trial_layer3_used and is_trial_request == 'layer3':
             return jsonify({
                 "error": "戦略レポートはproプランでご利用いただけます",
                 "code": "PLAN_LIMIT"
