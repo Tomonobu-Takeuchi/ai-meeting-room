@@ -1025,10 +1025,8 @@ JSONのみ出力してください。"""
         is_trial_request = req_data.get('trial_layer', '')
         app.logger.info(f"[BRIEF] user_id={user_id} plan={plan} trial_layer2={trial_layer2_used} trial_layer3={trial_layer3_used} is_trial_request={is_trial_request!r}")
         can_use_layer2 = (
-            category != 'chat' and (
-                plan in ('standard', 'pro') or
-                (plan == 'free' and not trial_layer2_used and is_trial_request == 'layer2')
-            )
+            plan in ('standard', 'pro') or
+            (plan == 'free' and not trial_layer2_used and is_trial_request == 'layer2')
         )
         if can_use_layer2:
             l2_prompt = f"""{LAYER2_TEMPLATES['common']}
@@ -1059,13 +1057,11 @@ JSONのみ出力してください。"""
                     conn2.close()
                 trial_layer2_used = True
 
-        # ===== Layer3（proは常時、standardは未使用時のみ、chatカテゴリは除外） =====
+        # ===== Layer3（proは常時、free/standardは未使用時のみ） =====
         layer3_data = None
         can_use_layer3 = (
-            category != 'chat' and (
-                plan == 'pro' or
-                (plan in ('free', 'standard') and not trial_layer3_used and is_trial_request == 'layer3')
-            )
+            plan == 'pro' or
+            (plan in ('free', 'standard') and not trial_layer3_used and is_trial_request == 'layer3')
         )
         if not can_use_layer3 and plan in ('free', 'standard') and trial_layer3_used and is_trial_request == 'layer3':
             return jsonify({

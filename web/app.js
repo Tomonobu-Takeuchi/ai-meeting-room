@@ -949,9 +949,7 @@ async function showReportModal() {
     }
 
     // ===== Layer3 =====
-    if (data.category === 'chat') {
-      DOM.layer3Section.style.display = 'none';
-    } else {
+    {
       DOM.layer3Section.style.display = '';
       if (data.layer3) {
         DOM.layer3Content.innerHTML = buildLayer3HTML(data.layer3, data.category || 'strategy');
