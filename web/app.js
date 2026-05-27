@@ -1807,6 +1807,7 @@ async function startMeeting() {
     }
     return;
   }
+  DOM.startMeetingBtn.disabled = true;
   setLoading(true);
   try {
     const data = await API.post('/api/meeting/start', {
@@ -1860,7 +1861,7 @@ async function startMeeting() {
       showToast(translateApiError(e.message, '会議の開始'), 'error');
     }
   }
-  finally { setLoading(false); }
+  finally { setLoading(false); DOM.startMeetingBtn.disabled = false; }
 }
 
 async function resetMeeting() {
@@ -1912,7 +1913,7 @@ async function endMeeting() {
   if (meRes.ok) {
     const meData = await meRes.json();
     State.currentUser = meData.user;
-    updateNavDisplay();
+    renderAuthArea();
   }
 }
 
@@ -3231,12 +3232,14 @@ async function logout() {
     await API.post('/api/auth/logout', {});
     State.currentUser = null;
     console.log('[LOG] ログアウト後 State.currentUser=null sessionId=' + State.sessionId);
+    State.sessionId = null;
+    await resetMeeting();
+    DOM.reportModal.classList.add('hidden');
     State.userAvatar = '👤';
     State.meetingCategory = null;
     State.suggestedPersonaIds = [];
     renderAuthArea();
     showToast('ログアウトしました', 'success');
-    await reloadPersonas();
   } catch (e) { showToast(translateApiError(e.message, 'ログアウト'), 'error'); }
 }
 
