@@ -446,7 +446,7 @@ async function init() {
 
   try {
     const me = await API.get('/api/auth/me');
-    if (me.user) State.currentUser = me.user;
+    if (me.user) { State.currentUser = me.user; console.log('[LOG] 初回plan取得 plan=' + me.user.plan + ' userId=' + me.user.id); }
   } catch(e) {}
   try {
     const data = await API.get('/api/personas/members');
@@ -1178,6 +1178,7 @@ function buildLayer3HTML(l3, cat) {
 }
 
 async function useTrialLayer2() {
+  console.log('[LOG] レポートボタン押下 layer=layer2(trial) plan=' + State.currentUser?.plan);
   const sid = State.sessionId || _briefSessionId;
   if (!sid) return;
   const btn = DOM.trialLayer2Btn;
@@ -1207,6 +1208,7 @@ async function useTrialLayer2() {
 }
 
 async function useTrialLayer3() {
+  console.log('[LOG] レポートボタン押下 layer=layer3(trial) plan=' + State.currentUser?.plan);
   const sid = State.sessionId || _briefSessionId;
   if (!sid) return;
   const btn = DOM.trialLayer3Btn;
@@ -1258,6 +1260,7 @@ async function downloadLayer1PDF() {
 }
 
 async function downloadLayer2PDF() {
+  console.log('[LOG] レポートボタン押下 layer=layer2(PDF) plan=' + State.currentUser?.plan);
   if (!State.sessionId || !_briefData?.layer2) return;
   const btn = DOM.downloadLayer2Btn;
   btn.disabled = true; btn.textContent = '⏳ 生成中...';
@@ -1288,6 +1291,7 @@ async function downloadLayer2PDF() {
 }
 
 async function downloadLayer3PDF() {
+  console.log('[LOG] レポートボタン押下 layer=layer3(PDF) plan=' + State.currentUser?.plan);
   if (!State.sessionId || !_briefData?.layer3) return;
   const btn = DOM.downloadLayer3Btn;
   btn.disabled = true; btn.textContent = '⏳ 生成中...';
@@ -1811,6 +1815,7 @@ async function startMeeting() {
       meeting_category: State.meetingCategory || 'chat'
     });
     State.sessionId = data.session_id; State.topic = data.topic;
+    console.log('[LOG] 会議開始 sessionId=' + State.sessionId);
     State.members = data.members; State.facilitator = data.facilitator;
     // ★ 会議開始後もアバターを再セット
     State.members.forEach(m => {
@@ -1889,6 +1894,7 @@ async function endMeeting() {
   stopSpeaking();
   if (State.isRecognizing && State.recognition) State.recognition.stop();
   State.sessionId = null; State.isStreaming = false; State.streamingMessages = {};
+  console.log('[LOG] 会議終了 newMeetingBtn.display=' + DOM.newMeetingBtn.style.display);
   DOM.chatInputArea.classList.add('hidden');
   DOM.sessionBar.classList.add('hidden');
   DOM.minutesBar.classList.remove('hidden');
@@ -3054,6 +3060,7 @@ async function submitLogin() {
     const data = await API.post('/api/auth/login', { email, password });
     State.currentUser = data.user;
     State.userAvatar = data.user.avatar || '👤';
+    console.log('[LOG] ログイン完了 plan=' + data.user?.plan + ' userId=' + data.user?.id);
     renderAuthArea();
     closeAuthModal();
     showToast(`${data.user.name || data.user.email} でログインしました`, 'success');
@@ -3220,8 +3227,10 @@ async function deleteAccount() {
 
 async function logout() {
   try {
+    console.log('[LOG] ログアウト前 State:', JSON.stringify({userId: State.currentUser?.id, plan: State.currentUser?.plan, sessionId: State.sessionId}));
     await API.post('/api/auth/logout', {});
     State.currentUser = null;
+    console.log('[LOG] ログアウト後 State.currentUser=null sessionId=' + State.sessionId);
     State.userAvatar = '👤';
     State.meetingCategory = null;
     State.suggestedPersonaIds = [];

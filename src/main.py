@@ -133,10 +133,12 @@ def login():
     session['user_id'] = user['id']
     session['user_email'] = user['email']
     session['user_name'] = user['name']
+    app.logger.info(f"[LOGIN] user_id={user['id']} plan={user.get('plan','free')} credits={user.get('credits',0)}")
     return jsonify({"message": "ログイン成功", "user": {"id": user['id'], "email": user['email'], "name": user['name'], "plan": user['plan'], "avatar": user.get('avatar') or '👤'}})
 
 @app.route("/api/auth/logout", methods=["POST"])
 def logout():
+    app.logger.info(f"[LOGOUT] user_id={session.get('user_id')}")
     session.clear()
     return jsonify({"message": "ログアウトしました"})
 
@@ -167,6 +169,7 @@ def me():
     if not user:
         session.clear()
         return jsonify({"user": None})
+    app.logger.info(f"[SESSION] user_id={user_id} plan={user.get('plan','free')}")
     return jsonify({"user": {
         "id": user['id'], "email": user['email'], "name": user['name'],
         "plan": user['plan'], "avatar": user.get('avatar') or '👤',
@@ -1020,6 +1023,7 @@ JSONのみ出力してください。"""
         # ===== Layer2（standard/pro は常時、free は未使用時のみ、chatカテゴリは除外） =====
         layer2_data = None
         is_trial_request = req_data.get('trial_layer', '')
+        app.logger.info(f"[BRIEF] user_id={user_id} plan={plan} trial_layer2={trial_layer2_used} trial_layer3={trial_layer3_used} is_trial_request={is_trial_request!r}")
         can_use_layer2 = (
             category != 'chat' and (
                 plan in ('standard', 'pro') or
@@ -2044,6 +2048,7 @@ def payment_webhook():
     """Stripe webhook。常に 200 を返す（Stripe ベストプラクティス）。"""
     import traceback
     from datetime import datetime, timedelta
+    app.logger.info("[WEBHOOK] 受信")
 
     # ── STEP 1: リクエスト受信ログ ──────────────────────────────
     try:
@@ -2171,11 +2176,13 @@ def _handle_checkout_completed(event, datetime, timedelta):
                 return
             print(f"[webhook][ch3] add_user_credits 開始 user={user_id} amount={STANDARD_CREDITS}")
             add_user_credits(user_id, STANDARD_CREDITS)
+            app.logger.info(f"[WEBHOOK] credits付与完了 user_id={user_id} plan=standard credits+={STANDARD_CREDITS}")
             print(f"[webhook][ch3] add_user_credits 完了")
         elif payment_type == 'pro':
             expires_at = datetime.utcnow() + timedelta(days=31)
             print(f"[webhook][ch3] update_user_plan 開始 user={user_id} expires={expires_at}")
             update_user_plan(user_id, 'pro', expires_at, stripe_customer_id=customer_id)
+            app.logger.info(f"[WEBHOOK] plan変更完了 user_id={user_id} plan=pro expires={expires_at}")
             print(f"[webhook][ch3] update_user_plan 完了")
         else:
             print(f"[webhook][ch3] 未知の payment_type={payment_type!r}")
