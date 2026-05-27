@@ -464,70 +464,72 @@ async function init() {
       }
     });
     renderMemberList();
-  } catch (e) { showToast(translateApiError(e.message, 'ペルソナの読み込み'), 'error'); }
+  } catch (e) {
+    showToast(translateApiError(e.message, 'ペルソナの読み込み'), 'error');
+  } finally {
+    DOM.newMeetingBtn.addEventListener('click', resetMeeting);
+    DOM.endMeetingBtn.addEventListener('click', endMeeting);
+    DOM.startMeetingBtn.addEventListener('click', showCategorySelectModal);
+    DOM.facilitatorBtn.addEventListener('click', invokeFacilitator);
+    DOM.autoDiscussBtn.addEventListener('click', autoDiscuss);
+    DOM.sendBtn.addEventListener('click', sendUserMessage);
+    DOM.allRespondBtn.addEventListener('click', allRespond);
 
-  DOM.newMeetingBtn.addEventListener('click', resetMeeting);
-  DOM.endMeetingBtn.addEventListener('click', endMeeting);
-  DOM.startMeetingBtn.addEventListener('click', showCategorySelectModal);
-  DOM.facilitatorBtn.addEventListener('click', invokeFacilitator);
-  DOM.autoDiscussBtn.addEventListener('click', autoDiscuss);
-  DOM.sendBtn.addEventListener('click', sendUserMessage);
-  DOM.allRespondBtn.addEventListener('click', allRespond);
+    DOM.cancelMemberSelect.addEventListener('click', () => DOM.memberSelectModal.classList.add('hidden'));
+    DOM.confirmMemberSelect.addEventListener('click', startMeetingFromModal);
 
-  DOM.cancelMemberSelect.addEventListener('click', () => DOM.memberSelectModal.classList.add('hidden'));
-  DOM.confirmMemberSelect.addEventListener('click', startMeetingFromModal);
+    // チーム提案モーダル
+    DOM.teamSuggestConfirmBtn.addEventListener('click', confirmSuggestedTeam);
+    DOM.teamSuggestChangeBtn.addEventListener('click', openRoleEditModal);
 
-  // チーム提案モーダル
-  DOM.teamSuggestConfirmBtn.addEventListener('click', confirmSuggestedTeam);
-  DOM.teamSuggestChangeBtn.addEventListener('click', openRoleEditModal);
+    // 役割別変更モーダル
+    DOM.roleEditAddBtn.addEventListener('click', addRoleEditRow);
+    DOM.roleEditCancelBtn.addEventListener('click', () => {
+      DOM.roleEditModal.classList.add('hidden');
+      DOM.teamSuggestModal.classList.remove('hidden');
+    });
+    DOM.roleEditConfirmBtn.addEventListener('click', confirmRoleEdit);
 
-  // 役割別変更モーダル
-  DOM.roleEditAddBtn.addEventListener('click', addRoleEditRow);
-  DOM.roleEditCancelBtn.addEventListener('click', () => {
-    DOM.roleEditModal.classList.add('hidden');
-    DOM.teamSuggestModal.classList.remove('hidden');
-  });
-  DOM.roleEditConfirmBtn.addEventListener('click', confirmRoleEdit);
+    DOM.summarizeBtn.addEventListener('click', summarizeMeeting);
+    DOM.reportBtn.addEventListener('click', showReportModal);
+    document.getElementById('minutesEndBtn')?.addEventListener('click', endMeeting);
+    DOM.downloadLayer1Btn.addEventListener('click', downloadLayer1PDF);
+    DOM.downloadLayer2Btn.addEventListener('click', downloadLayer2PDF);
+    DOM.downloadLayer3Btn.addEventListener('click', downloadLayer3PDF);
 
-  DOM.summarizeBtn.addEventListener('click', summarizeMeeting);
-  DOM.reportBtn.addEventListener('click', showReportModal);
-  document.getElementById('minutesEndBtn')?.addEventListener('click', endMeeting);
-  DOM.downloadLayer1Btn.addEventListener('click', downloadLayer1PDF);
-  DOM.downloadLayer2Btn.addEventListener('click', downloadLayer2PDF);
-  DOM.downloadLayer3Btn.addEventListener('click', downloadLayer3PDF);
+    const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
+    if (!isTouch) {
+      DOM.howToBtn?.addEventListener('click', () => openHowToModal());
+      DOM.planBtn?.addEventListener('click', () => openPricingModal());
+    }
+    DOM.voiceModeBtn.addEventListener('click', toggleVoiceMode);
+    DOM.stopSpeakBtn.addEventListener('click', stopSpeaking);
+    DOM.micBtn.addEventListener('click', () => startVoiceInput(DOM.chatInput, DOM.micBtn));
+    DOM.topicMicBtn.addEventListener('click', () => startVoiceInput(DOM.topicInput, DOM.topicMicBtn));
 
-  const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
-  if (!isTouch) {
-    DOM.howToBtn?.addEventListener('click', () => openHowToModal());
-    DOM.planBtn?.addEventListener('click', () => openPricingModal());
+    DOM.addMemberBtn.addEventListener('click', openAddModal);
+
+    // 認証ボタンのイベント（動的生成されるため直接バインド）
+    document.addEventListener('click', (e) => {
+      if (e.target.id === 'loginBtnHeader') openAuthModal();
+      if (e.target.id === 'loginSubmitBtn') submitLogin();
+      if (e.target.id === 'registerSubmitBtn') submitRegister();
+    });
+    // Enterキーでサブミット
+    $('loginPassword')?.addEventListener('keydown', e => { if (e.key === 'Enter') submitLogin(); });
+    $('registerPassword')?.addEventListener('keydown', e => { if (e.key === 'Enter') submitRegister(); });
+    // モーダル外クリックで閉じる
+    $('authModalOverlay')?.addEventListener('click', e => { if (e.target === $('authModalOverlay')) closeAuthModal(); });
+    DOM.cancelAddPersona.addEventListener('click', closeAddModal);
+    DOM.confirmAddPersona.addEventListener('click', submitAddPersona);
+    DOM.cancelEditPersona.addEventListener('click', closeEditModal);
+    DOM.confirmEditPersona.addEventListener('click', submitEditPersona);
+    DOM.cancelDeleteBtn.addEventListener('click', () => { DOM.deleteConfirmOverlay.classList.add('hidden'); State.deletePendingId = null; });
+    DOM.confirmDeleteBtn.addEventListener('click', executeDeletion);
+    DOM.copyPersonaCancel.addEventListener('click', closeCopyPersonaModal);
+    DOM.copyPersonaConfirm.addEventListener('click', executeCopyPersona);
+    DOM.fileInput.addEventListener('change', handleFileAttach);
   }
-  DOM.voiceModeBtn.addEventListener('click', toggleVoiceMode);
-  DOM.stopSpeakBtn.addEventListener('click', stopSpeaking);
-  DOM.micBtn.addEventListener('click', () => startVoiceInput(DOM.chatInput, DOM.micBtn));
-  DOM.topicMicBtn.addEventListener('click', () => startVoiceInput(DOM.topicInput, DOM.topicMicBtn));
-
-  DOM.addMemberBtn.addEventListener('click', openAddModal);
-
-  // 認証ボタンのイベント（動的生成されるため直接バインド）
-  document.addEventListener('click', (e) => {
-    if (e.target.id === 'loginBtnHeader') openAuthModal();
-    if (e.target.id === 'loginSubmitBtn') submitLogin();
-    if (e.target.id === 'registerSubmitBtn') submitRegister();
-  });
-  // Enterキーでサブミット
-  $('loginPassword')?.addEventListener('keydown', e => { if (e.key === 'Enter') submitLogin(); });
-  $('registerPassword')?.addEventListener('keydown', e => { if (e.key === 'Enter') submitRegister(); });
-  // モーダル外クリックで閉じる
-  $('authModalOverlay')?.addEventListener('click', e => { if (e.target === $('authModalOverlay')) closeAuthModal(); });
-  DOM.cancelAddPersona.addEventListener('click', closeAddModal);
-  DOM.confirmAddPersona.addEventListener('click', submitAddPersona);
-  DOM.cancelEditPersona.addEventListener('click', closeEditModal);
-  DOM.confirmEditPersona.addEventListener('click', submitEditPersona);
-  DOM.cancelDeleteBtn.addEventListener('click', () => { DOM.deleteConfirmOverlay.classList.add('hidden'); State.deletePendingId = null; });
-  DOM.confirmDeleteBtn.addEventListener('click', executeDeletion);
-  DOM.copyPersonaCancel.addEventListener('click', closeCopyPersonaModal);
-  DOM.copyPersonaConfirm.addEventListener('click', executeCopyPersona);
-  DOM.fileInput.addEventListener('change', handleFileAttach);
 
   $('pAvatar').addEventListener('input', () => { if (!State.addAvatarDataUrl) DOM.addAvatarPreview.innerHTML = $('pAvatar').value || '👤'; });
   $('addAvatarImageFile').addEventListener('change', (e) => {
