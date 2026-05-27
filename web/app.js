@@ -1216,11 +1216,12 @@ async function useTrialLayer3() {
 }
 
 async function downloadLayer1PDF() {
-  if (!State.sessionId) return;
+  const sid = State.sessionId || _briefSessionId;
+  if (!sid) return;
   const btn = DOM.downloadLayer1Btn;
   btn.disabled = true; btn.textContent = '⏳ 生成中...';
   try {
-    const res = await fetch(`/api/meeting/${State.sessionId}/brief_pdf`, { method: 'POST' });
+    const res = await fetch(`/api/meeting/${sid}/brief_pdf`, { method: 'POST' });
     if (!res.ok) throw new Error('生成失敗');
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
@@ -1239,11 +1240,12 @@ async function downloadLayer1PDF() {
 
 async function downloadLayer2PDF() {
   console.log('[LOG] レポートボタン押下 layer=layer2(PDF) plan=' + State.currentUser?.plan);
-  if (!State.sessionId || !_briefData?.layer2) return;
+  const sid = State.sessionId || _briefSessionId;
+  if (!sid || !_briefData?.layer2) return;
   const btn = DOM.downloadLayer2Btn;
   btn.disabled = true; btn.textContent = '⏳ 生成中...';
   try {
-    const res = await fetch(`/api/meeting/${State.sessionId}/brief_pdf_layer2`, {
+    const res = await fetch(`/api/meeting/${sid}/brief_pdf_layer2`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1270,11 +1272,12 @@ async function downloadLayer2PDF() {
 
 async function downloadLayer3PDF() {
   console.log('[LOG] レポートボタン押下 layer=layer3(PDF) plan=' + State.currentUser?.plan);
-  if (!State.sessionId || !_briefData?.layer3) return;
+  const sid = State.sessionId || _briefSessionId;
+  if (!sid || !_briefData?.layer3) return;
   const btn = DOM.downloadLayer3Btn;
   btn.disabled = true; btn.textContent = '⏳ 生成中...';
   try {
-    const res = await fetch(`/api/meeting/${State.sessionId}/brief_pdf_layer3`, {
+    const res = await fetch(`/api/meeting/${sid}/brief_pdf_layer3`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
