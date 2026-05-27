@@ -1064,10 +1064,10 @@ JSONのみ出力してください。"""
         can_use_layer3 = (
             category != 'chat' and (
                 plan == 'pro' or
-                (plan == 'standard' and not trial_layer3_used and is_trial_request == 'layer3')
+                (plan in ('free', 'standard') and not trial_layer3_used and is_trial_request == 'layer3')
             )
         )
-        if not can_use_layer3 and plan == 'standard' and trial_layer3_used and is_trial_request == 'layer3':
+        if not can_use_layer3 and plan in ('free', 'standard') and trial_layer3_used and is_trial_request == 'layer3':
             return jsonify({
                 "error": "戦略レポートはproプランでご利用いただけます",
                 "code": "PLAN_LIMIT"
@@ -1088,8 +1088,8 @@ JSONのみ出力してください。"""
             layer3_text = layer3_res.content[0].text.strip().replace("```json", "").replace("```", "").strip()
             layer3_data = json.loads(layer3_text)
 
-            # standardプランのお試し使用済みフラグを更新
-            if plan == 'standard' and not trial_layer3_used and user_id:
+            # free/standardプランのお試し使用済みフラグを更新
+            if plan in ('free', 'standard') and not trial_layer3_used and user_id:
                 from src.database import get_connection
                 conn3 = get_connection()
                 try:
