@@ -84,7 +84,6 @@ const DOM = {
   memberCheckList: $('memberCheckList'),
   summarizeBtn: $('summarizeBtn'),
   minutesBar: $('minutesBar'),
-  minutesBtn: $('minutesBtn'),
   howToBtn: $('howToBtn'),
   planBtn: $('planBtn'),
   voiceModeBtn: $('voiceModeBtn'),
@@ -892,27 +891,6 @@ async function summarizeMeeting() {
       DOM.minutesBar.classList.remove('hidden');
     }
   };
-}
-
-async function downloadMinutes() {
-  if (!State.sessionId) return;
-  const btn = DOM.minutesBtn;
-  btn.disabled = true; btn.textContent = '⏳ 生成中...';
-  try {
-    const res = await fetch(`/api/meeting/${State.sessionId}/minutes`, { method: 'POST' });
-    if (!res.ok) { const err = await res.json().catch(() => ({ error: '生成失敗' })); throw new Error(err.error || '生成失敗'); }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    const topic = State.topic.slice(0, 20).replace(/[\/\\]/g, '_');
-    a.download = `議事録_${topic}_${new Date().toISOString().slice(0, 10)}.pdf`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    showToast('議事録をダウンロードしました', 'success');
-    startFeedbackFlow();
-  } catch (e) { showToast(translateApiError(e.message, '議事録のダウンロード'), 'error'); startFeedbackFlow(); }
-  finally { btn.disabled = false; btn.textContent = '📄 議事録をダウンロード（PDF）'; }
 }
 
 let _briefData = null;
@@ -1903,6 +1881,7 @@ async function endMeeting() {
       console.error('[LOG] 会議終了APIエラー:', e);
     }
   }
+  if (State.sessionId) _briefSessionId = State.sessionId;
   State.sessionId = null; State.isStreaming = false; State.streamingMessages = {};
   console.log('[LOG] 会議終了 newMeetingBtn.display=' + DOM.newMeetingBtn.style.display);
   DOM.chatInputArea.classList.add('hidden');
