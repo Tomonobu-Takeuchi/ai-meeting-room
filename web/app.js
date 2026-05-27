@@ -1894,6 +1894,15 @@ async function endMeeting() {
   if (!confirm('会議を終了しますか？トランスクリプトを残したまま終了します。')) return;
   stopSpeaking();
   if (State.isRecognizing && State.recognition) State.recognition.stop();
+  const endSessionId = State.sessionId;
+  if (endSessionId) {
+    try {
+      await API.post(`/api/meeting/${endSessionId}/end`, {});
+      console.log('[LOG] 会議終了API呼び出し sessionId=' + endSessionId);
+    } catch(e) {
+      console.error('[LOG] 会議終了APIエラー:', e);
+    }
+  }
   State.sessionId = null; State.isStreaming = false; State.streamingMessages = {};
   console.log('[LOG] 会議終了 newMeetingBtn.display=' + DOM.newMeetingBtn.style.display);
   DOM.chatInputArea.classList.add('hidden');

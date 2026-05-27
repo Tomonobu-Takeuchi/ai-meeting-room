@@ -1114,6 +1114,28 @@ JSONのみ出力してください。"""
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/meeting/<session_id>/end", methods=["POST"])
+@login_required
+def end_meeting(session_id):
+    user_id = session.get('user_id')
+    app.logger.info(f"[END_MEETING] user_id={user_id} session_id={session_id}")
+    summary = meeting_room.get_session_summary(session_id)
+    if not summary:
+        return jsonify({"error": "セッションが見つかりません"}), 404
+    for func, name in [
+        (lambda: persona_manager.save_meeting_log(summary, user_id), "save_meeting_log"),
+        (lambda: persona_manager.extract_and_save_patterns(summary, user_id), "extract_and_save_patterns"),
+        (lambda: [persona_manager.increment_persona_meeting_count(m['id'], user_id) for m in summary.get('members', [])], "increment_persona_meeting_count"),
+        (lambda: persona_manager.on_conversation_end(summary, user_id), "on_conversation_end"),
+    ]:
+        try:
+            func()
+            app.logger.info(f"[END_MEETING] {name} 完了")
+        except Exception as e:
+            app.logger.error(f"[END_MEETING] {name} エラー: {e}")
+    return jsonify({"message": "会議終了処理完了"})
+
+
 @app.route("/api/meeting/<session_id>/brief_pdf", methods=["POST"])
 def generate_brief_pdf(session_id):
     """Layer 1（アクション・ブリーフ）をPDF化して返す"""
@@ -1494,272 +1516,6 @@ def generate_brief_pdf_layer3(session_id):
             as_attachment=True, download_name=filename)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-
-@app.route("/api/meeting/<session_id>/strategy_pdf", methods=["POST"])
-def generate_strategy_pdf(session_id):
-    """Layer 2（戦略レポート）をPDF化して返す"""
-    summary = meeting_room.get_session_summary(session_id)
-    if not summary:
-        return jsonify({"error": "セッションが見つかりません"}), 404
-    try:
-        import io
-        from datetime import datetime
-        from reportlab.lib.pagesizes import A4
-        from reportlab.lib.styles import ParagraphStyle
-        from reportlab.lib.units import mm
-        from reportlab.lib.colors import HexColor
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
-        from reportlab.pdfbase import pdfmetrics
-        from reportlab.pdfbase.cidfonts import UnicodeCIDFont
-
-        user_id = get_current_user_id()
-        plan = 'free'
-        if user_id:
-            from src.database import get_connection
-            conn = get_connection()
-            try:
-                row = conn.run("SELECT plan FROM users WHERE id = :uid", uid=user_id)
-                if row:
-                    plan = row[0][0] or 'free'
-            finally:
-                conn.close()
-        if plan not in ('standard', 'pro'):
-            return jsonify({"error": "スタンダード以上のプランが必要です"}), 403
-
-        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-        discussion = ""
-        for msg in summary.get("messages", []):
-            if msg["persona_id"] == "user":
-                name = "ユーザー"
-            elif msg["persona_id"] == "facilitator":
-                name = "ファシリテータ"
-            else:
-                persona = next((m for m in summary["members"] if m["id"] == msg["persona_id"]), None)
-                name = persona["name"] if persona else msg["persona_id"]
-            discussion += f"{name}: {msg['content']}\n\n"
-
-        member_names = ", ".join([m["name"] for m in summary["members"]])
-
-        layer2_prompt = f"""以下の会議から「戦略レポート」を作成してください。
-議題：{summary['topic']}
-参加者：{member_names}
-議論内容：
-{discussion if discussion else "（議論なし）"}
-
-以下のJSON形式のみで出力してください：
-{{
-  "overview": "議論全体の概要を3〜4文で",
-  "persona_analysis": {{"参加者名": "この人物がなぜそう言ったか、背景・価値観・立場を含めて2〜3文で"}},
-  "risks": ["注意すべきリスク1", "注意すべきリスク2"],
-  "recommendation": "総合的な推奨アクションを2〜3文で"
-}}
-JSONのみ出力してください。"""
-
-        res = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=1500,
-            messages=[{"role": "user", "content": layer2_prompt}]
-        )
-        text = res.content[0].text.strip().replace("```json", "").replace("```", "").strip()
-        data = json.loads(text)
-
-        pdfmetrics.registerFont(UnicodeCIDFont('HeiseiMin-W3'))
-        buf = io.BytesIO()
-        now = datetime.now()
-        doc = SimpleDocTemplate(buf, pagesize=A4,
-            rightMargin=20*mm, leftMargin=20*mm,
-            topMargin=20*mm, bottomMargin=20*mm)
-
-        def make_style(size=11, color=None):
-            s = ParagraphStyle('s', fontName='HeiseiMin-W3', fontSize=size, leading=size*1.8)
-            if color:
-                s.textColor = HexColor(color)
-            return s
-
-        story = []
-        story.append(Paragraph('戦略レポート', make_style(18, '#1a1a2e')))
-        story.append(Spacer(1, 2*mm))
-        story.append(HRFlowable(width='100%', thickness=1, color=HexColor('#7C3AED')))
-        story.append(Spacer(1, 3*mm))
-
-        for label, value in [
-            ('日時', now.strftime('%Y年%m月%d日 %H:%M')),
-            ('議題', summary['topic']),
-            ('参加者', member_names),
-        ]:
-            story.append(Paragraph(f'<b>{label}：</b>{value}', make_style(10)))
-        story.append(Spacer(1, 5*mm))
-
-        story.append(Paragraph('■ 議論の概要', make_style(13, '#7C3AED')))
-        story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
-        story.append(Spacer(1, 2*mm))
-        story.append(Paragraph(data.get('overview', ''), make_style(10)))
-        story.append(Spacer(1, 5*mm))
-
-        story.append(Paragraph('■ 各ペルソナの視点', make_style(13, '#7C3AED')))
-        story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
-        story.append(Spacer(1, 2*mm))
-        for name, analysis in data.get('persona_analysis', {}).items():
-            story.append(Paragraph(f'<b>【{name}】</b>', make_style(11, '#7C3AED')))
-            story.append(Paragraph(analysis, make_style(10)))
-            story.append(Spacer(1, 3*mm))
-        story.append(Spacer(1, 2*mm))
-
-        story.append(Paragraph('■ 注意すべきリスク', make_style(13, '#7C3AED')))
-        story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
-        story.append(Spacer(1, 2*mm))
-        for risk in data.get('risks', []):
-            story.append(Paragraph(f'・{risk}', make_style(10)))
-            story.append(Spacer(1, 1*mm))
-        story.append(Spacer(1, 5*mm))
-
-        story.append(Paragraph('■ 総合推奨', make_style(13, '#7C3AED')))
-        story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
-        story.append(Spacer(1, 2*mm))
-        story.append(Paragraph(data.get('recommendation', ''), make_style(10)))
-
-        doc.build(story)
-        buf.seek(0)
-        topic_short = summary['topic'][:20].replace('/', '_').replace('\\', '_')
-        filename = f'戦略レポート_{topic_short}_{now.strftime("%Y%m%d")}.pdf'
-        return send_file(buf, as_attachment=True, download_name=filename, mimetype='application/pdf')
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/api/meeting/<session_id>/minutes", methods=["POST"])
-def generate_minutes(session_id):
-    summary = meeting_room.get_session_summary(session_id)
-    if not summary:
-        return jsonify({"error": "セッションが見つかりません"}), 404
-    try:
-        from reportlab.lib.pagesizes import A4
-        from reportlab.lib.styles import ParagraphStyle
-        from reportlab.lib.units import mm
-        from reportlab.lib.colors import HexColor
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
-        from reportlab.pdfbase import pdfmetrics
-        from reportlab.pdfbase.cidfonts import UnicodeCIDFont
-        from datetime import datetime
-
-        pdfmetrics.registerFont(UnicodeCIDFont('HeiseiKakuGo-W5'))
-        FONT = 'HeiseiKakuGo-W5'
-
-        discussion = ""
-        for msg in summary.get("messages", []):
-            if msg["persona_id"] == "user":
-                name = "ユーザー"
-            elif msg["persona_id"] == "facilitator":
-                name = "ファシリテータ"
-            else:
-                persona = next((m for m in summary["members"] if m["id"] == msg["persona_id"]), None)
-                name = persona["name"] if persona else msg["persona_id"]
-            discussion += f"{name}: {msg['content']}\n\n"
-
-        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-        member_names = ", ".join([m["name"] for m in summary["members"]])
-
-        prompt = f"""以下の会議の議論から議事録を作成してください。
-議題：{summary['topic']}
-参加者：{member_names}
-議論内容：
-{discussion if discussion else "（議論なし）"}
-以下のJSON形式のみで出力してください：
-{{
-  "conclusion": "会議の結論を2〜3文で記述",
-  "opinions": {{"参加者名": "主な意見を1〜2文で"}},
-  "next_steps": "今後の進め方（改行区切り、各行を・で始める）"
-}}
-JSONのみ出力してください。"""
-
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=1500,
-            messages=[{"role": "user", "content": prompt}]
-        )
-
-        text = response.content[0].text.strip()
-        text = text.replace("```json", "").replace("```", "").strip()
-        minutes_data = json.loads(text)
-
-        now = datetime.now()
-        buf = io.BytesIO()
-        doc = SimpleDocTemplate(buf, pagesize=A4,
-            leftMargin=20*mm, rightMargin=20*mm,
-            topMargin=20*mm, bottomMargin=20*mm)
-
-        def make_style(size=11, color=None):
-            s = ParagraphStyle('s', fontName=FONT, fontSize=size,
-                leading=size * 1.8, wordWrap='CJK')
-            if color:
-                s.textColor = HexColor(color)
-            return s
-
-        story = []
-        story.append(Paragraph('AI-PERSONA 会議議事録', make_style(18, '#1a1a2e')))
-        story.append(Spacer(1, 6*mm))
-        story.append(HRFlowable(width='100%', thickness=1, color=HexColor('#7C3AED')))
-        story.append(Spacer(1, 4*mm))
-        for label, value in [
-            ('日時', now.strftime('%Y年%m月%d日 %H:%M')),
-            ('場所', 'AI仮想会議室'),
-            ('議題', summary['topic']),
-            ('参加メンバー', member_names),
-        ]:
-            story.append(Paragraph(f'<b>{label}：</b>{value}', make_style(10)))
-            story.append(Spacer(1, 1*mm))
-        story.append(Spacer(1, 5*mm))
-        story.append(Paragraph('■ 結論', make_style(13, '#2563EB')))
-        story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
-        story.append(Spacer(1, 2*mm))
-        story.append(Paragraph(minutes_data.get('conclusion', ''), make_style(10)))
-        story.append(Spacer(1, 5*mm))
-        story.append(Paragraph('■ 参加者の主な意見', make_style(13, '#2563EB')))
-        story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
-        story.append(Spacer(1, 2*mm))
-        for name, opinion in minutes_data.get('opinions', {}).items():
-            story.append(Paragraph(f'<b>{name}：</b>{opinion}', make_style(10)))
-            story.append(Spacer(1, 1*mm))
-        story.append(Spacer(1, 5*mm))
-        story.append(Paragraph('■ 今後の進め方', make_style(13, '#2563EB')))
-        story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
-        story.append(Spacer(1, 2*mm))
-        for step in minutes_data.get('next_steps', '').split('\n'):
-            step = step.strip().lstrip('・').strip()
-            if step:
-                story.append(Paragraph(f'・{step}', make_style(10)))
-                story.append(Spacer(1, 1*mm))
-        doc.build(story)
-        buf.seek(0)
-        topic_short = summary['topic'][:20].replace('/', '_').replace('\\', '_')
-        filename = f'議事録_{topic_short}_{now.strftime("%Y%m%d")}.pdf'
-
-        # ===== Phase 1-3: 会議ログ学習・パターン保存・カウント更新 =====
-        _uid = get_current_user_id()  # ゲストはNone（NULLとして保存）
-        try:
-            persona_manager.save_meeting_log(summary, _uid)
-        except Exception as e:
-            print(f"Phase1エラー（無視）: {e}")
-        try:
-            persona_manager.extract_and_save_patterns(summary, _uid)
-        except Exception as e:
-            print(f"Phase2エラー（無視）: {e}")
-        try:
-            for member in summary.get('members', []):
-                persona_manager.increment_persona_meeting_count(member['id'], _uid)
-        except Exception as e:
-            print(f"Phase3エラー（無視）: {e}")
-        # ===== Growth: 成熟度スコア更新 =====
-        try:
-            persona_manager.on_conversation_end(summary, _uid)
-        except Exception as e:
-            print(f"Growthエラー（無視）: {e}")
-
-        return send_file(buf, as_attachment=True, download_name=filename, mimetype='application/pdf')
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
 
 # ===== TTS API =====
 
