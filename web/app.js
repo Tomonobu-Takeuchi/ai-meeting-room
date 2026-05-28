@@ -435,6 +435,12 @@ function toggleVoiceMode() {
 }
 
 async function init() {
+  // 生年月日max属性：今日の日付を設定
+  const birthDateInput = $('registerBirthDate');
+  if (birthDateInput) {
+    birthDateInput.max = new Date().toISOString().slice(0, 10);
+  }
+
   if (window.speechSynthesis) {
     loadVoices();
     window.speechSynthesis.onvoiceschanged = loadVoices;
@@ -919,6 +925,8 @@ async function showReportModal() {
   DOM.layer3Trial.classList.add('hidden');
   DOM.layer3Locked.classList.add('hidden');
   DOM.downloadLayer2Btn.style.display = 'none';
+  const _initLayer2CostInfo = $('layer2CostInfo');
+  if (_initLayer2CostInfo) _initLayer2CostInfo.style.display = 'none';
   DOM.downloadLayer3Btn.style.display = 'none';
 
   try {
@@ -938,13 +946,22 @@ async function showReportModal() {
     if (data.layer2) {
       DOM.layer2Content.innerHTML = buildLayer2HTML(data.layer2, data.category || 'chat');
       DOM.downloadLayer2Btn.style.display = 'inline-block';
+      // 案A：standardプランのみクレジット消費テキスト表示
+      const layer2CostInfo = $('layer2CostInfo');
+      if (layer2CostInfo) {
+        layer2CostInfo.style.display = (State.currentUser?.plan === 'standard') ? 'block' : 'none';
+      }
     } else if (!isLoggedIn) {
       DOM.downloadLayer2Btn.style.display = 'none';
+      const layer2CostInfo = $('layer2CostInfo');
+      if (layer2CostInfo) layer2CostInfo.style.display = 'none';
       DOM.layer2Locked.classList.remove('hidden');
     } else if (data.plan === 'free' && !data.trial_layer2_used) {
       DOM.layer2Trial.classList.remove('hidden');
     } else {
       DOM.downloadLayer2Btn.style.display = 'none';
+      const layer2CostInfo = $('layer2CostInfo');
+      if (layer2CostInfo) layer2CostInfo.style.display = 'none';
       DOM.layer2Locked.classList.remove('hidden');
     }
 
@@ -1173,10 +1190,17 @@ async function useTrialLayer2() {
     if (data.layer2) {
       DOM.layer2Content.innerHTML = buildLayer2HTML(data.layer2, data.category || 'chat');
       DOM.downloadLayer2Btn.style.display = 'inline-block';
+      // 案A：standardプランのみクレジット消費テキスト表示
+      const layer2CostInfo = $('layer2CostInfo');
+      if (layer2CostInfo) {
+        layer2CostInfo.style.display = (State.currentUser?.plan === 'standard') ? 'block' : 'none';
+      }
       DOM.layer2Trial.classList.add('hidden');
     } else {
       DOM.layer2Trial.classList.add('hidden');
       DOM.downloadLayer2Btn.style.display = 'none';
+      const layer2CostInfo = $('layer2CostInfo');
+      if (layer2CostInfo) layer2CostInfo.style.display = 'none';
       DOM.layer2Locked.classList.remove('hidden');
     }
   } catch (e) {
@@ -1264,7 +1288,17 @@ async function downloadLayer2PDF() {
     a.download = `議論分析レポート_${State.topic?.slice(0,20)}_${new Date().toISOString().slice(0,10)}.pdf`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showToast('PDFをダウンロードしました', 'success');
+    if (State.currentUser?.plan === 'standard') {
+      const remaining = Math.max(0, (State.currentUser.credits || 1) - 1);
+      State.currentUser.credits = remaining;
+      const costInfo = $('layer2CostInfo');
+      if (costInfo) costInfo.style.display = 'none';
+      const costEl = $('startMeetingCostText');
+      if (costEl) costEl.textContent = `1チケット消費します（残り${remaining}枚）`;
+      showToast(`議論分析レポートをダウンロードしました（残り${remaining}クレジット）`, 'success');
+    } else {
+      showToast('PDFをダウンロードしました', 'success');
+    }
   } catch (e) {
     showToast('PDFの生成に失敗しました', 'error');
   } finally {
@@ -1831,7 +1865,15 @@ async function startMeeting() {
     if (State.voiceMode) DOM.micBtn.classList.remove('hidden');
     renderMemberList(); renderMemberTriggers();
     addSystemMessage(`会議を開始しました。議題：${State.topic}`);
-    showToast('会議を開始しました！', 'success');
+    if (State.currentUser?.plan === 'standard') {
+      const remaining = Math.max(0, (State.currentUser.credits || 1) - 1);
+      State.currentUser.credits = remaining;
+      const costEl = $('startMeetingCostText');
+      if (costEl) costEl.textContent = `1チケット消費します（残り${remaining}枚）`;
+      showToast(`会議を開始しました！（残り${remaining}チケット）`, 'success');
+    } else {
+      showToast('会議を開始しました！', 'success');
+    }
     // モバイルアクションバーを表示
     if (DOM.mobileActionBar) { DOM.mobileActionBar.classList.add('visible'); }
     if (DOM.mobileSummarizeBtn) DOM.mobileSummarizeBtn.disabled = false;
@@ -3011,6 +3053,19 @@ function renderAuthArea() {
   } else {
     area.innerHTML = `<button class="btn btn-green" id="freeStartBtn" onclick="startFree()">🚀 <span class="btn-full-text">無料で始める</span><span class="btn-short-text">無料</span></button><button class="btn" id="loginBtnHeader" onclick="openAuthModal()">🔑<span class="btn-login-text"> ログイン</span></button>`;
   }
+  // 案A：standardプランのチケット消費テキスト更新
+  const costInfo = $('startMeetingCostInfo');
+  const costText = $('startMeetingCostText');
+  if (costInfo && costText && State.currentUser) {
+    if (State.currentUser.plan === 'standard') {
+      costText.textContent = `1チケット消費します（残り${State.currentUser.credits || 0}枚）`;
+      costInfo.style.display = 'inline-flex';
+    } else {
+      costInfo.style.display = 'none';
+    }
+  } else if (costInfo) {
+    costInfo.style.display = 'none';
+  }
 }
 
 function openAuthModal() {
@@ -3076,13 +3131,21 @@ async function submitRegister() {
   const errEl = $('registerError');
   if (!email || !password) { errEl.textContent = 'メールアドレスとパスワードを入力してください'; return; }
   if (password.length < 6) { errEl.textContent = 'パスワードは6文字以上にしてください'; return; }
+  // 生年月日バリデーション
+  const birthDate = $('registerBirthDate')?.value;
+  if (!birthDate) { errEl.textContent = '生年月日を入力してください'; return; }
+  const birthYear = new Date(birthDate);
+  const today = new Date();
+  const age = today.getFullYear() - birthYear.getFullYear()
+    - (today < new Date(today.getFullYear(), birthYear.getMonth(), birthYear.getDate()) ? 1 : 0);
+  if (age < 18) { errEl.textContent = '18歳未満の方はご利用いただけません'; return; }
   // T-01: 利用規約同意確認
   const tosAgreed = $('tosAgreeCheck')?.checked;
   if (!tosAgreed) { errEl.textContent = '利用規約およびプライバシーポリシーへの同意が必要です'; return; }
   try {
     const btn = $('registerSubmitBtn');
     btn.textContent = '登録中...'; btn.disabled = true;
-    const data = await API.post('/api/auth/register', { email, password, name, tos_agreed: true });
+    const data = await API.post('/api/auth/register', { email, password, name, tos_agreed: true, birth_date: birthDate });
     State.currentUser = data.user;
     State.userAvatar = data.user.avatar || '👤';
     renderAuthArea();

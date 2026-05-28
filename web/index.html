@@ -493,6 +493,9 @@
       <input type="file" id="fileInput" accept=".pdf,.docx,.doc" style="display:none" multiple />
     </label>
     <button class="btn btn-green" id="startMeetingBtn">▶ 会議開始</button>
+    <div id="startMeetingCostInfo" style="display:none;font-size:11px;color:var(--text-muted);white-space:nowrap;">
+      💳 <span id="startMeetingCostText"></span>
+    </div>
     <button class="nav-link" id="planBtnRow2"
       onclick="openPricingModal()">
       🏷️<span class="nav-label" id="planBtnRow2Label"
@@ -618,6 +621,9 @@
         style="width:100%;margin-top:10px;display:none;">
         📄 議論分析レポートをPDF保存
       </button>
+      <div id="layer2CostInfo" style="display:none;font-size:11px;color:var(--text-muted);text-align:center;margin-top:4px;">
+        💳 1クレジット消費します
+      </div>
       <div id="layer2Trial" class="hidden" style="text-align:center;padding:16px;background:rgba(37,99,235,0.06);border-radius:8px;margin-bottom:8px;">
         <div style="font-size:13px;font-weight:600;margin-bottom:8px;">🎁 議論分析レポートを1回無料で体験できます</div>
         <button class="btn btn-primary" id="trialLayer2Btn" onclick="useTrialLayer2()">
@@ -1507,6 +1513,9 @@
       <input class="auth-input" type="text" id="registerName" placeholder="お名前（任意）" />
       <input class="auth-input" type="email" id="registerEmail" placeholder="メールアドレス" />
       <input class="auth-input" type="password" id="registerPassword" placeholder="パスワード（6文字以上）" />
+      <label style="display:block;font-size:12px;color:var(--text-secondary);margin:8px 0 2px;">生年月日（必須・18歳以上）</label>
+      <input class="auth-input" type="date" id="registerBirthDate"
+        max="" style="color-scheme:dark;" />
       <div style="display:flex;align-items:flex-start;gap:8px;margin:8px 0;font-size:12px;color:var(--text-secondary);">
         <input type="checkbox" id="tosAgreeCheck" style="margin-top:2px;cursor:pointer;flex-shrink:0;" />
         <label for="tosAgreeCheck" style="cursor:pointer;line-height:1.5;"><a href="/terms" target="_blank" style="color:var(--purple-light)">利用規約</a>および<a href="/privacy" target="_blank" style="color:var(--purple-light)">プライバシーポリシー</a>に同意します</label>
@@ -1562,10 +1571,10 @@
     <p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px;line-height:1.6;">以下の事項に同意の上、ペルソナを作成してください。</p>
     <ul class="prohibited-list">
       <li>作成するペルソナの内容・利用に関する責任はすべてあなた（ユーザー）が負います。</li>
-      <li>逝去から1年以内の方の場合、遺族等の関係者への事前承諾の取得を推奨します（義務ではありません）。</li>
+      <li>逝去から3年以内の方の場合、遺族等の関係者への事前承諾の取得を強く推奨します。</li>
       <li>故人を侮辱・中傷する内容のペルソナ作成は禁止されています。</li>
       <li>本ペルソナを用いて第三者を欺く行為は禁止されています。</li>
-      <li>遺族等から削除請求があった場合、当社は当該ペルソナを削除することがあります。</li>
+      <li>遺族等から削除請求があった場合、当社は速やかに当該ペルソナを削除します。</li>
     </ul>
     <div class="modal-footer">
       <button class="btn" onclick="closeDeceasedConsentModal()">キャンセル</button>

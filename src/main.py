@@ -7,7 +7,7 @@ import re
 import sys
 import json
 import secrets
-from datetime import timedelta
+from datetime import timedelta, date
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -95,13 +95,26 @@ def register():
     if not tos_agreed:
         return jsonify({"error": "利用規約およびプライバシーポリシーへの同意が必要です", "code": "TOS_REQUIRED"}), 400
 
+    # T-未成年者チェック
+    birth_date_str = data.get("birth_date", "")
+    if not birth_date_str:
+        return jsonify({"error": "生年月日を入力してください"}), 400
+    try:
+        birth = date.fromisoformat(birth_date_str)
+        today = date.today()
+        age = today.year - birth.year - ((today.month, today.day) < (birth.month, birth.day))
+        if age < 18:
+            return jsonify({"error": "18歳未満の方はご利用いただけません", "code": "AGE_RESTRICTED"}), 400
+    except ValueError:
+        return jsonify({"error": "生年月日の形式が正しくありません（YYYY-MM-DD）"}), 400
+
     existing = get_user_by_email(email)
     if existing:
         return jsonify({"error": "このメールアドレスはすでに登録されています"}), 400
 
     password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
     try:
-        user = create_user(email, password_hash, name)
+        user = create_user(email, password_hash, name, birth_date=birth_date_str)
         try:
             _c = get_connection()
             _c.run("UPDATE users SET tos_agreed_at=NOW() WHERE id=:id", id=user['id'])

@@ -124,7 +124,7 @@ def test1_auth(client):
 
     # 登録（T-01: tos_agreed=True が必須）
     r = client.post('/api/auth/register',
-                    json={'email': TEST_EMAIL, 'password': TEST_PW, 'name': TEST_NAME, 'tos_agreed': True})
+                    json={'email': TEST_EMAIL, 'password': TEST_PW, 'name': TEST_NAME, 'tos_agreed': True, 'birth_date': '1990-01-01'})
     check_code(r, 200, "register 200 OK")
     data = r.get_json() or {}
     check('user' in data, "register レスポンスに user が含まれる")
@@ -132,7 +132,7 @@ def test1_auth(client):
 
     # 重複登録
     r2 = client.post('/api/auth/register',
-                     json={'email': TEST_EMAIL, 'password': TEST_PW, 'name': TEST_NAME, 'tos_agreed': True})
+                     json={'email': TEST_EMAIL, 'password': TEST_PW, 'name': TEST_NAME, 'tos_agreed': True, 'birth_date': '1990-01-01'})
     check_code(r2, 400, "重複登録 → 400")
 
     # ログアウト
@@ -1003,7 +1003,7 @@ def test_func10_plan_boundary():
     try:
         with flask_app.test_client() as c:
             r = c.post('/api/auth/register',
-                       json={'email': email, 'password': pw, 'name': '境界値テスト', 'tos_agreed': True})
+                       json={'email': email, 'password': pw, 'name': '境界値テスト', 'tos_agreed': True, 'birth_date': '1990-01-01'})
             uid = ((r.get_json() or {}).get('user') or {}).get('id')
             if not uid:
                 skip("ユーザー登録失敗のためスキップ")
@@ -1073,7 +1073,7 @@ def test_func11_cross_user_isolation():
         # ─ ユーザーA: 登録・ペルソナ作成 ─
         with flask_app.test_client() as ca:
             ra = ca.post('/api/auth/register',
-                         json={'email': email_a, 'password': pw, 'name': 'ユーザーA', 'tos_agreed': True})
+                         json={'email': email_a, 'password': pw, 'name': 'ユーザーA', 'tos_agreed': True, 'birth_date': '1990-01-01'})
             uid_a = ((ra.get_json() or {}).get('user') or {}).get('id')
             if uid_a:
                 rp = ca.post('/api/personas/add', json={
@@ -1086,7 +1086,7 @@ def test_func11_cross_user_isolation():
         # ─ ユーザーB: 登録・分離テスト ─
         with flask_app.test_client() as cb:
             rb = cb.post('/api/auth/register',
-                         json={'email': email_b, 'password': pw, 'name': 'ユーザーB', 'tos_agreed': True})
+                         json={'email': email_b, 'password': pw, 'name': 'ユーザーB', 'tos_agreed': True, 'birth_date': '1990-01-01'})
             uid_b = ((rb.get_json() or {}).get('user') or {}).get('id')
 
             if not uid_a or not uid_b or not pid_a:
@@ -1227,7 +1227,7 @@ def test_ops6_endpoint_health():
 
             # ログイン後テスト用ユーザー登録
             rr = c.post('/api/auth/register',
-                        json={'email': email, 'password': pw, 'name': '疎通テスト', 'tos_agreed': True})
+                        json={'email': email, 'password': pw, 'name': '疎通テスト', 'tos_agreed': True, 'birth_date': '1990-01-01'})
             uid = ((rr.get_json() or {}).get('user') or {}).get('id')
             c.post('/api/auth/login', json={'email': email, 'password': pw})
 
@@ -1305,12 +1305,12 @@ def test_func13_tos_check():
         with flask_app.test_client() as c:
             # 1. tos_agreed=False → 400
             r1 = c.post('/api/auth/register',
-                        json={'email': email, 'password': pw, 'name': name, 'tos_agreed': False})
+                        json={'email': email, 'password': pw, 'name': name, 'tos_agreed': False, 'birth_date': '1990-01-01'})
             check_code(r1, 400, "tos_agreed=Falseで登録 → 400エラー")
 
             # 2. tos_agreed=True → 200
             r2 = c.post('/api/auth/register',
-                        json={'email': email, 'password': pw, 'name': name, 'tos_agreed': True})
+                        json={'email': email, 'password': pw, 'name': name, 'tos_agreed': True, 'birth_date': '1990-01-01'})
             check_code(r2, 200, "tos_agreed=Trueで登録 → 200 OK")
             uid = ((r2.get_json() or {}).get('user') or {}).get('id')
 
@@ -1322,6 +1322,16 @@ def test_func13_tos_check():
                 check(val is not None, "DBのtos_agreed_atがNULLでない")
             else:
                 check(False, "DBのtos_agreed_atがNULLでない（ユーザー作成失敗）")
+
+            # 18歳未満登録拒否テスト
+            with flask_app.test_client() as c_minor:
+                r_minor = c_minor.post('/api/auth/register',
+                                        json={'email': f'minor_{email}', 'password': pw,
+                                              'name': 'テスト未成年', 'tos_agreed': True,
+                                              'birth_date': '2015-01-01'})
+                check_code(r_minor, 400, "18歳未満登録 → 400エラー")
+                minor_data = r_minor.get_json() or {}
+                check(minor_data.get('code') == 'AGE_RESTRICTED', "18歳未満エラーのcodeがAGE_RESTRICTED")
     finally:
         if uid:
             conn.run("DELETE FROM users WHERE id=:id", id=uid)

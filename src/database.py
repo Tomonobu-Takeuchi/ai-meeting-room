@@ -137,6 +137,10 @@ def init_db():
         conn.run("ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_layer3_used BOOLEAN DEFAULT FALSE")
     except Exception:
         pass
+    try:
+        conn.run("ALTER TABLE users ADD COLUMN IF NOT EXISTS birth_date DATE")
+    except Exception:
+        pass
 
     # ===== persona_learnテーブル（user_id追加） =====
     conn.run("""
@@ -236,13 +240,14 @@ def init_db():
 
 # ===== ユーザー認証関連 =====
 
-def create_user(email, password_hash, name=''):
+def create_user(email, password_hash, name='', birth_date=None):
     conn = get_connection()
     try:
         conn.run("""
-            INSERT INTO users (email, password_hash, name)
-            VALUES (:email, :password_hash, :name)
-        """, email=email, password_hash=password_hash, name=encrypt_value(conn, name))
+            INSERT INTO users (email, password_hash, name, birth_date)
+            VALUES (:email, :password_hash, :name, :birth_date)
+        """, email=email, password_hash=password_hash,
+           name=encrypt_value(conn, name), birth_date=birth_date)
         rows = conn.run("SELECT id, email, name, plan FROM users WHERE email=:email", email=email)
         if not rows:
             conn.close()
