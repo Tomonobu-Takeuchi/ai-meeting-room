@@ -1988,6 +1988,12 @@ async function endMeeting() {
     State.currentUser = meData.user;
     renderAuthArea();
   }
+  // 会議終了後フィードバック：ログインユーザーはフィードバックフロー、ゲストは登録促進
+  if (State.currentUser) {
+    startFeedbackFlow();
+  } else {
+    showGuestFeedbackPrompt();
+  }
 }
 
 async function sendUserMessage() {
@@ -2693,11 +2699,32 @@ async function saveUserAvatar() {
   }
 }
 
+// ゲスト向け登録促進トースト（会議終了後）
+function showGuestFeedbackPrompt() {
+  const container = DOM.toastContainer;
+  if (!container) return;
+  const existing = container.querySelector('.toast-guest-prompt');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.className = 'toast info toast-guest-prompt';
+  toast.style.cssText = 'max-width:300px;line-height:1.5;';
+  toast.innerHTML = `
+    <div style="font-weight:500;margin-bottom:4px;">ペルソナを育てませんか？</div>
+    <div style="font-size:12px;margin-bottom:8px;opacity:0.85;">無料登録するとペルソナへの評価が記録され、会議を重ねるほど成長します。</div>
+    <button onclick="openAuthModal();showRegisterPanel();this.closest('.toast-guest-prompt').remove();"
+      style="font-size:12px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:6px;padding:4px 10px;color:inherit;cursor:pointer;width:100%;">
+      無料で登録する
+    </button>
+  `;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 8000);
+}
+
 // ===== フィードバックモーダル制御 =====
 const FeedbackState = { members: [], currentIndex: 0, rating: null };
 
 function startFeedbackFlow() {
-  if (!State.sessionId || !State.members || State.members.length === 0) return;
+  if (!State.members || State.members.length === 0) return;
   // ログインユーザーのみフィードバックを表示
   if (!State.currentUser) return;
   FeedbackState.members = State.members.filter(m => m.id !== 'facilitator');
