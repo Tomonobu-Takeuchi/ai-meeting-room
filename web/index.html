@@ -782,6 +782,13 @@
         <input type="checkbox" id="is_deceased_check" style="margin-top:2px;cursor:pointer;flex-shrink:0;" />
         <span style="flex:1;min-width:0;word-break:break-word;">この人物は故人（亡くなった方）ですか？</span>
       </label>
+      <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:12px;color:var(--text-secondary);width:100%;margin-top:4px;">
+        <input type="checkbox" id="is_famous_check" style="margin-top:2px;cursor:pointer;flex-shrink:0;" />
+        <span style="flex:1;min-width:0;word-break:break-word;">この人物は著名人・公人ですか？</span>
+      </label>
+      <div id="famousWarning" style="display:none;margin-top:6px;padding:8px 10px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:var(--radius);font-size:11px;color:#FCD34D;line-height:1.5;">
+        ⚠️ 著名人・公人のペルソナは教育・研究目的での利用に限ります。発言内容を実在の発言として流布することは禁止されています。
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn" id="cancelAddPersona">キャンセル</button>
@@ -1526,16 +1533,25 @@
     </div>
   </div>
 </div>
-<!-- personaTosModal: ペルソナ作成時の利用規約同意モーダル -->
-<div id="personaTosModal" class="modal" style="display:none;">
-  <div class="modal-content" style="max-width:480px;">
-    <h3>ペルソナ作成について</h3>
-    <p style="font-size:13px;color:var(--text-secondary);line-height:1.6;">
-      ペルソナを作成する前に<a href="/terms" target="_blank">利用規約</a>および<a href="/privacy" target="_blank">プライバシーポリシー</a>をご確認ください。
-      実在する生存者を模したペルソナの作成は禁止されています。
-    </p>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
-      <button class="btn-secondary" onclick="document.getElementById('personaTosModal').style.display='none'">閉じる</button>
+<!-- personaTosModal: T-08 ペルソナ作成初回同意確認モーダル -->
+<div class="modal-overlay hidden" id="personaTosOverlay">
+  <div class="prohibited-notice-box">
+    <h2>📋 ペルソナ作成前の確認</h2>
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px;line-height:1.6;">以下の事項を確認の上、同意してからペルソナを作成してください。</p>
+    <ul class="prohibited-list">
+      <li>作成したペルソナの内容・利用に関する責任はすべてあなた（ユーザー）が負います。</li>
+      <li>実在する生存者を模したペルソナの作成は禁止されています。</li>
+      <li>ペルソナの発言を実在する人物の発言として第三者に見せることは禁止されています。</li>
+      <li>故人ペルソナを作成する場合は、追加の同意確認が必要です。</li>
+      <li>詳細は<a href="/terms" target="_blank" style="color:var(--purple-light);">利用規約</a>をご確認ください。</li>
+    </ul>
+    <div style="display:flex;align-items:flex-start;gap:8px;margin:14px 0 6px;font-size:12px;color:var(--text-secondary);">
+      <input type="checkbox" id="personaTosAgreeCheck" style="margin-top:2px;cursor:pointer;flex-shrink:0;" />
+      <label for="personaTosAgreeCheck" style="cursor:pointer;line-height:1.5;">上記を確認し、同意します</label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closePersonaTosModal()">キャンセル</button>
+      <button class="btn btn-primary" id="personaTosAgreeBtn" disabled onclick="agreePersonaTos()">同意してペルソナを作成</button>
     </div>
   </div>
 </div>
