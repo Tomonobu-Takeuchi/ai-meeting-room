@@ -1060,8 +1060,10 @@ JSONのみ出力してください。"""
         # ===== Layer3（proは常時、free/standardは未使用時のみ） =====
         layer3_data = None
         can_use_layer3 = (
-            plan == 'pro' or
-            (plan in ('free', 'standard') and not trial_layer3_used and is_trial_request == 'layer3')
+            category in LAYER3_TEMPLATES and (
+                plan == 'pro' or
+                (plan in ('free', 'standard') and not trial_layer3_used and is_trial_request == 'layer3')
+            )
         )
         if not can_use_layer3 and plan in ('free', 'standard') and trial_layer3_used and is_trial_request == 'layer3':
             return jsonify({
@@ -1105,7 +1107,8 @@ JSONのみ出力してください。"""
             "trial_layer3_used": trial_layer3_used,
             "layer1": layer1_data,
             "layer2": layer2_data,
-            "layer3": layer3_data
+            "layer3": layer3_data,
+            "layer3_available": category in LAYER3_TEMPLATES
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
