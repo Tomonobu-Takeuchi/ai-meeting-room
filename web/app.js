@@ -1897,6 +1897,7 @@ async function endMeeting() {
   DOM.startMeetingBtn.disabled = false; DOM.facilitatorBtn.disabled = true;
   DOM.autoDiscussBtn.disabled = true; DOM.summarizeBtn.disabled = true; DOM.endMeetingBtn.disabled = true;
   DOM.headerRow2In.classList.add('hidden'); DOM.headerRow2Pre.classList.remove('hidden');
+  DOM.newMeetingBtn.style.display = 'inline-flex';
   DOM.topicInput.disabled = false;
   if (DOM.mobileActionBar) DOM.mobileActionBar.classList.remove('visible');
   if (DOM.mobileSummarizeBtn) DOM.mobileSummarizeBtn.disabled = true;
