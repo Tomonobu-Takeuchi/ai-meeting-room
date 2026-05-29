@@ -3093,13 +3093,6 @@ function renderAuthArea() {
       remainingLabel = `残り${remaining}回`;
     } else if (plan === 'standard') {
       remainingLabel = `残り${u.credits || 0}枚`;
-    } else if (plan === 'pro') {
-      if (u.plan_expires_at) {
-        const days = Math.ceil((new Date(u.plan_expires_at) - new Date()) / (1000 * 60 * 60 * 24));
-        remainingLabel = days > 0 ? `あと${days}日` : '無制限';
-      } else {
-        remainingLabel = '無制限';
-      }
     }
     const remainingHtml = remainingLabel
       ? `<span style="font-size:10px;color:var(--accent);margin-left:4px;">${escapeHtml(remainingLabel)}</span>`
