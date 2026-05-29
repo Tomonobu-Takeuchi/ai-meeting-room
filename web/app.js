@@ -1909,6 +1909,10 @@ async function startMeeting() {
       const costEl = $('startMeetingCostText');
       if (costEl) costEl.textContent = `1チケット消費します（残り${remaining}枚）`;
       showToast(`会議を開始しました！（残り${remaining}チケット）`, 'success');
+    } else if (State.currentUser?.plan === 'free') {
+      State.currentUser.monthly_meeting_count = (State.currentUser.monthly_meeting_count || 0) + 1;
+      renderAuthArea();
+      showToast('会議を開始しました！', 'success');
     } else {
       showToast('会議を開始しました！', 'success');
     }
