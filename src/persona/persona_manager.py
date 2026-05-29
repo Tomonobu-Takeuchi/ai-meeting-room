@@ -14,7 +14,7 @@ from src.database import (
     increment_meeting_count, get_meeting_count,
     ensure_growth_record, update_growth_conversation,
     update_growth_knowledge, calculate_and_save_maturity,
-    get_growth_record, save_feedback_record
+    get_growth_record, save_feedback_record, update_growth_c_axis
 )
 
 COLUMNS = ['id','user_id','name','avatar','description','personality',
@@ -472,6 +472,28 @@ class PersonaManager:
             try:
                 ensure_growth_record(persona_id, user_id, app_type)
                 update_growth_conversation(persona_id, user_id, topic, app_type)
+                # C軸：avg_session_length・profile_completeness更新
+                from datetime import datetime as _dt
+                created_at_str = session_summary.get('created_at')
+                duration_min = None
+                if created_at_str:
+                    try:
+                        started = _dt.fromisoformat(created_at_str)
+                        duration_min = (_dt.now() - started).total_seconds() / 60
+                    except Exception:
+                        pass
+                persona_data = self.get_persona(persona_id)
+                if persona_data:
+                    fields = [str(persona_data.get(f, '') or '') for f in
+                              ['name', 'description', 'personality', 'speaking_style', 'background']]
+                    filled = sum(1 for f in fields if f.strip())
+                    profile_comp = (filled / len(fields)) * 40
+                else:
+                    profile_comp = None
+                update_growth_c_axis(persona_id, user_id,
+                                     profile_completeness=profile_comp,
+                                     avg_session_minutes=duration_min,
+                                     app_type=app_type)
                 calculate_and_save_maturity(persona_id, user_id, app_type)
             except Exception as e:
                 print(f"Growth更新エラー（無視）: {e}")
@@ -511,9 +533,11 @@ class PersonaManager:
         try:
             save_feedback_record(persona_id, user_id, session_id, rating, detail_category, correct_response, app_type)
             calculate_and_save_maturity(persona_id, user_id, app_type)
-            # チェックON: コメントをpersona_learnにも追加学習
-            if add_to_learn and correct_response and correct_response.strip():
-                self.add_learn_data(persona_id, correct_response, 'feedback', user_id)
+            if add_to_learn:
+                update_growth_c_axis(persona_id, user_id,
+                                     increment_tuning=True, app_type=app_type)
+                if correct_response and correct_response.strip():
+                    self.add_learn_data(persona_id, correct_response, 'feedback', user_id)
         except Exception as e:
             print(f"フィードバック保存エラー（無視）: {e}")
 

@@ -1038,6 +1038,42 @@ def get_growth_record(persona_id, user_id, app_type='meeting'):
         conn.close()
 
 
+def update_growth_c_axis(persona_id, user_id, profile_completeness=None,
+                          avg_session_minutes=None, increment_tuning=False,
+                          app_type='meeting'):
+    """C軸（個性スコア）の各要素を更新する"""
+    conn = get_connection()
+    try:
+        parts = []
+        params = dict(persona_id=persona_id, user_id=user_id, app_type=app_type)
+        if profile_completeness is not None:
+            parts.append("profile_completeness = :pc")
+            params['pc'] = round(profile_completeness, 2)
+        if avg_session_minutes is not None:
+            rows = conn.run("""
+                SELECT avg_session_length, conversation_count FROM persona_growth
+                WHERE persona_id=:persona_id AND user_id=:user_id AND app_type=:app_type
+            """, persona_id=persona_id, user_id=user_id, app_type=app_type)
+            if rows:
+                old_avg = rows[0][0] or 0.0
+                old_count = max(rows[0][1] or 1, 1)
+                new_avg = (old_avg * (old_count - 1) + avg_session_minutes) / old_count
+                parts.append("avg_session_length = :asl")
+                params['asl'] = round(new_avg, 2)
+        if increment_tuning:
+            parts.append("tuning_count = tuning_count + 1")
+        if not parts:
+            return
+        parts.append("updated_at = NOW()")
+        conn.run(
+            f"UPDATE persona_growth SET {', '.join(parts)} "
+            f"WHERE persona_id=:persona_id AND user_id=:user_id AND app_type=:app_type",
+            **params
+        )
+    finally:
+        conn.close()
+
+
 # ===== フィードバック保存 =====
 
 def save_feedback_record(persona_id, user_id, session_id, rating, detail_category, correct_response, app_type='meeting'):

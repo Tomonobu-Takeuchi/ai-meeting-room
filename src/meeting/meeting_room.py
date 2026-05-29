@@ -196,5 +196,6 @@ class MeetingRoom:
             "facilitator": session["facilitator"],
             "message_count": len(session["messages"]),
             "messages": session["messages"],
-            "status": session["status"]
+            "status": session["status"],
+            "created_at": session.get("created_at")   # C軸：会議時間計算用
         }
