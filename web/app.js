@@ -1918,8 +1918,14 @@ async function startMeeting() {
       if (costEl) costEl.textContent = `1チケット消費します（残り${remaining}枚）`;
       showToast(`会議を開始しました！（残り${remaining}チケット）`, 'success');
     } else if (State.currentUser?.plan === 'free') {
-      State.currentUser.monthly_meeting_count = (State.currentUser.monthly_meeting_count || 0) + 1;
+      if (data.monthly_meeting_count !== undefined) {
+        State.currentUser.monthly_meeting_count = data.monthly_meeting_count;
+      } else {
+        State.currentUser.monthly_meeting_count = (State.currentUser.monthly_meeting_count || 0) + 1;
+      }
       renderAuthArea();
+      showToast('会議を開始しました！', 'success');
+    } else if (State.currentUser?.plan === 'pro') {
       showToast('会議を開始しました！', 'success');
     } else {
       showToast('会議を開始しました！', 'success');
@@ -3078,7 +3084,11 @@ function renderAuthArea() {
     const planLabels = { free: '無料', standard: 'スタンダード', pro: 'PRO' };
     const planLabel = planLabels[plan] || plan;
     let remainingLabel = '';
-    if (plan === 'free') {
+    if (plan === 'premium') {
+      remainingLabel = '無制限';
+    } else if (plan === 'pro') {
+      remainingLabel = '無制限';
+    } else if (plan === 'free') {
       const remaining = Math.max(0, 5 - (u.monthly_meeting_count || 0));
       remainingLabel = `残り${remaining}回`;
     } else if (plan === 'standard') {

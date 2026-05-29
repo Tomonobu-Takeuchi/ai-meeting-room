@@ -284,7 +284,8 @@ def get_user_by_id(user_id):
         rows = conn.run("""
             SELECT id, email, name, plan, credits, plan_expires_at,
                    monthly_meeting_count, monthly_reset_at, avatar, password_hash,
-                   trial_layer2_used, trial_layer3_used
+                   trial_layer2_used, trial_layer3_used,
+                   layer3_monthly_count, layer3_monthly_reset_at
             FROM users WHERE id=:id
         """, id=user_id)
         if not rows:
@@ -293,7 +294,8 @@ def get_user_by_id(user_id):
         r = rows[0]
         d = row_to_dict(['id','email','name','plan','credits','plan_expires_at',
                          'monthly_meeting_count','monthly_reset_at','avatar','password_hash',
-                         'trial_layer2_used','trial_layer3_used'], r)
+                         'trial_layer2_used','trial_layer3_used',
+                         'layer3_monthly_count','layer3_monthly_reset_at'], r)
         d['name'] = decrypt_value(conn, d['name'])
         conn.close()
         d['credits'] = d['credits'] or 0
@@ -424,6 +426,68 @@ def check_and_use_meeting(user_id):
             pass
         print(f"check_and_use_meeting エラー: {e}")
         return False, "会議の開始に失敗しました。しばらく後に再度お試しください。"
+
+
+def check_and_use_layer3(user_id):
+    """proプランのLayer3月次チェック＆カウントアップ。Returns (ok, reason)"""
+    from datetime import datetime, timezone
+    conn = get_connection()
+    try:
+        rows = conn.run("""
+            SELECT plan, plan_expires_at, layer3_monthly_count, layer3_monthly_reset_at
+            FROM users WHERE id=:id
+        """, id=user_id)
+        if not rows:
+            conn.close()
+            return False, "ユーザーが見つかりません"
+
+        plan, plan_expires_at, layer3_count, layer3_reset_at = rows[0]
+        plan = plan or 'free'
+        layer3_count = layer3_count or 0
+
+        now = datetime.now(timezone.utc)
+
+        if plan_expires_at is not None and plan_expires_at.tzinfo is None:
+            plan_expires_at = plan_expires_at.replace(tzinfo=timezone.utc)
+        if layer3_reset_at is not None and layer3_reset_at.tzinfo is None:
+            layer3_reset_at = layer3_reset_at.replace(tzinfo=timezone.utc)
+
+        # pro以外・期限切れはLayer3側で別途制御済みのためスルー
+        if plan != 'pro' or (plan_expires_at and plan_expires_at < now):
+            conn.close()
+            return True, "ok"
+
+        # 月次リセット判定
+        needs_reset = (
+            layer3_reset_at is None or
+            layer3_reset_at.year < now.year or
+            (layer3_reset_at.year == now.year and layer3_reset_at.month < now.month)
+        )
+        if needs_reset:
+            layer3_count = 0
+
+        # 30回上限チェック
+        LAYER3_LIMIT = 30
+        if layer3_count >= LAYER3_LIMIT:
+            conn.close()
+            return False, f"proプランのLayer3レポートは月{LAYER3_LIMIT}回までです。Premiumプランへのアップグレードをご検討ください。"
+
+        # カウントアップ
+        if needs_reset:
+            conn.run("""UPDATE users SET layer3_monthly_count=1,
+                layer3_monthly_reset_at=NOW() WHERE id=:id""", id=user_id)
+        else:
+            conn.run("""UPDATE users SET layer3_monthly_count=layer3_monthly_count+1
+                WHERE id=:id""", id=user_id)
+        conn.close()
+        return True, "ok"
+    except Exception as e:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        print(f"check_and_use_layer3 エラー: {e}")
+        return False, "Layer3チェックエラー"
 
 
 def add_user_credits(user_id, amount):

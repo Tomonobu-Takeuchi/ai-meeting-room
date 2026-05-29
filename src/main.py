@@ -839,11 +839,17 @@ def start_meeting():
         member_ids = [p["id"] for p in prefetched_members]
     category = data.get("meeting_category", "chat")
     session_data = meeting_room.create_session(topic, member_ids, user_id, prefetched_members=prefetched_members, category=category)
+    updated_count = 0
+    if user_id:
+        from src.database import get_user_payment_status
+        status = get_user_payment_status(user_id)
+        updated_count = status.get('monthly_meeting_count', 0)
     return jsonify({
         "session_id": session_data["session_id"],
         "topic": session_data["topic"],
         "members": session_data["members"],
-        "facilitator": session_data["facilitator"]
+        "facilitator": session_data["facilitator"],
+        "monthly_meeting_count": updated_count
     })
 
 @app.route("/api/meeting/<session_id>", methods=["GET"])
@@ -1358,6 +1364,13 @@ def generate_brief_pdf_layer2(session_id):
 @app.route("/api/meeting/<session_id>/brief_pdf_layer3", methods=["POST"])
 def generate_brief_pdf_layer3(session_id):
     """Layer3（戦略フレームワーク）をPDF化して返す。フロントからJSONを受け取る"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"error": "ログインが必要です"}), 401
+    from src.database import check_and_use_layer3
+    ok, reason = check_and_use_layer3(user_id)
+    if not ok:
+        return jsonify({"error": reason, "code": "LAYER3_LIMIT"}), 403
     data = request.get_json()
     l3 = data.get('layer3', {})
     category = data.get('category', 'strategy')
