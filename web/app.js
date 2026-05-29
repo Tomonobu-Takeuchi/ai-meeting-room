@@ -2706,18 +2706,18 @@ function showGuestFeedbackPrompt() {
   const existing = container.querySelector('.toast-guest-prompt');
   if (existing) existing.remove();
   const toast = document.createElement('div');
-  toast.className = 'toast info toast-guest-prompt';
-  toast.style.cssText = 'max-width:300px;line-height:1.5;';
+  toast.className = 'toast success toast-guest-prompt';
+  toast.style.cssText = 'max-width:360px;line-height:1.6;padding:14px 16px;font-size:13px;';
   toast.innerHTML = `
-    <div style="font-weight:500;margin-bottom:4px;">ペルソナを育てませんか？</div>
-    <div style="font-size:12px;margin-bottom:8px;opacity:0.85;">無料登録するとペルソナへの評価が記録され、会議を重ねるほど成長します。</div>
+    <div style="font-weight:600;margin-bottom:6px;font-size:14px;">🌱 ペルソナを育てませんか？</div>
+    <div style="margin-bottom:10px;opacity:0.92;">無料登録するとペルソナへの評価が記録され、会議を重ねるほど成長します。</div>
     <button onclick="openAuthModal();showRegisterPanel();this.closest('.toast-guest-prompt').remove();"
-      style="font-size:12px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:6px;padding:4px 10px;color:inherit;cursor:pointer;width:100%;">
-      無料で登録する
+      style="font-size:13px;background:rgba(255,255,255,0.25);border:1px solid rgba(255,255,255,0.5);border-radius:6px;padding:7px 14px;color:inherit;cursor:pointer;width:100%;font-weight:500;">
+      ✨ 無料で登録する
     </button>
   `;
   container.appendChild(toast);
-  setTimeout(() => toast.remove(), 8000);
+  setTimeout(() => toast.remove(), 15000);
 }
 
 // ===== フィードバックモーダル制御 =====
@@ -2727,7 +2727,9 @@ function startFeedbackFlow() {
   if (!State.members || State.members.length === 0) return;
   // ログインユーザーのみフィードバックを表示
   if (!State.currentUser) return;
-  FeedbackState.members = State.members.filter(m => m.id !== 'facilitator');
+  FeedbackState.members = State.members.filter(
+    m => m.id !== 'facilitator' && State.selectedMemberIds.includes(m.id)
+  );
   FeedbackState.currentIndex = 0;
   FeedbackState.rating = null;
   showFeedbackModal();
@@ -3183,6 +3185,23 @@ async function submitLogin() {
     State.currentUser = data.user;
     State.userAvatar = data.user.avatar || '👤';
     console.log('[LOG] ログイン完了 plan=' + data.user?.plan + ' userId=' + data.user?.id);
+    // BUG-38: ゲストセッションのクリア（個人情報保護）
+    if (State.sessionId || DOM.chatMessages.innerHTML.trim()) {
+      State.sessionId = null; State.topic = ''; State.selectedMemberIds = [];
+      State.isStreaming = false; State.streamingMessages = {};
+      DOM.chatMessages.innerHTML = '';
+      DOM.chatMessages.classList.add('hidden'); DOM.chatInputArea.classList.add('hidden');
+      DOM.welcomeScreen.classList.remove('hidden'); DOM.sessionBar.classList.add('hidden');
+      DOM.minutesBar.classList.add('hidden'); DOM.micBtn.classList.add('hidden');
+      DOM.topicInput.disabled = false; DOM.topicInput.value = '';
+      DOM.inMeetingTopic.textContent = '';
+      DOM.newMeetingBtn.style.display = 'none';
+      DOM.startMeetingBtn.disabled = false; DOM.facilitatorBtn.disabled = true;
+      DOM.autoDiscussBtn.disabled = true; DOM.summarizeBtn.disabled = true;
+      DOM.endMeetingBtn.disabled = true;
+      DOM.headerRow2In.classList.add('hidden'); DOM.headerRow2Pre.classList.remove('hidden');
+      if (DOM.mobileActionBar) DOM.mobileActionBar.classList.remove('visible');
+    }
     renderAuthArea();
     closeAuthModal();
     showToast(`${data.user.name || data.user.email} でログインしました`, 'success');
@@ -3221,6 +3240,23 @@ async function submitRegister() {
     const data = await API.post('/api/auth/register', { email, password, name, tos_agreed: true, birth_date: birthDate });
     State.currentUser = data.user;
     State.userAvatar = data.user.avatar || '👤';
+    // BUG-38: ゲストセッションのクリア（個人情報保護）
+    if (State.sessionId || DOM.chatMessages.innerHTML.trim()) {
+      State.sessionId = null; State.topic = ''; State.selectedMemberIds = [];
+      State.isStreaming = false; State.streamingMessages = {};
+      DOM.chatMessages.innerHTML = '';
+      DOM.chatMessages.classList.add('hidden'); DOM.chatInputArea.classList.add('hidden');
+      DOM.welcomeScreen.classList.remove('hidden'); DOM.sessionBar.classList.add('hidden');
+      DOM.minutesBar.classList.add('hidden'); DOM.micBtn.classList.add('hidden');
+      DOM.topicInput.disabled = false; DOM.topicInput.value = '';
+      DOM.inMeetingTopic.textContent = '';
+      DOM.newMeetingBtn.style.display = 'none';
+      DOM.startMeetingBtn.disabled = false; DOM.facilitatorBtn.disabled = true;
+      DOM.autoDiscussBtn.disabled = true; DOM.summarizeBtn.disabled = true;
+      DOM.endMeetingBtn.disabled = true;
+      DOM.headerRow2In.classList.add('hidden'); DOM.headerRow2Pre.classList.remove('hidden');
+      if (DOM.mobileActionBar) DOM.mobileActionBar.classList.remove('visible');
+    }
     renderAuthArea();
     closeAuthModal();
     showToast(`登録完了！${data.user.name || data.user.email} でログインしました`, 'success');
