@@ -125,7 +125,17 @@ def register():
         session['user_id'] = user['id']
         session['user_email'] = user['email']
         session['user_name'] = user['name']
-        return jsonify({"message": "登録完了", "user": {"id": user['id'], "email": user['email'], "name": user['name'], "plan": user['plan']}})
+        full_user = get_user_by_id(user['id'])
+        return jsonify({"message": "登録完了", "user": {
+            "id": full_user['id'], "email": full_user['email'],
+            "name": full_user['name'], "plan": full_user['plan'],
+            "avatar": full_user.get('avatar') or '👤',
+            "credits": full_user.get('credits') or 0,
+            "monthly_meeting_count": full_user.get('monthly_meeting_count') or 0,
+            "plan_expires_at": full_user.get('plan_expires_at'),
+            "trial_layer2_used": bool(full_user.get('trial_layer2_used') or False),
+            "trial_layer3_used": bool(full_user.get('trial_layer3_used') or False),
+        }})
     except Exception as e:
         return jsonify({"error": f"登録エラー: {str(e)}"}), 500
 
@@ -147,7 +157,16 @@ def login():
     session['user_email'] = user['email']
     session['user_name'] = user['name']
     app.logger.info(f"[LOGIN] user_id={user['id']} plan={user.get('plan','free')} credits={user.get('credits',0)}")
-    return jsonify({"message": "ログイン成功", "user": {"id": user['id'], "email": user['email'], "name": user['name'], "plan": user['plan'], "avatar": user.get('avatar') or '👤'}})
+    return jsonify({"message": "ログイン成功", "user": {
+        "id": user['id'], "email": user['email'],
+        "name": user['name'], "plan": user['plan'],
+        "avatar": user.get('avatar') or '👤',
+        "credits": user.get('credits') or 0,
+        "monthly_meeting_count": user.get('monthly_meeting_count') or 0,
+        "plan_expires_at": user.get('plan_expires_at'),
+        "trial_layer2_used": bool(user.get('trial_layer2_used') or False),
+        "trial_layer3_used": bool(user.get('trial_layer3_used') or False),
+    }})
 
 @app.route("/api/auth/logout", methods=["POST"])
 def logout():

@@ -263,12 +263,17 @@ def create_user(email, password_hash, name='', birth_date=None):
 def get_user_by_email(email):
     conn = get_connection()
     rows = conn.run("""
-        SELECT id, email, name, plan, password_hash, avatar FROM users WHERE email=:email
+        SELECT id, email, name, plan, password_hash, avatar,
+               credits, plan_expires_at, monthly_meeting_count,
+               trial_layer2_used, trial_layer3_used
+        FROM users WHERE email=:email
     """, email=email)
     if not rows:
         conn.close()
         return None
-    d = row_to_dict(['id','email','name','plan','password_hash','avatar'], rows[0])
+    d = row_to_dict(['id','email','name','plan','password_hash','avatar',
+                     'credits','plan_expires_at','monthly_meeting_count',
+                     'trial_layer2_used','trial_layer3_used'], rows[0])
     d['name'] = decrypt_value(conn, d['name'])
     conn.close()
     return d
