@@ -936,6 +936,7 @@ async function summarizeMeeting() {
 
 let _briefData = null;
 let _briefSessionId = null;
+let _feedbackFlowStarted = false;  // BUG-42：フィードバック重複発火防止フラグ
 
 async function showReportModal() {
   const sid = State.sessionId || _briefSessionId;
@@ -1290,6 +1291,13 @@ async function downloadLayer1PDF() {
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
     showToast('PDFをダウンロードしました', 'success');
+    // BUG-42：Layer1 DL後にフィードバック発火
+    _feedbackFlowStarted = true;
+    if (State.currentUser) {
+      startFeedbackFlow();
+    } else {
+      showGuestFeedbackPrompt();
+    }
   } catch (e) {
     showToast('PDFの生成に失敗しました', 'error');
   } finally {
@@ -1991,12 +1999,6 @@ async function endMeeting() {
     const meData = await meRes.json();
     State.currentUser = meData.user;
     renderAuthArea();
-  }
-  // 会議終了後フィードバック：ログインユーザーはフィードバックフロー、ゲストは登録促進
-  if (State.currentUser) {
-    startFeedbackFlow();
-  } else {
-    showGuestFeedbackPrompt();
   }
 }
 
@@ -3393,6 +3395,19 @@ async function deleteAccount() {
     setAcctMsg('deleteAccountMsg', e.message || '削除に失敗しました', 'error');
     btn.disabled = false;
   }
+}
+
+function closeReportModal() {
+  DOM.reportModal.classList.add('hidden');
+  // BUG-42：レポートモーダルを閉じた時にフィードバック発火（Layer1未DLの場合）
+  if (!_feedbackFlowStarted) {
+    if (State.currentUser) {
+      startFeedbackFlow();
+    } else {
+      showGuestFeedbackPrompt();
+    }
+  }
+  _feedbackFlowStarted = false;  // 次の会議のためリセット
 }
 
 async function logout() {

@@ -590,7 +590,7 @@
 <!-- ===== レポートモーダル ===== -->
 <div class="modal-overlay hidden" id="reportModal">
   <div class="modal" style="width:560px;max-height:80vh;overflow-y:auto;position:relative;">
-    <button onclick="document.getElementById('reportModal').classList.add('hidden');"
+    <button onclick="closeReportModal();"
       style="position:absolute;top:12px;right:16px;background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;">✕</button>
     <h2>📋 会議レポート</h2>
 
@@ -670,7 +670,7 @@
     <hr style="border:none;border-top:1px solid var(--border);margin:20px 0;">
     <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-wrap:wrap;">
       <button class="btn"
-        onclick="document.getElementById('reportModal').classList.add('hidden');">
+        onclick="closeReportModal();">
         閉じる
       </button>
     </div>
