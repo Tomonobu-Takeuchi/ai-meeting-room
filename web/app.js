@@ -2021,6 +2021,9 @@ async function endMeeting() {
     State.currentUser = meData.user;
     renderAuthArea();
   }
+  if (!State.currentUser) {
+    showGuestFeedbackPrompt();
+  }
 }
 
 async function sendUserMessage() {
