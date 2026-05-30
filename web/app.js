@@ -1012,7 +1012,7 @@ async function showReportModal() {
         const remainingEl = $('layer3RemainingInfo');
         if (remainingEl) {
           if (data.layer3_remaining !== null && data.layer3_remaining !== undefined) {
-            remainingEl.textContent = `今月の残り生成回数：${data.layer3_remaining}/30回`;
+            remainingEl.innerHTML = `<span style="display:inline-flex;align-items:center;gap:4px;background:#EDE9FE;color:#5B21B6;font-size:13px;font-weight:500;padding:4px 10px;border-radius:20px;">🔄 今月の残り生成回数：${data.layer3_remaining} / 30回</span>`;
             remainingEl.style.display = 'block';
           } else {
             remainingEl.style.display = 'none';
