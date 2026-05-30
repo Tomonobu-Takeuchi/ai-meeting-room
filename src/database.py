@@ -470,7 +470,7 @@ def check_and_use_layer3(user_id):
         LAYER3_LIMIT = 30
         if layer3_count >= LAYER3_LIMIT:
             conn.close()
-            return False, f"proプランのLayer3レポートは月{LAYER3_LIMIT}回までです。Premiumプランへのアップグレードをご検討ください。"
+            return False, f"proプランのLayer3レポートは月{LAYER3_LIMIT}回までです。"
 
         # カウントアップ
         if needs_reset:

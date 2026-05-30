@@ -1925,8 +1925,6 @@ async function startMeeting() {
       }
       renderAuthArea();
       showToast('会議を開始しました！', 'success');
-    } else if (State.currentUser?.plan === 'pro') {
-      showToast('会議を開始しました！', 'success');
     } else {
       showToast('会議を開始しました！', 'success');
     }
@@ -3084,15 +3082,18 @@ function renderAuthArea() {
     const planLabels = { free: '無料', standard: 'スタンダード', pro: 'PRO' };
     const planLabel = planLabels[plan] || plan;
     let remainingLabel = '';
-    if (plan === 'premium') {
-      remainingLabel = '無制限';
-    } else if (plan === 'pro') {
-      remainingLabel = '無制限';
-    } else if (plan === 'free') {
+    if (plan === 'free') {
       const remaining = Math.max(0, 5 - (u.monthly_meeting_count || 0));
       remainingLabel = `残り${remaining}回`;
     } else if (plan === 'standard') {
       remainingLabel = `残り${u.credits || 0}枚`;
+    } else if (plan === 'pro') {
+      if (u.plan_expires_at) {
+        const days = Math.ceil((new Date(u.plan_expires_at) - new Date()) / (1000 * 60 * 60 * 24));
+        remainingLabel = days > 0 ? `あと${days}日` : '無制限';
+      } else {
+        remainingLabel = '無制限';
+      }
     }
     const remainingHtml = remainingLabel
       ? `<span style="font-size:10px;color:var(--accent);margin-left:4px;">${escapeHtml(remainingLabel)}</span>`
