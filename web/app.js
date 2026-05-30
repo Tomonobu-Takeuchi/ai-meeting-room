@@ -964,6 +964,8 @@ async function showReportModal() {
   DOM.downloadLayer3Btn.style.display = 'none';
   const _initLayer3Remaining = $('layer3RemainingInfo');
   if (_initLayer3Remaining) _initLayer3Remaining.style.display = 'none';
+  const _initLayer3ProLocked = $('layer3ProLocked');
+  if (_initLayer3ProLocked) _initLayer3ProLocked.classList.add('hidden');
 
   try {
     const data = await API.post(`/api/meeting/${sid}/brief`, {
@@ -1018,6 +1020,10 @@ async function showReportModal() {
             remainingEl.style.display = 'none';
           }
         }
+      } else if (data.plan === 'pro' && data.layer3_remaining === 0) {
+        DOM.downloadLayer3Btn.style.display = 'none';
+        const proLockedEl = $('layer3ProLocked');
+        if (proLockedEl) proLockedEl.classList.remove('hidden');
       } else if (!isLoggedIn) {
         DOM.downloadLayer3Btn.style.display = 'none';
         DOM.layer3Locked.classList.remove('hidden');

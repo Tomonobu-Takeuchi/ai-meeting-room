@@ -1103,11 +1103,28 @@ JSONのみ出力してください。"""
                     conn2.close()
                 trial_layer2_used = True
 
-        # ===== Layer3（proは常時、free/standardは未使用時のみ） =====
+        # ===== Layer3（proは月30回まで・free/standardは未使用時のみ） =====
         layer3_data = None
+
+        # proプランの残り回数計算（生成判定の前に実施）
+        layer3_remaining = None
+        if plan == 'pro':
+            from datetime import datetime, timezone
+            now = datetime.now(timezone.utc)
+            reset_at = layer3_monthly_reset_at
+            if reset_at and reset_at.tzinfo is None:
+                reset_at = reset_at.replace(tzinfo=timezone.utc)
+            needs_reset = (
+                reset_at is None or
+                reset_at.year < now.year or
+                (reset_at.year == now.year and reset_at.month < now.month)
+            )
+            current_count = 0 if needs_reset else layer3_monthly_count
+            layer3_remaining = max(0, 30 - current_count)
+
         can_use_layer3 = (
             category in LAYER3_TEMPLATES and (
-                plan == 'pro' or
+                (plan == 'pro' and layer3_remaining > 0) or
                 (plan in ('free', 'standard') and not trial_layer3_used and is_trial_request == 'layer3')
             )
         )
@@ -1144,22 +1161,6 @@ JSONのみ出力してください。"""
                 finally:
                     conn3.close()
                 trial_layer3_used = True
-
-        # proプランの残り回数計算
-        layer3_remaining = None
-        if plan == 'pro':
-            from datetime import datetime, timezone
-            now = datetime.now(timezone.utc)
-            reset_at = layer3_monthly_reset_at
-            if reset_at and reset_at.tzinfo is None:
-                reset_at = reset_at.replace(tzinfo=timezone.utc)
-            needs_reset = (
-                reset_at is None or
-                reset_at.year < now.year or
-                (reset_at.year == now.year and reset_at.month < now.month)
-            )
-            current_count = 0 if needs_reset else layer3_monthly_count
-            layer3_remaining = max(0, 30 - current_count)
 
         return jsonify({
             "plan": plan,
