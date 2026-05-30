@@ -1002,18 +1002,22 @@ def generate_brief(session_id):
         plan = 'free'
         trial_layer2_used = False
         trial_layer3_used = False
+        layer3_monthly_count = 0
+        layer3_monthly_reset_at = None
         if user_id:
             from src.database import get_connection
             conn = get_connection()
             try:
                 row = conn.run(
-                    "SELECT plan, trial_layer2_used, trial_layer3_used FROM users WHERE id = :uid",
+                    "SELECT plan, trial_layer2_used, trial_layer3_used, layer3_monthly_count, layer3_monthly_reset_at FROM users WHERE id = :uid",
                     uid=user_id
                 )
                 if row:
                     plan = row[0][0] or 'free'
                     trial_layer2_used = bool(row[0][1])
                     trial_layer3_used = bool(row[0][2])
+                    layer3_monthly_count = row[0][3] or 0
+                    layer3_monthly_reset_at = row[0][4]
             finally:
                 conn.close()
 
@@ -1137,6 +1141,22 @@ JSONのみ出力してください。"""
                     conn3.close()
                 trial_layer3_used = True
 
+        # proプランの残り回数計算
+        layer3_remaining = None
+        if plan == 'pro':
+            from datetime import datetime, timezone
+            now = datetime.now(timezone.utc)
+            reset_at = layer3_monthly_reset_at
+            if reset_at and reset_at.tzinfo is None:
+                reset_at = reset_at.replace(tzinfo=timezone.utc)
+            needs_reset = (
+                reset_at is None or
+                reset_at.year < now.year or
+                (reset_at.year == now.year and reset_at.month < now.month)
+            )
+            current_count = 0 if needs_reset else layer3_monthly_count
+            layer3_remaining = max(0, 30 - current_count)
+
         return jsonify({
             "plan": plan,
             "topic": summary["topic"],
@@ -1146,7 +1166,8 @@ JSONのみ出力してください。"""
             "layer1": layer1_data,
             "layer2": layer2_data,
             "layer3": layer3_data,
-            "layer3_available": category in LAYER3_TEMPLATES
+            "layer3_available": category in LAYER3_TEMPLATES,
+            "layer3_remaining": layer3_remaining
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500

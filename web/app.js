@@ -962,6 +962,8 @@ async function showReportModal() {
   const _initLayer2CostInfo = $('layer2CostInfo');
   if (_initLayer2CostInfo) _initLayer2CostInfo.style.display = 'none';
   DOM.downloadLayer3Btn.style.display = 'none';
+  const _initLayer3Remaining = $('layer3RemainingInfo');
+  if (_initLayer3Remaining) _initLayer3Remaining.style.display = 'none';
 
   try {
     const data = await API.post(`/api/meeting/${sid}/brief`, {
@@ -1007,6 +1009,15 @@ async function showReportModal() {
       if (data.layer3) {
         DOM.layer3Content.innerHTML = buildLayer3HTML(data.layer3, data.category || 'strategy');
         DOM.downloadLayer3Btn.style.display = 'inline-block';
+        const remainingEl = $('layer3RemainingInfo');
+        if (remainingEl) {
+          if (data.layer3_remaining !== null && data.layer3_remaining !== undefined) {
+            remainingEl.textContent = `今月の残り生成回数：${data.layer3_remaining}/30回`;
+            remainingEl.style.display = 'block';
+          } else {
+            remainingEl.style.display = 'none';
+          }
+        }
       } else if (!isLoggedIn) {
         DOM.downloadLayer3Btn.style.display = 'none';
         DOM.layer3Locked.classList.remove('hidden');
