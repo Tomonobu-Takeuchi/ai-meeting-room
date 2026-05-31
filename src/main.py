@@ -81,6 +81,15 @@ def index():
     return response
 
 
+@app.route("/app.js")
+def serve_appjs():
+    response = send_from_directory(app.static_folder, "app.js")
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
+
 # ===== ユーザー認証API =====
 
 @app.route("/api/auth/register", methods=["POST"])
