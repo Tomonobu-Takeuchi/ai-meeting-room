@@ -833,6 +833,27 @@ def init_phase_tables(conn):
             PRIMARY KEY (persona_id, user_id)
         )
     """)
+
+    # ===== crisis_keywordsテーブル =====
+    conn.run("""
+        CREATE TABLE IF NOT EXISTS crisis_keywords (
+            id         SERIAL PRIMARY KEY,
+            keyword    VARCHAR(100) NOT NULL UNIQUE,
+            is_active  BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+    """)
+    initial_keywords = [
+        '死にたい', '消えたい', '自殺', '自傷', '死ぬ方法',
+        '生きていたくない', 'もう終わりにしたい', '消えてしまいたい'
+    ]
+    for kw in initial_keywords:
+        conn.run("""
+            INSERT INTO crisis_keywords (keyword)
+            VALUES (:kw)
+            ON CONFLICT (keyword) DO NOTHING
+        """, kw=kw)
+
     print("✅ Phase 1-3テーブル初期化完了")
 
 
@@ -1185,3 +1206,27 @@ def save_feedback_record(persona_id, user_id, session_id, rating, detail_categor
                  rate=round(recent_positive, 3))
     finally:
         conn.close()
+
+
+# ===== 危機キーワード取得（5分キャッシュ）=====
+
+def get_crisis_keywords():
+    """アクティブな危機キーワード一覧を取得（5分キャッシュ）"""
+    import time
+    now = time.time()
+    cache = get_crisis_keywords._cache
+    if cache['data'] is not None and now - cache['ts'] < 300:
+        return cache['data']
+    conn = get_connection()
+    try:
+        rows = conn.run(
+            "SELECT keyword FROM crisis_keywords WHERE is_active = TRUE"
+        )
+        result = [r[0] for r in rows]
+        cache['data'] = result
+        cache['ts'] = now
+        return result
+    finally:
+        conn.close()
+
+get_crisis_keywords._cache = {'data': None, 'ts': 0}

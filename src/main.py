@@ -25,6 +25,7 @@ from src.database import (
     get_user_payment_status, check_and_use_meeting,
     add_user_credits, update_user_plan, save_payment, complete_payment,
     get_user_by_stripe_customer, update_user_avatar, encrypt_value,
+    get_crisis_keywords,
 )
 
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
@@ -863,12 +864,20 @@ def get_session(session_id):
         return jsonify({"error": "セッションが見つかりません"}), 404
     return jsonify(summary)
 
+def detect_crisis(text):
+    return any(kw in text for kw in get_crisis_keywords())
+
 @app.route("/api/meeting/<session_id>/message", methods=["POST"])
 def post_message(session_id):
     data = request.json
     content = data.get("content", "").strip()
     if not content:
         return jsonify({"error": "メッセージを入力してください"}), 400
+    if detect_crisis(content):
+        return jsonify({
+            "crisis": True,
+            "message": "今おっしゃったことがとても気になります。専門家への相談をお勧めします。\nよりそいホットライン：0120-279-338（24時間・無料）\nいのちの電話：0120-783-556（24時間・無料）"
+        }), 200
     msg = meeting_room.add_message(session_id, "user", "user", content)
     return jsonify({"message": msg})
 

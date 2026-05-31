@@ -2026,6 +2026,17 @@ async function endMeeting() {
   }
 }
 
+function showCrisisBanner() {
+  const existing = document.getElementById('crisis-banner');
+  if (existing) existing.remove();
+  const banner = document.createElement('div');
+  banner.id = 'crisis-banner';
+  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#b91c1c;color:#fff;padding:12px 20px;font-size:14px;line-height:1.6;text-align:center;';
+  banner.innerHTML = '<strong>【相談窓口のご案内】</strong> つらい気持ちがあるときは、専門家に話してみてください。<br>よりそいホットライン：<strong>0120-279-338</strong>（24時間・無料）　いのちの電話：<strong>0120-783-556</strong>（24時間・無料）<button onclick="document.getElementById(\'crisis-banner\').remove()" style="margin-left:16px;background:rgba(255,255,255,0.3);border:none;color:#fff;padding:4px 10px;border-radius:4px;cursor:pointer;">✕</button>';
+  document.body.appendChild(banner);
+  setTimeout(() => { if (banner.parentNode) banner.remove(); }, 15000);
+}
+
 async function sendUserMessage() {
   const content = DOM.chatInput.value.trim();
   if (!content || !State.sessionId || State.isStreaming) return;
@@ -2035,7 +2046,12 @@ async function sendUserMessage() {
   DOM.chatInput.value = ''; DOM.chatInput.style.height = 'auto';
   addMessage({ role: 'user', persona_id: 'user', content, id: 'tmp_' + Date.now() });
   try {
-    await API.post(`/api/meeting/${State.sessionId}/message`, { content });
+    const res = await API.post(`/api/meeting/${State.sessionId}/message`, { content });
+    if (res && res.crisis) {
+      showCrisisBanner();
+      addMessage({ role: 'assistant', persona_id: 'system', content: res.message, id: 'crisis_' + Date.now() });
+      return;
+    }
     // ランダムで1〜2体のペルソナが反応
     const activeMembers = shuffleArray(
       State.members.filter(m => State.selectedMemberIds.includes(m.id))
