@@ -2049,7 +2049,7 @@ async function sendUserMessage() {
     const res = await API.post(`/api/meeting/${State.sessionId}/message`, { content });
     if (res && res.crisis) {
       showCrisisBanner();
-      addSystemMessage(res.message);
+      addCrisisMessage(res.message);
       return;
     }
     // ランダムで1〜2体のペルソナが反応
@@ -2375,6 +2375,26 @@ function addMessage(msg) {
       <div class="msg-body"><div class="msg-name">${persona.name||'メンバー'}</div><div class="msg-bubble">${escapeHtml(msg.content)}</div></div>`;
   }
   DOM.chatMessages.appendChild(row); scrollToBottom(); return row;
+}
+
+function addCrisisMessage(text) {
+  const row = document.createElement('div');
+  row.className = 'message-row member';
+  row.innerHTML = `
+    <div class="msg-avatar" style="background:#FAECE7;border:2px solid #F0997B;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+        fill="none" stroke="#993C1D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        <path d="M12 8v4M12 16h.01"/>
+      </svg>
+    </div>
+    <div class="msg-body">
+      <div class="msg-name" style="color:#993C1D;">システム</div>
+      <div class="msg-bubble" style="background:#FAECE7;border:1px solid #F0997B;color:#4A1B0C;">
+        ${text.replace(/\n/g, '<br>').replace(/(0120-\d{3}-\d{3})/g, '<strong>$1</strong>')}
+      </div>
+    </div>`;
+  DOM.chatMessages.appendChild(row); scrollToBottom();
 }
 
 function addSystemMessage(text) {
