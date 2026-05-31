@@ -282,6 +282,7 @@ def update_persona(persona_id):
     return jsonify({"persona": updated})
 
 @app.route("/api/personas/<persona_id>", methods=["DELETE"])
+@login_required
 def delete_persona(persona_id):
     user_id = get_current_user_id()
     success, message = persona_manager.delete_persona(persona_id, user_id)
@@ -293,12 +294,14 @@ def delete_persona(persona_id):
 # ===== 学習データAPI =====
 
 @app.route("/api/personas/<persona_id>/learn", methods=["GET"])
+@login_required
 def get_learn_data(persona_id):
     user_id = get_current_user_id()
     data = persona_manager.get_all_learn_data(persona_id, user_id)
     return jsonify({"learn_data": data, "count": len(data)})
 
 @app.route("/api/personas/<persona_id>/learn", methods=["POST"])
+@login_required
 def add_learn_data(persona_id):
     user_id = get_current_user_id()
     data = request.json
@@ -315,6 +318,7 @@ def add_learn_data(persona_id):
     return jsonify({"message": "学習データを保存しました", "total_count": count})
 
 @app.route("/api/personas/<persona_id>/learn/<int:learn_id>", methods=["DELETE"])
+@login_required
 def delete_learn_data(persona_id, learn_id):
     user_id = get_current_user_id()
     persona_manager.delete_learn_data(persona_id, learn_id, user_id)
