@@ -467,6 +467,9 @@
       .pricing-card-features li{font-size:11px;}
       .pricing-subtitle{font-size:12px;margin-bottom:12px;}
     }
+    @media (max-width: 768px) {
+      #startMeetingCostInfo { display: none !important; }
+    }
   </style>
 </head>
 <body>
@@ -492,10 +495,9 @@
     <label class="attach-btn" for="fileInput" title="資料添付">📎<span class="attach-text"> 資料添付</span>
       <input type="file" id="fileInput" accept=".pdf,.docx,.doc" style="display:none" multiple />
     </label>
-    <button class="btn btn-green" id="startMeetingBtn">▶ 会議開始</button>
-    <div id="startMeetingCostInfo" style="display:none;font-size:11px;color:var(--text-muted);white-space:nowrap;">
-      💳 <span id="startMeetingCostText"></span>
-    </div>
+    <button class="btn btn-green" id="startMeetingBtn" style="line-height:1.4;">▶ 会議開始<br>
+      <span id="startMeetingCostInfo" style="display:none;font-size:11px;opacity:0.8;white-space:nowrap;">💳 <span id="startMeetingCostText"></span></span>
+    </button>
     <button class="nav-link" id="planBtnRow2"
       onclick="openPricingModal()">
       🏷️<span class="nav-label" id="planBtnRow2Label"
@@ -618,12 +620,10 @@
       </div>
       <div id="layer2Content"></div>
       <button class="btn btn-primary" id="downloadLayer2Btn"
-        style="width:100%;margin-top:10px;display:none;">
-        📄 議論分析レポートをPDF保存
+        style="width:100%;margin-top:10px;display:none;line-height:1.4;">
+        📄 議論分析レポートをPDF保存<br>
+        <span id="layer2CostInfo" style="display:none;font-size:11px;opacity:0.8;">💳 1クレジット消費します</span>
       </button>
-      <div id="layer2CostInfo" style="display:none;font-size:11px;color:var(--text-muted);text-align:center;margin-top:4px;">
-        💳 1クレジット消費します
-      </div>
       <div id="layer2Trial" class="hidden" style="text-align:center;padding:16px;background:rgba(37,99,235,0.06);border-radius:8px;margin-bottom:8px;">
         <div style="font-size:13px;font-weight:600;margin-bottom:8px;">🎁 議論分析レポートを1回無料で体験できます</div>
         <button class="btn btn-primary" id="trialLayer2Btn" onclick="useTrialLayer2()">
@@ -651,8 +651,9 @@
       <div id="layer3RemainingInfo"
         style="display:none;margin-bottom:8px;"></div>
       <button class="btn btn-purple" id="downloadLayer3Btn"
-        style="width:100%;margin-top:10px;display:none;">
-        📄 戦略レポートをPDF保存
+        style="width:100%;margin-top:10px;display:none;line-height:1.4;">
+        📄 戦略レポートをPDF保存<br>
+        <span id="layer3CostInfo" style="display:none;font-size:11px;opacity:0.8;">💳 1クレジット消費します</span>
       </button>
       <div id="layer3Trial" class="hidden" style="text-align:center;padding:16px;background:rgba(124,58,237,0.06);border-radius:8px;margin-bottom:8px;">
         <div style="font-size:13px;font-weight:600;margin-bottom:8px;">🎁 戦略フレームワーク・レポートを1回無料で体験できます</div>
@@ -1111,7 +1112,7 @@
   </div>
 </div>
 
-<script src="app.js?v=20260530004"></script>
+<script src="app.js?v=20260530005"></script>
 
 <!-- ===== 使い方モーダル ===== -->
 <div class="modal-overlay hidden" id="howToModal" onclick="if(event.target===this)closeHowToModal()">

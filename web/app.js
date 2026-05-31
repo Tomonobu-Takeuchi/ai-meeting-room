@@ -987,7 +987,7 @@ async function showReportModal() {
       // 案A：standardプランのみクレジット消費テキスト表示
       const layer2CostInfo = $('layer2CostInfo');
       if (layer2CostInfo) {
-        layer2CostInfo.style.display = (State.currentUser?.plan === 'standard') ? 'block' : 'none';
+        layer2CostInfo.style.display = (State.currentUser?.plan === 'standard') ? 'inline' : 'none';
       }
     } else if (!isLoggedIn) {
       DOM.downloadLayer2Btn.style.display = 'none';
@@ -1011,6 +1011,10 @@ async function showReportModal() {
       if (data.layer3) {
         DOM.layer3Content.innerHTML = buildLayer3HTML(data.layer3, data.category || 'strategy');
         DOM.downloadLayer3Btn.style.display = 'inline-block';
+        const layer3CostInfo = $('layer3CostInfo');
+        if (layer3CostInfo) {
+          layer3CostInfo.style.display = (State.currentUser?.plan === 'standard') ? 'inline' : 'none';
+        }
         const remainingEl = $('layer3RemainingInfo');
         if (remainingEl) {
           if (data.layer3_remaining !== null && data.layer3_remaining !== undefined) {
@@ -1244,7 +1248,7 @@ async function useTrialLayer2() {
       // 案A：standardプランのみクレジット消費テキスト表示
       const layer2CostInfo = $('layer2CostInfo');
       if (layer2CostInfo) {
-        layer2CostInfo.style.display = (State.currentUser?.plan === 'standard') ? 'block' : 'none';
+        layer2CostInfo.style.display = (State.currentUser?.plan === 'standard') ? 'inline' : 'none';
       }
       DOM.layer2Trial.classList.add('hidden');
     } else {
@@ -1278,6 +1282,10 @@ async function useTrialLayer3() {
     if (data.layer3) {
       DOM.layer3Content.innerHTML = buildLayer3HTML(data.layer3, data.category || 'strategy');
       DOM.downloadLayer3Btn.style.display = 'inline-block';
+      const layer3CostInfo = $('layer3CostInfo');
+      if (layer3CostInfo) {
+        layer3CostInfo.style.display = (State.currentUser?.plan === 'standard') ? 'inline' : 'none';
+      }
       DOM.layer3Trial.classList.add('hidden');
     } else {
       DOM.layer3Trial.classList.add('hidden');
@@ -3200,7 +3208,7 @@ function renderAuthArea() {
   if (costInfo && costText && State.currentUser) {
     if (State.currentUser.plan === 'standard') {
       costText.textContent = `1チケット消費します（残り${State.currentUser.credits || 0}枚）`;
-      costInfo.style.display = 'inline-flex';
+      costInfo.style.display = 'inline';
     } else {
       costInfo.style.display = 'none';
     }
