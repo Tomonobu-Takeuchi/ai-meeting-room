@@ -1031,6 +1031,15 @@ async function showReportModal() {
       } else if (!isLoggedIn) {
         DOM.downloadLayer3Btn.style.display = 'none';
         DOM.layer3Locked.classList.remove('hidden');
+      } else if (data.plan === 'pro') {
+        DOM.downloadLayer3Btn.style.display = 'inline-block';
+        const layer3CostInfo = $('layer3CostInfo');
+        if (layer3CostInfo) layer3CostInfo.style.display = 'inline';
+        const remainingEl = $('layer3RemainingInfo');
+        if (remainingEl && data.layer3_remaining !== null && data.layer3_remaining !== undefined) {
+          remainingEl.innerHTML = `<span style="display:inline-flex;align-items:center;gap:4px;background:#EDE9FE;color:#5B21B6;font-size:13px;font-weight:500;padding:4px 10px;border-radius:20px;">🔄 今月の残り生成回数：${data.layer3_remaining} / 30回</span>`;
+          remainingEl.style.display = 'block';
+        }
       } else if ((data.plan === 'free' || data.plan === 'standard') && !data.trial_layer3_used) {
         DOM.layer3Trial.classList.remove('hidden');
       } else {
