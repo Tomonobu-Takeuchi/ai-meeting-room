@@ -865,6 +865,7 @@ def get_session(session_id):
     return jsonify(summary)
 
 def detect_crisis(text):
+    """危機キーワードの部分一致チェック"""
     return any(kw in text for kw in get_crisis_keywords())
 
 @app.route("/api/meeting/<session_id>/message", methods=["POST"])

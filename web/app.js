@@ -2049,7 +2049,7 @@ async function sendUserMessage() {
     const res = await API.post(`/api/meeting/${State.sessionId}/message`, { content });
     if (res && res.crisis) {
       showCrisisBanner();
-      addMessage({ role: 'assistant', persona_id: 'system', content: res.message, id: 'crisis_' + Date.now() });
+      addSystemMessage(res.message);
       return;
     }
     // ランダムで1〜2体のペルソナが反応
