@@ -648,11 +648,10 @@
         📊 戦略フレームワーク・レポート
       </div>
       <div id="layer3Content"></div>
-      <div id="layer3RemainingInfo"
-        style="display:none;margin-bottom:8px;"></div>
       <button class="btn btn-purple" id="downloadLayer3Btn"
         style="width:100%;margin-top:10px;display:none;line-height:1.4;">
         📄 戦略レポートをPDF保存<br>
+        <span id="layer3RemainingInfo" style="display:none;font-size:11px;opacity:0.8;"></span><br>
         <span id="layer3CostInfo" style="display:none;font-size:11px;opacity:0.8;">💳 1クレジット消費します</span>
       </button>
       <div id="layer3Trial" class="hidden" style="text-align:center;padding:16px;background:rgba(124,58,237,0.06);border-radius:8px;margin-bottom:8px;">
@@ -1112,7 +1111,7 @@
   </div>
 </div>
 
-<script src="app.js?v=20260530005"></script>
+<script src="app.js?v=20260530006"></script>
 
 <!-- ===== 使い方モーダル ===== -->
 <div class="modal-overlay hidden" id="howToModal" onclick="if(event.target===this)closeHowToModal()">
