@@ -1111,7 +1111,7 @@
   </div>
 </div>
 
-<script src="app.js?v=20260530006"></script>
+<script src="app.js?v=20260601001"></script>
 
 <!-- ===== 使い方モーダル ===== -->
 <div class="modal-overlay hidden" id="howToModal" onclick="if(event.target===this)closeHowToModal()">
@@ -1515,6 +1515,10 @@
       <div class="auth-error" id="loginError"></div>
       <input class="auth-input" type="email" id="loginEmail" placeholder="メールアドレス" />
       <input class="auth-input" type="password" id="loginPassword" placeholder="パスワード" />
+      <div style="display:flex;align-items:center;gap:8px;margin:4px 0 8px;font-size:12px;color:var(--text-secondary);">
+        <input type="checkbox" id="rememberMeCheck" checked style="cursor:pointer;flex-shrink:0;" />
+        <label for="rememberMeCheck" style="cursor:pointer;">ログイン状態を保持する</label>
+      </div>
       <button class="auth-btn" id="loginSubmitBtn">ログイン</button>
       <div class="auth-switch">アカウントをお持ちでない方は <a onclick="showRegisterPanel()">新規登録</a></div>
       <div class="auth-guest"><a onclick="closeAuthModal()">ゲストとして続ける</a></div>

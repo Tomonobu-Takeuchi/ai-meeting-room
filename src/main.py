@@ -176,7 +176,8 @@ def login():
     if not bcrypt.checkpw(password.encode('utf-8'), user['password_hash'].encode('utf-8')):
         return jsonify({"error": "メールアドレスまたはパスワードが違います"}), 401
 
-    session.permanent = True
+    remember_me = data.get('rememberMe', True)
+    session.permanent = bool(remember_me)
     session['user_id'] = user['id']
     session['user_email'] = user['email']
     session['user_name'] = user['name']

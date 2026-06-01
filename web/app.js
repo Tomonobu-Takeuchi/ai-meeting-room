@@ -3269,7 +3269,8 @@ async function submitLogin() {
   try {
     const btn = $('loginSubmitBtn');
     btn.textContent = 'ログイン中...'; btn.disabled = true;
-    const data = await API.post('/api/auth/login', { email, password });
+    const rememberMe = $('rememberMeCheck')?.checked ?? true;
+    const data = await API.post('/api/auth/login', { email, password, rememberMe });
     State.currentUser = data.user;
     State.userAvatar = data.user.avatar || '👤';
     console.log('[LOG] ログイン完了 plan=' + data.user?.plan + ' userId=' + data.user?.id);
