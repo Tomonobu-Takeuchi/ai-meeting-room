@@ -2576,7 +2576,16 @@ function setStreamingButtons(isStreaming) {
 
 function setLoading(isLoading) {
   DOM.startMeetingBtn.disabled = isLoading;
-  DOM.startMeetingBtn.textContent = isLoading ? '⏳ 開始中...' : '▶ 会議開始';
+  const costInfo = $('startMeetingCostInfo');
+  if (isLoading) {
+    DOM.startMeetingBtn.firstChild.textContent = '⏳ 開始中...';
+    if (costInfo) costInfo.style.display = 'none';
+  } else {
+    DOM.startMeetingBtn.firstChild.textContent = '▶ 会議開始';
+    if (State.currentUser?.plan === 'standard') {
+      if (costInfo) costInfo.style.display = 'inline';
+    }
+  }
 }
 
 function scrollToBottom() { DOM.chatMessages.scrollTop = DOM.chatMessages.scrollHeight; }
