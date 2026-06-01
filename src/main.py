@@ -16,6 +16,8 @@ from dotenv import load_dotenv
 import anthropic
 import bcrypt
 from src.email_sender import send_email_change_confirmation
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 from src.persona.persona_manager import PersonaManager
 from src.meeting.meeting_room import MeetingRoom
@@ -49,6 +51,13 @@ app = Flask(
 app.secret_key = os.environ.get('SECRET_KEY', 'ai-persona-secret-key-2026')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 app.json.ensure_ascii = False  # 日本語をUnicodeエスケープしない（Flask 2.2以降）
+
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    storage_uri="memory://",
+    default_limits=[]
+)
 
 init_db()
 persona_manager = PersonaManager()
@@ -154,6 +163,7 @@ def register():
         return jsonify({"error": f"登録エラー: {str(e)}"}), 500
 
 @app.route("/api/auth/login", methods=["POST"])
+@limiter.limit("10 per minute")
 def login():
     data = request.json
     email = data.get("email", "").strip().lower()
@@ -481,6 +491,7 @@ def fetch_learn_youtube():
         return jsonify({"error": f"取得エラー: {str(e)}"}), 500
 
 @app.route("/api/learn/transcribe-audio", methods=["POST"])
+@limiter.limit("2 per minute")
 def transcribe_audio():
     audio_file = request.files.get("audio")
     if not audio_file:
@@ -548,6 +559,7 @@ def transcribe_audio():
 
 
 @app.route("/api/learn/transcribe-video", methods=["POST"])
+@limiter.limit("2 per minute")
 def transcribe_video():
     video_file = request.files.get("video")
     if not video_file:
@@ -882,6 +894,7 @@ def detect_crisis(text):
     return any(kw in text for kw in get_crisis_keywords())
 
 @app.route("/api/meeting/<session_id>/message", methods=["POST"])
+@limiter.limit("5 per minute")
 def post_message(session_id):
     data = request.json
     content = data.get("content", "").strip()
