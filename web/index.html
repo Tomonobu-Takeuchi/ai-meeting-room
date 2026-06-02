@@ -364,8 +364,8 @@
     .pricing-card-features{list-style:none;display:flex;flex-direction:column;gap:5px;flex:1;}
     .pricing-card-features li{font-size:12px;color:var(--text-secondary);padding-left:16px;position:relative;}
     .pricing-card-features li::before{content:'✓';position:absolute;left:0;color:var(--accent-green);}
-    .pricing-card-features li.dim::before{color:var(--text-muted);}
-    .pricing-card-features li.dim{color:var(--text-muted);}
+    .pricing-card-features li.dim::before{content:'⚠';color:var(--accent-orange);}
+    .pricing-card-features li.dim{color:var(--accent-orange);}
     .badge-recommended{position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:var(--accent-purple);color:#fff;font-size:10px;font-weight:700;padding:2px 10px;border-radius:10px;white-space:nowrap;}
     .pricing-modal-footer{text-align:center;font-size:11px;color:var(--text-muted);}
     .pricing-current{text-align:center;font-size:13px;color:var(--text-secondary);margin-bottom:16px;padding:10px;background:var(--bg-elevated);border-radius:var(--radius);border:1px solid var(--border);}
@@ -1111,7 +1111,7 @@
   </div>
 </div>
 
-<script src="app.js?v=20260603001"></script>
+<script src="app.js?v=20260603002"></script>
 
 <!-- ===== 使い方モーダル ===== -->
 <div class="modal-overlay hidden" id="howToModal" onclick="if(event.target===this)closeHowToModal()">
