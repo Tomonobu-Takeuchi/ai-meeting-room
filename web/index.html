@@ -1111,7 +1111,7 @@
   </div>
 </div>
 
-<script src="app.js?v=20260601002"></script>
+<script src="app.js?v=20260603001"></script>
 
 <!-- ===== 使い方モーダル ===== -->
 <div class="modal-overlay hidden" id="howToModal" onclick="if(event.target===this)closeHowToModal()">
@@ -1177,8 +1177,8 @@
         <div class="howto-step">
           <div class="howto-step-num">3</div>
           <div class="howto-step-body">
-            <h4>議論してまとめ・議事録をダウンロード</h4>
-            <p>チャット欄でメッセージを送るとAIが応答します。「🤔 議論のまとめ」で全体を要約し、「📄 議事録をダウンロード（PDF）」で議事録を保存できます。</p>
+            <h4>議論してまとめ・レポートをダウンロード</h4>
+            <p>チャット欄でメッセージを送るとAIが応答します。「🤔 議論のまとめ」で全体を要約し、「📄 アクション・ブリーフPDFをダウンロード」でレポートを保存できます。</p>
           </div>
         </div>
         <div class="howto-tip">
@@ -1257,8 +1257,8 @@
         <div class="howto-step">
           <div class="howto-step-num">5</div>
           <div class="howto-step-body">
-            <h4>🤔 まとめ → 📄 議事録PDF</h4>
-            <p>「🤔 議論のまとめ」で結論・各人の意見・次のステップを要約します。その後「📄 議事録をダウンロード（PDF）」で議事録をファイル保存できます。</p>
+            <h4>🤔 まとめ → 📄 レポートPDF</h4>
+            <p>「🤔 議論のまとめ」で結論・各人の意見・次のステップを要約します。その後「📄 アクション・ブリーフPDFをダウンロード」でレポートをファイル保存できます。</p>
           </div>
         </div>
         <div class="howto-tip">
@@ -1331,10 +1331,17 @@
       <div class="howto-section">
         <h3 class="howto-h3">💳 プラン比較</h3>
         <table class="howto-table">
-          <tr><th>プラン</th><th>価格</th><th>会議回数</th><th>その他</th></tr>
-          <tr><td>無料</td><td>¥0</td><td>月5回</td><td>全機能利用可、PDF議事録無制限</td></tr>
-          <tr><td>スタンダード</td><td>¥480 / 50チケット</td><td>50回分（有効期限なし）</td><td>単発購入・使い切り型</td></tr>
-          <tr><td>プロ</td><td>¥980 / 月</td><td>無制限</td><td>ヘビーユーザー向けサブスク</td></tr>
+          <tr><th>プラン</th><th>価格</th><th>会議回数</th><th>ペルソナ作成</th></tr>
+          <tr><td>無料</td><td>¥0</td><td>月5回</td><td>3体まで</td></tr>
+          <tr><td>スタンダード</td><td>¥480 / 50チケット</td><td>50回分（有効期限なし）</td><td>無制限</td></tr>
+          <tr><td>プロ</td><td>¥980 / 月</td><td>無制限</td><td>無制限</td></tr>
+        </table>
+        <p class="howto-p" style="font-weight:600;margin-top:12px">📄 レポート機能（プラン別）</p>
+        <table class="howto-table">
+          <tr><th>レポート種別</th><th>無料</th><th>スタンダード</th><th>プロ</th></tr>
+          <tr><td>Layer1：アクション・ブリーフPDF（会議サマリー）</td><td>✓ 無制限</td><td>✓ 無制限</td><td>✓ 無制限</td></tr>
+          <tr><td>Layer2：詳細分析PDF（意見・論点整理）</td><td>試用1回のみ</td><td>✓ 利用可（1チケット追加消費）</td><td>✓ 無制限</td></tr>
+          <tr><td>Layer3：戦略レポートPDF（アクションプラン・リスク分析）</td><td>試用1回のみ</td><td>試用1回のみ</td><td>✓ 月30回まで</td></tr>
         </table>
         <div class="howto-tip">
           <p>💡 <strong>ゲスト（未ログイン）は会議回数カウントなし</strong>で利用できます。ただしペルソナ・学習データはブラウザを閉じると消えます。</p>
@@ -1465,9 +1472,10 @@
         <div class="pricing-card-desc">はじめての方に</div>
         <ul class="pricing-card-features">
           <li>月5回まで会議</li>
-          <li>全ペルソナ利用可</li>
+          <li>ペルソナ作成3体まで</li>
           <li>学習データ登録</li>
-          <li>PDF議事録は無制限</li>
+          <li>Layer1レポート（無制限）</li>
+          <li class="dim">Layer2・Layer3は試用1回のみ</li>
         </ul>
         <button class="btn" disabled>現在のプラン</button>
       </div>
@@ -1478,9 +1486,10 @@
         <div class="pricing-card-desc">単発購入・有効期限なし</div>
         <ul class="pricing-card-features">
           <li>50回分の会議チケット</li>
-          <li>全ペルソナ利用可</li>
+          <li>全ペルソナ利用可（無制限作成）</li>
           <li>学習データ登録</li>
-          <li>PDF議事録は無制限</li>
+          <li>Layer1・Layer2レポート利用可</li>
+          <li class="dim">Layer3は試用1回のみ</li>
         </ul>
         <button class="btn btn-primary" id="buyStandardBtn" onclick="showPurchaseConfirm('standard')">チケットを購入</button>
       </div>
@@ -1492,9 +1501,10 @@
         <div class="pricing-card-desc">ヘビーユーザーに</div>
         <ul class="pricing-card-features">
           <li>月間会議回数無制限</li>
-          <li>全ペルソナ利用可</li>
+          <li>全ペルソナ利用可（無制限作成）</li>
           <li>学習データ登録</li>
-          <li>PDF議事録は無制限</li>
+          <li>全レポート利用可</li>
+          <li>Layer3戦略レポート月30回</li>
         </ul>
         <button class="btn btn-purple" id="buyProBtn" onclick="showPurchaseConfirm('pro')">プロプランに登録</button>
       </div>
