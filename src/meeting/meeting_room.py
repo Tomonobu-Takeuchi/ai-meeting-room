@@ -60,13 +60,20 @@ class MeetingRoom:
             "user_id": user_id,
             "category": category,
             "created_at": datetime.now().isoformat(),
-            "status": "active"
+            "status": "active",
+            "crisis_flag": False
         }
         self.sessions[session_id] = session
         return session
 
     def get_session(self, session_id):
         return self.sessions.get(session_id)
+
+    def set_crisis_flag(self, session_id):
+        session = self.sessions.get(session_id)
+        if session:
+            session["crisis_flag"] = True
+            self._save_session(session_id)
 
     def add_message(self, session_id, role, persona_id, content):
         session = self.sessions.get(session_id)
@@ -94,7 +101,8 @@ class MeetingRoom:
             return
         messages = self._build_conversation_history(session, persona_id, trigger_message)
         system_prompt = self.persona_manager.build_system_prompt(
-            persona, session["topic"], user_id=session.get("user_id")
+            persona, session["topic"], user_id=session.get("user_id"),
+            crisis_mode=session.get("crisis_flag", False)
         )
         try:
             full_response = ""
@@ -125,7 +133,8 @@ class MeetingRoom:
         member_ids = [m['id'] for m in session.get('members', [])]
         system_prompt = self.persona_manager.build_facilitator_prompt(
             session["facilitator"], session["topic"], discussion_text,
-            mode=mode, member_ids=member_ids
+            mode=mode, member_ids=member_ids,
+            crisis_mode=session.get("crisis_flag", False)
         )
         try:
             full_response = ""

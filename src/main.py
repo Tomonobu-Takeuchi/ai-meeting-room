@@ -927,6 +927,7 @@ def post_message(session_id):
     if not content:
         return jsonify({"error": "メッセージを入力してください"}), 400
     if detect_crisis(content):
+        meeting_room.set_crisis_flag(session_id)
         return jsonify({
             "crisis": True,
             "message": "今おっしゃったことがとても気になります。専門家への相談をお勧めします。\nよりそいホットライン：0120-279-338（24時間・無料）\nいのちの電話：0120-783-556（24時間・無料）"

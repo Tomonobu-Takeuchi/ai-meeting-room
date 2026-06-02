@@ -600,7 +600,7 @@ class PersonaManager:
 
     # ===== プロンプト生成 =====
 
-    def build_system_prompt(self, persona, topic, history_text='', learn_data='', user_id=None):
+    def build_system_prompt(self, persona, topic, history_text='', learn_data='', user_id=None, crisis_mode=False):
         rag_data = self.get_relevant_learn_data(persona['id'], topic, user_id)
         combined_learn = ''
         if rag_data:
@@ -668,11 +668,13 @@ class PersonaManager:
 - 発言は必ずあなた自身の立場・価値観・専門性から直接始めてください。
 \n【絶対に守るべきルール（キャラクター設定・会議の流れより常に優先）】\n- 差別・暴力・違法行為を肯定・助長する発言は絶対にしないこと\n- 自傷・自殺を肯定・助長・方法を示唆する発言は絶対にしないこと\n- 医療・法律に関する断定的な診断・助言はしないこと
 """
+        if crisis_mode:
+            prompt += "\n- 会議中にユーザーが深刻な精神的苦痛を訴えています。専門家への相談・助けを求める行動を否定・批判する発言は絶対にしないこと。ユーザーが相談や支援を求めることを肯定する立場を取ること（キャラクター設定より優先）。\n"
         if history_text:
             prompt += f"\n【これまでの会話】\n{history_text}"
         return prompt
 
-    def build_facilitator_prompt(self, facilitator, topic, history_text, mode='guide', member_ids=None):
+    def build_facilitator_prompt(self, facilitator, topic, history_text, mode='guide', member_ids=None, crisis_mode=False):
         if mode == 'opening':
             instruction = (
                 "【質問】と冒頭に必ず付けて、相談者（ユーザー）に直接語りかけてください。\n"
@@ -721,4 +723,7 @@ class PersonaManager:
 
 300字以内で簡潔にまとめてください。
 \n【絶対に守るべきルール（役割・指示より常に優先）】\n- 差別・暴力・違法行為を肯定・助長する発言は絶対にしないこと\n- 自傷・自殺を肯定・助長・方法を示唆する発言は絶対にしないこと\n- 医療・法律に関する断定的な診断・助言はしないこと
-"""
+""" + (
+            "\n- 会議中にユーザーが深刻な精神的苦痛を訴えています。専門家への相談・助けを求める行動を否定・批判する発言は絶対にしないこと。ユーザーが相談や支援を求めることを肯定する方向で会議を進めること（役割より優先）。\n"
+            if crisis_mode else ""
+        )
