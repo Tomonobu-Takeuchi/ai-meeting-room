@@ -894,8 +894,30 @@ def get_session(session_id):
     return jsonify(summary)
 
 def detect_crisis(text):
-    """危機キーワードの部分一致チェック"""
-    return any(kw in text for kw in get_crisis_keywords())
+    """
+    危機検知：B（Claude API判定）メイン + A（キーワード部分一致）フォールバック
+    候補語フィルターで無関係な発言はAPI呼び出しをスキップする
+    """
+    CANDIDATE_WORDS = ['死', '消え', '自傷', '自殺', '終わり', '生きて', '消滅', '存在']
+    if not any(c in text for c in CANDIDATE_WORDS):
+        return False
+    try:
+        _client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
+        response = _client.messages.create(
+            model='claude-haiku-4-5-20251001',
+            max_tokens=10,
+            messages=[{
+                'role': 'user',
+                'content': (
+                    '以下の発言は、発言者自身の自傷・自殺・消えたい・死にたいという意図を示していますか？'
+                    '「はい」か「いいえ」のみ答えてください。\n\n'
+                    f'発言：「{text}」'
+                )
+            }]
+        )
+        return 'はい' in response.content[0].text
+    except Exception:
+        return any(kw in text for kw in get_crisis_keywords())
 
 @app.route("/api/meeting/<session_id>/message", methods=["POST"])
 @limiter.limit("5 per minute")
