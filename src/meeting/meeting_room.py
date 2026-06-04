@@ -95,7 +95,9 @@ class MeetingRoom:
         if not session:
             yield "data: [ERROR] セッションが見つかりません\n\n"
             return
-        persona = self.persona_manager.get_persona(persona_id)
+        user_id = session.get("user_id")
+        persona = (self.persona_manager.get_persona(persona_id, user_id=user_id)
+                   or self.persona_manager.get_persona(persona_id))
         if not persona:
             yield "data: [ERROR] ペルソナが見つかりません\n\n"
             return
@@ -163,8 +165,10 @@ class MeetingRoom:
 
     def _build_conversation_history(self, session, current_persona_id, trigger=None):
         messages = []
+        _uid = session.get("user_id")
         for msg in session["messages"][-10:]:
-            persona = self.persona_manager.get_persona(msg["persona_id"])
+            persona = (self.persona_manager.get_persona(msg["persona_id"], user_id=_uid)
+                       or self.persona_manager.get_persona(msg["persona_id"]))
             name = persona["name"] if persona else "参加者"
             if msg["persona_id"] == current_persona_id:
                 messages.append({"role": "assistant", "content": msg["content"]})
@@ -180,8 +184,10 @@ class MeetingRoom:
 
     def _format_discussion(self, session):
         lines = []
+        _uid2 = session.get("user_id")
         for msg in session["messages"]:
-            persona = self.persona_manager.get_persona(msg["persona_id"])
+            persona = (self.persona_manager.get_persona(msg["persona_id"], user_id=_uid2)
+                       or self.persona_manager.get_persona(msg["persona_id"]))
             name = persona["name"] if persona else msg["persona_id"]
             lines.append(f"{name}: {msg['content']}")
         return "\n".join(lines) if lines else "（まだ議論はありません）"
