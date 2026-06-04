@@ -753,18 +753,18 @@ CATEGORY_PATTERNS = {
         'roles': [
             {'role': 'ビジョナリー（推進）', 'persona_id': 'hideyoshi'},
             {'role': '戦略家（推進）',       'persona_id': 'koumei'},
-            {'role': '批評家（慎重）',       'persona_id': 'critic'},
+            {'role': '経営倫理',             'persona_id': 'shibusawa'},
             {'role': '実務家（慎重）',       'persona_id': 'consultant'},
         ]
     },
     'practice': {
         'name': '発表・プレゼン練習',
-        'description': '厳格な審査員・友好的な審査員・聴衆代表・天邪鬼の4人が発表を評価します',
+        'description': '厳格な審査員・多角的視点・創造的視点・科学的視点の4人が発表を評価します',
         'roles': [
             {'role': '厳格な審査員', 'persona_id': 'professor'},
-            {'role': '友好的な審査員', 'persona_id': 'elizabeth1'},
-            {'role': '聴衆代表',     'persona_id': 'critic'},
-            {'role': '天邪鬼',       'persona_id': 'amanojaku'},
+            {'role': '多角的視点',     'persona_id': 'koumei'},
+            {'role': '創造的視点',     'persona_id': 'davinci'},
+            {'role': '科学的視点',     'persona_id': 'curie'},
         ]
     },
     'study': {
@@ -784,7 +784,7 @@ CATEGORY_PATTERNS = {
             {'role': '傾聴者',     'persona_id': 'obaa'},
             {'role': '論理家',     'persona_id': 'koumei'},
             {'role': '経験者',     'persona_id': 'yako'},
-            {'role': '背中押し役', 'persona_id': 'amanojaku'},
+            {'role': '背中押し役', 'persona_id': 'fukuzawa'},
         ]
     },
 }
