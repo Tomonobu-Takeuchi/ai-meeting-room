@@ -749,7 +749,7 @@ TEAM_PATTERNS = {
 CATEGORY_PATTERNS = {
     'strategy': {
         'name': 'ビジネス戦略・企画',
-        'description': 'ビジョナリー（推進）・戦略家（推進）・批評家（慎重）・実務家（慎重）の4人で議論します',
+        'description': 'ビジョナリー（推進）・戦略家（推進）・経営倫理・実務家（慎重）の4人で議論します',
         'roles': [
             {'role': 'ビジョナリー（推進）', 'persona_id': 'hideyoshi'},
             {'role': '戦略家（推進）',       'persona_id': 'koumei'},
