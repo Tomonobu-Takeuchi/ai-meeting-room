@@ -684,11 +684,12 @@ async function init() {
 // ===== カテゴリ選択モーダル =====
 
 const MEETING_CATEGORIES = [
-  { id: 'strategy',   icon: '📊', label: '戦略・企画',   desc: 'ビジネス戦略・企画書レビュー・新規事業',    personas: ['hideyoshi','koumei','critic','consultant'] },
-  { id: 'practice',   icon: '🎤', label: '発表・練習',   desc: 'プレゼン練習・報告書レビュー・論文発表',    personas: ['professor','elizabeth1','critic','amanojaku'] },
-  { id: 'study',      icon: '📚', label: '学習・研究',   desc: '論文壁打ち・スキルアップ・創作',            personas: ['professor','turing','curie','shisho'] },
-  { id: 'consulting', icon: '💬', label: '人生相談',     desc: 'キャリア・人間関係・恋愛・意思決定',        personas: ['obaa','koumei','yako','amanojaku'] },
-  { id: 'chat',       icon: '☕', label: '雑談・その他', desc: '自由に話したい・フレームワークなし',         personas: [] },
+  { id: 'strategy',     icon: '📊', label: 'ビジネス戦略',   desc: '新規事業・市場参入・経営判断・競合分析',       personas: ['hideyoshi','koumei','shibusawa','consultant'] },
+  { id: 'practice',     icon: '💡', label: '提案・企画強化', desc: '企画書レビュー・プレゼン準備・反論対策',       personas: ['professor','koumei','davinci','critic'] },
+  { id: 'consulting',   icon: '🧭', label: 'キャリア・転機', desc: '転職・独立・定年後・人生の岐路の決断',         personas: ['shibusawa','teresa','fukuzawa','nightingale'] },
+  { id: 'relationship', icon: '🤝', label: '人間関係・交渉', desc: '職場の悩み・上司部下・交渉・ハラスメント対処', personas: ['koumei','tsuda','ojii'] },
+  { id: 'study',        icon: '📚', label: '学習・創作',     desc: '独学ロードマップ・研究壁打ち・創作批評',       personas: ['einstein','edison','critic','murasaki'] },
+  { id: 'chat',         icon: '☕', label: 'カテゴリ未選択', desc: '自由に話したい・フレームワークなし',           personas: [] },
 ];
 
 function showCategorySelectModal() {
@@ -707,13 +708,27 @@ function showCategorySelectModal() {
     btn.addEventListener('click', () => selectCategory(cat));
     list.appendChild(btn);
   });
+  // Haiku提案バッジのリセット（前回の提案をクリア）
+  const prevBadge = document.getElementById('aiCategorySuggestBadge');
+  if (prevBadge) prevBadge.remove();
   document.getElementById('categorySelectModal').classList.remove('hidden');
 }
+
+const CATEGORY_PLACEHOLDERS = {
+  strategy:     '例：「新規事業Xへの参入可否を検討したい」「競合Yに対してどう差別化すべきか」',
+  practice:     '例：「○○社へのシステム提案内容をレビューしてほしい」「プレゼンの想定Q&Aを作りたい」',
+  consulting:   '例：「転職すべきかどうか迷っている」「50歳で独立することのリスクを整理したい」',
+  relationship: '例：「部下のAさんとうまくいっていない」「上司のハラスメントへの対処を考えたい」',
+  study:        '例：「機械学習の独学ロードマップを作りたい」「小説の書き出しを批評してほしい」',
+  chat:         '今日の会議の議題を入力してください',
+};
 
 function selectCategory(cat) {
   State.meetingCategory = cat.id;
   State.suggestedPersonaIds = cat.personas;
   document.getElementById('categorySelectModal').classList.add('hidden');
+  const ph = CATEGORY_PLACEHOLDERS[cat.id] || CATEGORY_PLACEHOLDERS['chat'];
+  if (DOM.topicInput) DOM.topicInput.placeholder = ph;
   showTeamSuggestModal();
 }
 
@@ -752,6 +767,18 @@ async function showTeamSuggestModal() {
     DOM.teamSuggestPattern.textContent = `パターン${data.pattern}：${data.pattern_name}`;
     DOM.teamSuggestDesc.textContent = data.description;
 
+    // Haiku提案カテゴリバッジ表示
+    if (data.suggested_category && data.suggested_category !== State.meetingCategory) {
+      const catInfo = MEETING_CATEGORIES.find(c => c.id === data.suggested_category);
+      if (catInfo) {
+        const badge = document.createElement('div');
+        badge.id = 'aiCategorySuggestBadge';
+        badge.style.cssText = 'margin-top:8px;padding:6px 12px;background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.3);border-radius:6px;font-size:12px;color:var(--accent-purple);';
+        badge.innerHTML = `🤖 AIの提案：<b>${catInfo.icon} ${catInfo.label}</b>に変更しますか？ <button onclick="switchCategoryFromBadge('${data.suggested_category}')" style="margin-left:8px;padding:2px 10px;border-radius:4px;background:var(--accent-purple);color:#fff;border:none;font-size:11px;cursor:pointer;">切り替える</button>`;
+        DOM.teamSuggestRoles.parentNode.insertBefore(badge, DOM.teamSuggestRoles);
+      }
+    }
+
     // 役割カードを描画
     DOM.teamSuggestRoles.innerHTML = '';
     data.roles.forEach(r => {
@@ -782,6 +809,19 @@ async function showTeamSuggestModal() {
     // フォールバック：従来のメンバー選択モーダルへ
     showMemberSelectModal();
   }
+}
+
+async function switchCategoryFromBadge(newCategoryId) {
+  const catInfo = MEETING_CATEGORIES.find(c => c.id === newCategoryId);
+  if (!catInfo) return;
+  State.meetingCategory = newCategoryId;
+  const badge = document.getElementById('aiCategorySuggestBadge');
+  if (badge) badge.remove();
+  const ph = CATEGORY_PLACEHOLDERS[newCategoryId] || CATEGORY_PLACEHOLDERS['chat'];
+  if (DOM.topicInput) DOM.topicInput.placeholder = ph;
+  showToast(`${catInfo.icon} ${catInfo.label}に切り替えました`, 'success');
+  DOM.teamSuggestModal.classList.add('hidden');
+  await showTeamSuggestModal();
 }
 
 function confirmSuggestedTeam() {
@@ -1175,56 +1215,108 @@ function buildLayer3HTML(l3, cat) {
       });
     }
   } else if (cat === 'study') {
-    if (l3.current_level && l3.current_level.length > 0) {
-      html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">📍 現在地</div>`;
-      l3.current_level.forEach(cl => {
-        html += `<div style="margin-bottom:8px;">`;
-        html += `<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-secondary);margin-bottom:4px;"><span>${cl.skill||''}</span><span>${cl.percent||0}%</span></div>`;
-        html += `<div style="height:6px;background:var(--bg-elevated);border-radius:3px;overflow:hidden;">`;
-        html += `<div style="height:100%;background:var(--accent-purple);border-radius:3px;width:${cl.percent||0}%;"></div></div></div>`;
+    if (l3.current_level) {
+      html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">📍 現在地の評価</div>`;
+      html += `<div style="padding:10px 14px;border-left:3px solid var(--accent-purple);background:rgba(124,58,237,0.06);border-radius:0 8px 8px 0;font-size:13px;line-height:1.7;margin-bottom:14px;">${l3.current_level}</div>`;
+    }
+    if (l3.gap_analysis && l3.gap_analysis.length > 0) {
+      html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">🔍 ギャップ分析</div>`;
+      l3.gap_analysis.forEach(g => {
+        html += `<div style="margin-bottom:6px;padding:7px 12px;background:var(--bg-elevated);border-radius:6px;font-size:12px;">`;
+        html += `<span style="font-size:11px;font-weight:600;color:var(--accent-blue);margin-right:8px;">${g.axis||''}</span>${g.gap||''}</div>`;
       });
     }
-    if (l3.roadmap && l3.roadmap.length > 0) {
-      html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">🗓️ ロードマップ</div>`;
-      l3.roadmap.forEach(r => {
-        html += `<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px;">`;
-        html += `<span style="font-size:11px;padding:2px 8px;background:rgba(37,99,235,0.15);color:var(--accent-blue);border-radius:4px;flex-shrink:0;white-space:nowrap;">${r.period||''}</span>`;
-        html += `<span style="font-size:13px;line-height:1.5;">${r.action||''}</span></div>`;
+    if (l3.roadmap_90days && l3.roadmap_90days.length > 0) {
+      html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">🗓️ 90日ロードマップ</div>`;
+      l3.roadmap_90days.forEach(r => {
+        html += `<div style="margin-bottom:8px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;">`;
+        html += `<div style="display:flex;gap:8px;align-items:baseline;margin-bottom:4px;">`;
+        html += `<span style="font-size:11px;padding:2px 8px;background:rgba(37,99,235,0.15);color:var(--accent-blue);border-radius:4px;flex-shrink:0;">${r.period||''}</span>`;
+        html += `<span style="font-size:12px;font-weight:600;">${r.theme||''}</span></div>`;
+        html += `<div style="font-size:12px;color:var(--text-secondary);padding-left:4px;">${r.action||''}</div></div>`;
       });
     }
-    if (l3.obstacles && l3.obstacles.length > 0) {
-      html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">🧱 障壁と突破策</div>`;
-      l3.obstacles.forEach(o => {
-        html += `<div style="margin-bottom:8px;padding:8px 12px;background:var(--bg-base);border-radius:8px;font-size:12px;">`;
-        html += `<b>${o.name||''}</b><br><span style="color:var(--text-secondary);">${o.solution||''}</span></div>`;
-      });
+    const cont = l3.continuity || {};
+    if ((cont.obstacles && cont.obstacles.length > 0) || (cont.solutions && cont.solutions.length > 0)) {
+      html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">🔄 継続設計</div>`;
+      html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">`;
+      html += `<div style="background:rgba(220,38,38,0.08);border-radius:8px;padding:10px 12px;"><div style="font-size:11px;font-weight:600;color:#DC2626;margin-bottom:6px;">続かない理由</div>`;
+      (cont.obstacles||[]).forEach(o => { html += `<div style="font-size:12px;padding:2px 0;">・${o}</div>`; });
+      html += `</div><div style="background:rgba(22,163,74,0.08);border-radius:8px;padding:10px 12px;"><div style="font-size:11px;font-weight:600;color:#16A34A;margin-bottom:6px;">仕組みで解決</div>`;
+      (cont.solutions||[]).forEach(s => { html += `<div style="font-size:12px;padding:2px 0;">・${s}</div>`; });
+      html += `</div></div>`;
     }
   } else if (cat === 'consulting') {
-    if (l3.options && l3.options.length > 0) {
-      html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">🔀 選択肢の比較</div>`;
-      l3.options.forEach(o => {
-        html += `<div style="margin-bottom:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;">`;
-        html += `<div style="font-size:13px;font-weight:600;margin-bottom:6px;">${o.name||''}</div>`;
-        html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">`;
-        html += `<div style="background:rgba(22,163,74,0.1);border-radius:6px;padding:6px 10px;font-size:12px;"><b style="color:#16A34A;font-size:11px;">メリット</b><br>${o.merit||''}</div>`;
-        html += `<div style="background:rgba(220,38,38,0.1);border-radius:6px;padding:6px 10px;font-size:12px;"><b style="color:#DC2626;font-size:11px;">デメリット</b><br>${o.demerit||''}</div>`;
+    const inv = l3.asset_inventory || {};
+    if (inv.market_value || (inv.skills && inv.skills.length > 0)) {
+      html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">💼 キャリア資産</div>`;
+      if (inv.market_value) {
+        html += `<div style="padding:10px 14px;border-left:3px solid var(--accent-blue);background:rgba(37,99,235,0.06);border-radius:0 8px 8px 0;font-size:13px;line-height:1.7;margin-bottom:10px;">${inv.market_value}</div>`;
+      }
+      if (inv.skills && inv.skills.length > 0) {
+        html += `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">`;
+        inv.skills.forEach(s => { html += `<span style="font-size:12px;padding:3px 10px;background:rgba(37,99,235,0.12);color:var(--accent-blue);border-radius:12px;">${s}</span>`; });
+        html += `</div>`;
+      }
+    }
+    if (l3.scenarios && l3.scenarios.length > 0) {
+      html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">🔀 シナリオ比較</div>`;
+      const scCols = ['rgba(22,163,74,0.08)','rgba(37,99,235,0.08)','rgba(124,58,237,0.08)'];
+      l3.scenarios.forEach((s, i) => {
+        html += `<div style="margin-bottom:10px;padding:10px 14px;border-radius:8px;background:${scCols[i]||scCols[0]};">`;
+        html += `<div style="font-size:13px;font-weight:600;margin-bottom:6px;">${s.option||''}</div>`;
+        html += `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px;">`;
+        html += `<div><span style="font-size:10px;color:var(--text-secondary);">1年後</span><br>${s.year1||''}</div>`;
+        html += `<div><span style="font-size:10px;color:var(--text-secondary);">5年後</span><br>${s.year5||''}</div>`;
+        html += `<div><span style="font-size:10px;color:#DC2626;">リスク</span><br>${s.risk||''}</div>`;
         html += `</div></div>`;
       });
     }
-    if (l3.criteria && l3.criteria.length > 0) {
-      html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">⚖️ 判断基準</div>`;
-      l3.criteria.forEach((c, i) => {
-        html += `<div style="font-size:13px;padding:5px 0;border-bottom:1px solid var(--border-subtle);display:flex;gap:8px;">`;
-        html += `<span style="font-size:11px;font-weight:600;background:rgba(37,99,235,0.15);color:var(--accent-blue);border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${i+1}</span>${c}</div>`;
-      });
+    if (l3.regret_check) {
+      html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">⏳ 後悔最小化</div>`;
+      html += `<div style="padding:10px 14px;border-left:3px solid var(--accent-orange);background:rgba(217,119,6,0.06);border-radius:0 8px 8px 0;font-size:13px;line-height:1.7;">${l3.regret_check}</div>`;
     }
     if (l3.recommendation) {
       html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">🎯 推奨</div>`;
       html += `<div style="padding:10px 14px;border-left:3px solid var(--accent-green);background:rgba(22,163,74,0.06);border-radius:0 8px 8px 0;font-size:13px;line-height:1.7;">${l3.recommendation}</div>`;
     }
+    if (l3.first_action && l3.first_action.length > 0) {
+      html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">👟 第一歩</div>`;
+      l3.first_action.forEach((a, i) => {
+        html += `<div style="font-size:13px;padding:5px 0;border-bottom:1px solid var(--border-subtle);display:flex;gap:8px;">`;
+        html += `<span style="font-size:11px;font-weight:600;background:rgba(37,99,235,0.15);color:var(--accent-blue);border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${i+1}</span>${a}</div>`;
+      });
+    }
+  } else if (cat === 'relationship') {
+    const struct = l3.structure_analysis || {};
+    if (struct.root_cause) {
+      html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">🔍 問題の本質</div>`;
+      html += `<div style="padding:10px 14px;border-left:3px solid var(--accent-purple);background:rgba(124,58,237,0.06);border-radius:0 8px 8px 0;font-size:13px;line-height:1.7;margin-bottom:14px;">${struct.root_cause}</div>`;
+    }
+    if (struct.user_position || struct.other_position) {
+      html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">`;
+      html += `<div style="background:rgba(37,99,235,0.08);border-radius:8px;padding:10px 12px;"><div style="font-size:11px;font-weight:600;color:var(--accent-blue);margin-bottom:6px;">あなたの立場</div><div style="font-size:12px;line-height:1.6;">${struct.user_position||''}</div></div>`;
+      html += `<div style="background:rgba(220,38,38,0.08);border-radius:8px;padding:10px 12px;"><div style="font-size:11px;font-weight:600;color:#DC2626;margin-bottom:6px;">相手の立場（推定）</div><div style="font-size:12px;line-height:1.6;">${struct.other_position||''}</div></div>`;
+      html += `</div>`;
+    }
+    const scenarios = l3.dialogue_scenarios || [];
+    if (scenarios.length > 0) {
+      html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">💬 対話シナリオ3択</div>`;
+      const colors = ['rgba(22,163,74,0.08)','rgba(37,99,235,0.08)','rgba(124,58,237,0.08)'];
+      scenarios.forEach((s, i) => {
+        html += `<div style="margin-bottom:10px;padding:10px 14px;border-radius:8px;background:${colors[i]||colors[0]};">`;
+        html += `<div style="font-size:13px;font-weight:600;margin-bottom:4px;">${s.approach||''}</div>`;
+        html += `<div style="font-size:13px;padding:6px 10px;background:rgba(124,58,237,0.1);border-radius:6px;color:var(--accent-purple);margin-bottom:6px;">「${s.phrase||''}」</div>`;
+        html += `<div style="font-size:12px;color:var(--text-secondary);display:grid;grid-template-columns:1fr 1fr;gap:6px;">`;
+        html += `<div>✅ ${s.merit||''}</div><div>⚠ ${s.risk||''}</div></div></div>`;
+      });
+    }
+    if (l3.recommendation) {
+      html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">🎯 推奨アプローチ</div>`;
+      html += `<div style="padding:10px 14px;border-left:3px solid var(--accent-green);background:rgba(22,163,74,0.06);border-radius:0 8px 8px 0;font-size:13px;line-height:1.7;">${l3.recommendation}</div>`;
+    }
     if (l3.caution) {
-      html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">⚠️ 注意点</div>`;
-      html += `<div style="padding:10px 14px;border-left:3px solid var(--accent-orange);background:rgba(217,119,6,0.06);border-radius:0 8px 8px 0;font-size:13px;line-height:1.7;">${l3.caution}</div>`;
+      html += `<div style="margin-top:14px;padding:8px 12px;background:rgba(217,119,6,0.08);border-radius:6px;font-size:12px;color:#D97706;">${l3.caution}</div>`;
     }
   }
   if (l3.risks && l3.risks.length > 0) {

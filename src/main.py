@@ -791,6 +791,15 @@ CATEGORY_PATTERNS = {
             {'role': '背中押し役', 'persona_id': 'fukuzawa'},
         ]
     },
+    'relationship': {
+        'name': '人間関係・交渉',
+        'description': '相手役（自動判定）・第三者アドバイザー2名・感情サポートの3〜4人が寄り添います',
+        'roles': [
+            {'role': '第三者アドバイザー①', 'persona_id': 'koumei'},
+            {'role': '第三者アドバイザー②', 'persona_id': 'tsuda'},
+            {'role': '感情サポート',         'persona_id': 'ojii'},
+        ]
+    },
 }
 
 @app.route("/api/team/suggest", methods=["POST"])
@@ -844,11 +853,72 @@ def suggest_team():
             'persona_color': persona.get('color', '#8B5CF6') if persona else '#8B5CF6',
         })
 
+    # Haikuによるカテゴリ自動判定（カテゴリ未指定時のみ）
+    suggested_category = matched_pattern if category else None
+    if not category:
+        try:
+            haiku_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+            haiku_res = haiku_client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=20,
+                messages=[{"role": "user", "content": f"""以下の議題から最も適切なカテゴリを1つ選んでください。
+議題：{topic}
+選択肢：strategy（ビジネス戦略）/ practice（提案・企画強化）/ consulting（キャリア・転機）/ relationship（人間関係・交渉）/ study（学習・創作）/ chat（その他）
+カテゴリ名のみ返答してください。"""}]
+            )
+            raw = haiku_res.content[0].text.strip().lower()
+            valid = {'strategy', 'practice', 'consulting', 'relationship', 'study', 'chat'}
+            if raw in valid:
+                suggested_category = raw
+        except Exception:
+            suggested_category = None
+
+    # 人間関係カテゴリの相手役ペルソナ自動判定
+    opponent_role = None
+    if category == 'relationship' or suggested_category == 'relationship':
+        try:
+            haiku_client2 = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+            opponent_res = haiku_client2.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=30,
+                messages=[{"role": "user", "content": f"""以下の議題から相手役のタイプを1つ選んでください。
+議題：{topic}
+選択肢：権威・強引型 / 論理・数字型 / 意固地・拒絶型 / 批判・攻撃型 / 折れない・信念型 / 叱咤・圧力型
+タイプ名のみ返答してください。"""}]
+            )
+            type_map = {
+                '権威・強引型':     'iwasaki',
+                '論理・数字型':     'consultant',
+                '意固地・拒絶型':   'amanojaku',
+                '批判・攻撃型':     'critic',
+                '折れない・信念型': 'churchill',
+                '叱咤・圧力型':     'shisho',
+            }
+            raw_type = opponent_res.content[0].text.strip()
+            opponent_pid = type_map.get(raw_type, 'amanojaku')
+            opponent_persona = persona_manager.get_persona(opponent_pid, user_id) or persona_manager.get_persona(opponent_pid)
+            if opponent_persona:
+                opponent_role = {
+                    'role': f'相手役（{raw_type}）',
+                    'persona_id': opponent_pid,
+                    'persona_name': opponent_persona['name'],
+                    'persona_avatar': opponent_persona.get('avatar') or '👤',
+                    'persona_color': opponent_persona.get('color', '#8B5CF6'),
+                }
+        except Exception:
+            opponent_role = None
+
+    # relationshipカテゴリの場合、相手役をrolesの先頭に追加
+    if (category == 'relationship' or matched_pattern == 'relationship') and opponent_role:
+        enriched_roles.insert(0, opponent_role)
+
     return jsonify({
         'pattern': matched_pattern,
         'pattern_name': pattern['name'],
         'description': pattern['description'],
         'roles': enriched_roles,
+        'suggested_category': suggested_category,
+        'opponent_type': opponent_role['role'] if opponent_role else None,
     })
 
 # ===== 会議API =====
@@ -964,6 +1034,10 @@ LAYER1_TEMPLATES = {
         'prompt_prefix': '以下の人生相談会議から「今日からできること」を作成してください。',
         'json_schema': '{"conclusion": "相談の核心を2〜3文で", "actions": ["明日できること1", "明日できること2", "長期的にやること"], "user_basis": "ユーザーの気持ちと決断のポイント"}',
     },
+    'relationship': {
+        'prompt_prefix': '以下の人間関係・交渉に関する会議から「対話アクション・ブリーフ」を作成してください。',
+        'json_schema': '{"conclusion": "状況の核心を2〜3文で", "actions": ["今日試せること1", "今日試せること2", "中長期的にやること"], "user_basis": "ユーザーの立場と感情を踏まえた方針"}',
+    },
     'chat': {
         'prompt_prefix': '以下の会話から「ハイライト」を作成してください。',
         'json_schema': '{"conclusion": "会話の要点を2〜3文で", "actions": ["印象に残った話題1", "印象に残った話題2"], "user_basis": "あなたが話していたこと"}',
@@ -1000,7 +1074,7 @@ JSONのみ出力してください。"""
 
 LAYER3_TEMPLATES = {
     'strategy': """以下のビジネス戦略会議から「戦略レポート」を作成してください。
-フレームワーク：ビジョン→SWOT分析→ターゲット市場→実行戦略（4P）→未解決課題→リスク
+フレームワーク：SWOT分析＋4P分析＋OKR（3ヶ月）＋競合分析
 
 以下のJSON形式のみで出力してください：
 {
@@ -1018,51 +1092,116 @@ LAYER3_TEMPLATES = {
     "place": "流通チャネル",
     "promotion": "認知獲得方法"
   },
+  "okr": {
+    "objective": "3ヶ月の目標（1文）",
+    "key_results": ["計測指標1", "計測指標2", "計測指標3"]
+  },
+  "competitive": {"differentiation": "競合との差別化根拠を2〜3文で"},
   "open_issues": [{"issue": "未解決課題1", "why": "重要な理由"}],
   "risks": [{"risk": "リスク1", "advice": "対処法"}]
 }
 JSONのみ出力してください。""",
-    'practice': """以下の発表練習会議から「発表分析レポート」を作成してください。
-会議の議論内容を深く分析し、発表者が次に活かせる具体的なフィードバックを提供してください。
+    'practice': """以下の提案・企画強化の会議から「企画強化レポート」を作成してください。
+フレームワーク：反論予測＋論理構造分析＋Q&A生成
 
 以下のJSON形式のみで出力してください：
 {
-  "summary": "発表内容と議論全体の要点を3〜4文で。どんな発表でどんな議論が行われたかを具体的に",
-  "evaluation": {
-    "strengths": ["具体的にうまくいった点1（議論から抽出）", "うまくいった点2", "うまくいった点3"],
-    "weaknesses": ["具体的に改善すべき点1（議論から抽出）", "改善すべき点2", "改善すべき点3"]
+  "summary": "提案内容と議論の要点を3〜4文で",
+  "logic_check": {
+    "strengths": ["論理的に強い点1", "強い点2"],
+    "gaps": ["論理の穴・飛躍1", "論理の穴2"]
   },
-  "qa_list": [
-    {"question": "本番で想定される質問1（議論から導出）", "answer": "推奨回答（具体的に）"},
-    {"question": "想定質問2", "answer": "推奨回答"},
-    {"question": "想定質問3", "answer": "推奨回答"}
+  "objections": [
+    {"objection": "想定される反論1", "counter": "対処法（具体的に）"},
+    {"objection": "想定される反論2", "counter": "対処法"},
+    {"objection": "想定される反論3", "counter": "対処法"}
   ],
-  "improvement": "発表全体の改善に向けた具体的なアドバイスを3〜4文で",
-  "checklist": ["本番前に必ずやること1（具体的に）", "本番前チェック2", "本番前チェック3", "本番前チェック4", "本番前チェック5"]
+  "qa_list": [
+    {"question": "本番で想定されるQ1", "answer": "推奨回答（具体的に）"},
+    {"question": "想定Q2", "answer": "推奨回答"},
+    {"question": "想定Q3", "answer": "推奨回答"}
+  ],
+  "improvement": "提案全体の改善アドバイスを3〜4文で",
+  "checklist": ["提出前に必ずやること1", "チェック2", "チェック3"]
 }
 JSONのみ出力してください。""",
-    'study': """以下の学習・研究会議から「学習ロードマップ」を作成してください。
+    'consulting': """以下のキャリア・転機に関する会議から「キャリア戦略レポート」を作成してください。
+フレームワーク：キャリア資産棚卸し＋シナリオ設計＋後悔最小化
+
+以下のJSON形式のみで出力してください：
+{
+  "asset_inventory": {
+    "skills": ["スキル・経験1", "スキル2"],
+    "network": "人脈・評判の強みを1〜2文で",
+    "market_value": "現在の市場価値評価を2文で"
+  },
+  "scenarios": [
+    {"option": "現状維持", "year1": "1年後の姿", "year5": "5年後の姿", "risk": "主なリスク"},
+    {"option": "転換・変化", "year1": "1年後の姿", "year5": "5年後の姿", "risk": "主なリスク"},
+    {"option": "段階的移行", "year1": "1年後の姿", "year5": "5年後の姿", "risk": "主なリスク"}
+  ],
+  "regret_check": "80歳の自分が振り返ったとき、後悔しない選択の根拠を2〜3文で",
+  "recommendation": "推奨する選択肢と根拠を2〜3文で",
+  "first_action": ["今週できる第一歩1", "第一歩2"]
+}
+JSONのみ出力してください。""",
+    'relationship': """以下の人間関係・交渉に関する会議から「関係性分析レポート」を作成してください。
+フレームワーク：関係性構造分析＋相手視点推定＋対話シナリオ3択
+
+以下のJSON形式のみで出力してください：
+{
+  "structure_analysis": {
+    "root_cause": "問題の本質（相手の性格vs役割構造の切り分け）を2〜3文で",
+    "user_position": "ユーザーの立場・感情・ニーズを1〜2文で",
+    "other_position": "相手の立場・感情・ニーズの推定を1〜2文で"
+  },
+  "dialogue_scenarios": [
+    {
+      "approach": "境界線の設定",
+      "phrase": "具体的なセリフ例（30字以内）",
+      "merit": "この方法のメリット",
+      "risk": "この方法のリスク"
+    },
+    {
+      "approach": "対話と理解",
+      "phrase": "具体的なセリフ例（30字以内）",
+      "merit": "この方法のメリット",
+      "risk": "この方法のリスク"
+    },
+    {
+      "approach": "適切な距離の確保",
+      "phrase": "具体的なセリフ例（30字以内）",
+      "merit": "この方法のメリット",
+      "risk": "この方法のリスク"
+    }
+  ],
+  "recommendation": "推奨アプローチと根拠を2〜3文で",
+  "caution": "⚠ このレポートはAI参考情報です。深刻な問題・ハラスメント・精神的苦しさを感じている場合は産業カウンセラー・専門機関への相談をお勧めします。"
+}
+JSONのみ出力してください。""",
+    'study': """以下の学習・創作会議から「学習ロードマップ」を作成してください。
+フレームワーク：ギャップ分析＋90日ロードマップ＋継続設計
 
 以下のJSON形式のみで出力してください：
 {
   "current_level": "現在地の評価を2〜3文で",
   "goal": "目標を1〜2文で明確に",
-  "gap_analysis": ["ギャップ1", "ギャップ2"],
-  "roadmap": [{"period": "1週目", "action": "やること"}],
-  "obstacles": [{"obstacle": "障壁1", "solution": "突破策1"}],
+  "gap_analysis": [
+    {"axis": "知識", "gap": "不足している点"},
+    {"axis": "スキル", "gap": "不足している点"},
+    {"axis": "習慣", "gap": "不足している点"},
+    {"axis": "環境", "gap": "不足している点"}
+  ],
+  "roadmap_90days": [
+    {"period": "1ヶ月目", "theme": "テーマ", "action": "具体的な行動"},
+    {"period": "2ヶ月目", "theme": "テーマ", "action": "具体的な行動"},
+    {"period": "3ヶ月目", "theme": "テーマ", "action": "具体的な行動"}
+  ],
+  "continuity": {
+    "obstacles": ["続かない理由の先回り1", "先回り2"],
+    "solutions": ["仕組みで解決する方法1", "方法2"]
+  },
   "motivation": "継続のためのアドバイスを2〜3文で"
-}
-JSONのみ出力してください。""",
-    'consulting': """以下の人生相談会議から「相談レポート」を作成してください。
-
-以下のJSON形式のみで出力してください：
-{
-  "essence": "悩みの本質を2〜3文で",
-  "options": [{"option": "選択肢1", "merit": "メリット", "demerit": "デメリット"}],
-  "criteria": ["判断基準1", "判断基準2"],
-  "recommendation": "推奨と根拠を2〜3文で",
-  "regret_check": "後悔最小化の視点から一言",
-  "caution": "注意点を1〜2文で"
 }
 JSONのみ出力してください。""",
 }
@@ -1552,10 +1691,9 @@ def generate_brief_pdf_layer3(session_id):
                     story.append(Spacer(1, 1*mm))
 
         elif category == 'study':
-            current_level = l3.get('current_level', '')
-            if current_level:
+            if l3.get('current_level'):
                 story.append(Paragraph('■ 現在地の評価', styles_h2))
-                story.append(Paragraph(current_level, styles_base))
+                story.append(Paragraph(l3['current_level'], styles_base))
                 story.append(Spacer(1, 4*mm))
             if l3.get('goal'):
                 story.append(Paragraph('■ 目標', styles_h2))
@@ -1565,58 +1703,98 @@ def generate_brief_pdf_layer3(session_id):
             if gap:
                 story.append(Paragraph('■ ギャップ分析', styles_h2))
                 for g in gap:
-                    story.append(Paragraph(f'・{g}', styles_base))
+                    story.append(Paragraph(f"・【{g.get('axis','')}】{g.get('gap','')}", styles_base))
                 story.append(Spacer(1, 4*mm))
-            roadmap = l3.get('roadmap', [])
+            roadmap = l3.get('roadmap_90days', [])
             if roadmap:
-                story.append(Paragraph('■ ロードマップ', styles_h2))
+                story.append(Paragraph('■ 90日ロードマップ', styles_h2))
                 for r in roadmap:
-                    story.append(Paragraph(f"【{r.get('period','')}】{r.get('action','')}", styles_base))
+                    story.append(Paragraph(f"【{r.get('period','')}】{r.get('theme','')}：{r.get('action','')}", styles_base))
                     story.append(Spacer(1, 2*mm))
                 story.append(Spacer(1, 2*mm))
-            obstacles = l3.get('obstacles', [])
-            if obstacles:
-                story.append(Paragraph('■ 障壁と突破策', styles_h2))
-                for o in obstacles:
-                    story.append(Paragraph(f"・{o.get('obstacle','')}", styles_base))
-                    story.append(Paragraph(f"  → {o.get('solution','')}", styles_base))
-                    story.append(Spacer(1, 2*mm))
-                story.append(Spacer(1, 2*mm))
+            cont = l3.get('continuity', {})
+            obs = cont.get('obstacles', [])
+            sols = cont.get('solutions', [])
+            if obs or sols:
+                story.append(Paragraph('■ 継続設計', styles_h2))
+                for o in obs:
+                    story.append(Paragraph(f'・続かない理由：{o}', styles_base))
+                for s in sols:
+                    story.append(Paragraph(f'・仕組みで解決：{s}', styles_base))
+                story.append(Spacer(1, 4*mm))
             if l3.get('motivation'):
                 story.append(Paragraph('■ 継続のアドバイス', styles_h2))
                 story.append(Paragraph(l3['motivation'], styles_base))
 
         elif category == 'consulting':
-            if l3.get('essence'):
-                story.append(Paragraph('■ 悩みの本質', styles_h2))
-                story.append(Paragraph(l3['essence'], styles_base))
+            inv = l3.get('asset_inventory', {})
+            if inv.get('market_value'):
+                story.append(Paragraph('■ 市場価値評価', styles_h2))
+                story.append(Paragraph(inv['market_value'], styles_base))
                 story.append(Spacer(1, 4*mm))
-            options = l3.get('options', [])
-            if options:
-                story.append(Paragraph('■ 選択肢の比較', styles_h2))
-                for o in options:
-                    story.append(Paragraph(f"【{o.get('option','')}】", styles_base))
-                    story.append(Paragraph(f"  メリット：{o.get('merit','')}", styles_base))
-                    story.append(Paragraph(f"  デメリット：{o.get('demerit','')}", styles_base))
+            skills = inv.get('skills', [])
+            if skills:
+                story.append(Paragraph('■ スキル・強み', styles_h2))
+                for s in skills:
+                    story.append(Paragraph(f'・{s}', styles_base))
+                story.append(Spacer(1, 4*mm))
+            scenarios = l3.get('scenarios', [])
+            if scenarios:
+                story.append(Paragraph('■ シナリオ比較', styles_h2))
+                for sc in scenarios:
+                    story.append(Paragraph(f"【{sc.get('option','')}】", styles_base))
+                    story.append(Paragraph(f"  1年後：{sc.get('year1','')}", styles_base))
+                    story.append(Paragraph(f"  5年後：{sc.get('year5','')}", styles_base))
+                    story.append(Paragraph(f"  リスク：{sc.get('risk','')}", styles_base))
                     story.append(Spacer(1, 3*mm))
                 story.append(Spacer(1, 2*mm))
-            criteria = l3.get('criteria', [])
-            if criteria:
-                story.append(Paragraph('■ 判断基準', styles_h2))
-                for c in criteria:
-                    story.append(Paragraph(f'・{c}', styles_base))
-                story.append(Spacer(1, 4*mm))
-            if l3.get('recommendation'):
-                story.append(Paragraph('■ 推奨と根拠', styles_h2))
-                story.append(Paragraph(l3['recommendation'], styles_base))
-                story.append(Spacer(1, 4*mm))
             if l3.get('regret_check'):
                 story.append(Paragraph('■ 後悔最小化の視点', styles_h2))
                 story.append(Paragraph(l3['regret_check'], styles_base))
                 story.append(Spacer(1, 4*mm))
+            if l3.get('recommendation'):
+                story.append(Paragraph('■ 推奨', styles_h2))
+                story.append(Paragraph(l3['recommendation'], styles_base))
+                story.append(Spacer(1, 4*mm))
+            first_action = l3.get('first_action', [])
+            if first_action:
+                story.append(Paragraph('■ 第一歩', styles_h2))
+                for a in first_action:
+                    story.append(Paragraph(f'・{a}', styles_base))
+                story.append(Spacer(1, 4*mm))
+
+        elif category == 'relationship':
+            struct = l3.get('structure_analysis', {})
+            if struct.get('root_cause'):
+                story.append(Paragraph('■ 問題の本質', styles_h2))
+                story.append(Paragraph(struct['root_cause'], styles_base))
+                story.append(Spacer(1, 4*mm))
+            if struct.get('user_position'):
+                story.append(Paragraph('■ あなたの立場', styles_h2))
+                story.append(Paragraph(struct['user_position'], styles_base))
+                story.append(Spacer(1, 2*mm))
+            if struct.get('other_position'):
+                story.append(Paragraph('■ 相手の立場（推定）', styles_h2))
+                story.append(Paragraph(struct['other_position'], styles_base))
+                story.append(Spacer(1, 4*mm))
+            scenarios = l3.get('dialogue_scenarios', [])
+            if scenarios:
+                story.append(Paragraph('■ 対話シナリオ3択', styles_h2))
+                for s in scenarios:
+                    story.append(Paragraph(f"【{s.get('approach','')}】", styles_base))
+                    styles_phrase = ParagraphStyle('phrase', fontName='HeiseiMin-W3', fontSize=10, leading=16, textColor=HexColor('#7C3AED'))
+                    story.append(Paragraph(f"セリフ例：「{s.get('phrase','')}」", styles_phrase))
+                    story.append(Paragraph(f"  メリット：{s.get('merit','')}", styles_base))
+                    story.append(Paragraph(f"  リスク：{s.get('risk','')}", styles_base))
+                    story.append(Spacer(1, 3*mm))
+                story.append(Spacer(1, 2*mm))
+            if l3.get('recommendation'):
+                story.append(Paragraph('■ 推奨アプローチ', styles_h2))
+                story.append(Paragraph(l3['recommendation'], styles_base))
+                story.append(Spacer(1, 4*mm))
             if l3.get('caution'):
-                story.append(Paragraph('■ 注意点', styles_h2))
-                story.append(Paragraph(l3['caution'], styles_base))
+                styles_caution = ParagraphStyle('caution', fontName='HeiseiMin-W3', fontSize=9, leading=14, textColor=HexColor('#D97706'))
+                story.append(Paragraph(l3['caution'], styles_caution))
 
         else:  # strategy（デフォルト）
             if l3.get('vision'):
