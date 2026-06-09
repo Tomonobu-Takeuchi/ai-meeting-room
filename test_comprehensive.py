@@ -86,6 +86,7 @@ def section(title: str):
 # ─── Flask test client ────────────────────────────────────────
 
 from src.main import app as flask_app
+from src.database import get_connection as _get_app_db_conn
 flask_app.config['TESTING'] = True
 
 UNIQUE = str(uuid.uuid4())[:8]
@@ -93,6 +94,22 @@ TEST_EMAIL    = f"comp_{UNIQUE}@test.invalid"
 TEST_PW       = "testpass123"
 TEST_NAME     = "テスト太郎"
 TEST_EMAIL_B  = f"comp_{UNIQUE}_b@test.invalid"   # 永続性テスト用
+
+def _set_user_plan(uid, plan, credits=0, monthly_count=0):
+    """DBを直接操作してユーザープランを変更（freeプランlearn制限テスト対応）"""
+    if not uid:
+        return
+    try:
+        conn = _get_app_db_conn()
+        conn.run(
+            "UPDATE users SET plan=:plan, credits=:credits, "
+            "monthly_meeting_count=:mc WHERE id=:id",
+            plan=plan, credits=credits, mc=monthly_count, id=uid
+        )
+        conn.close()
+    except Exception as e:
+        info(f"プラン変更エラー（無視）: {e}")
+
 
 # テスト中に共有する状態
 state: dict = {
@@ -1425,9 +1442,11 @@ if __name__ == '__main__':
             safe_run("機能試験1: 認証",              test1_auth,             client)
             safe_run("機能試験2: ゲスト会議",        test2_guest_meeting)
             safe_run("機能試験3: ペルソナCRUD",      test3_persona_crud,     client)
+            _set_user_plan(state.get('user_id'), 'standard', credits=100)  # learn制限解除
             safe_run("機能試験4: 学習データ冪等性",  test4_learn_idempotency, client)
             safe_run("機能試験4b: 学習データ非同期保存", test4b_learn_async_save, client)
             safe_run("機能試験4c: ペルソナ間非混入",    test4c_persona_isolation, client)
+            _set_user_plan(state.get('user_id'), 'free', credits=0)  # freeに戻す
             safe_run("機能試験5: 会議開始・メッセージ", test5_meeting,        client)
             safe_run("機能試験6: フィードバック",    test6_feedback,         client)
             safe_run("機能試験7: プラン制限",        test7_plan_limits,      client)

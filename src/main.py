@@ -318,6 +318,10 @@ def get_learn_data(persona_id):
 @login_required
 def add_learn_data(persona_id):
     user_id = get_current_user_id()
+    from src.database import get_user_payment_status
+    status = get_user_payment_status(user_id)
+    if status.get('plan', 'free') == 'free':
+        return jsonify({"error": "学習データの登録はstandardプラン以上でご利用いただけます", "code": "PLAN_LIMIT"}), 403
     data = request.json
     content = data.get("content", "").strip()
     source = data.get("source", "")

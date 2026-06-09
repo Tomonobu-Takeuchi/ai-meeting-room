@@ -1847,6 +1847,10 @@ async function submitEditPersona() {
     }
 
     // ★ 学習データをpersona_learnテーブルにDB保存（3件バッチ並列・1件失敗でも続行）
+    if (State.editLearnFiles.length > 0 && State.currentUser?.plan === 'free') {
+      showToast('学習データの登録はstandardプラン以上でご利用いただけます', 'error');
+      State.editLearnFiles = [];
+    }
     const textFiles = State.editLearnFiles.filter(f => f.type === 'text' || f.type === 'pdf');
     if (textFiles.length > 0) showToast('学習データを読み込んでいます...しばらくお待ちください', 'info', 30000);
     const learnResults = await batchSettled(
@@ -2338,6 +2342,10 @@ async function doCreatePersona(isDeceasedConfirmed) {
     if (State.addAvatarDataUrl) State.avatarImages[data.persona.id] = State.addAvatarDataUrl;
 
     // ★ 学習データをpersona_learnテーブルにDB保存（3件バッチ並列・1件失敗でも続行）
+    if (State.addLearnFiles.length > 0 && State.currentUser?.plan === 'free') {
+      showToast('学習データの登録はstandardプラン以上でご利用いただけます', 'error');
+      State.addLearnFiles = [];
+    }
     const textFiles = State.addLearnFiles.filter(f => f.type === 'text' || f.type === 'pdf');
     if (textFiles.length > 0) showToast('学習データを読み込んでいます...しばらくお待ちください', 'info', 30000);
     const learnResults = await batchSettled(
