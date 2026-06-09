@@ -1321,6 +1321,10 @@ async function downloadLayer1PDF() {
   btn.disabled = true; btn.textContent = '⏳ 生成中...';
   try {
     const res = await fetch(`/api/meeting/${sid}/brief_pdf`, { method: 'POST' });
+    if (res.status === 401) {
+      showToast('ログインが必要です。右上の「ログイン」からログインしてください。', 'error');
+      return;
+    }
     if (!res.ok) throw new Error('生成失敗');
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
@@ -1360,6 +1364,10 @@ async function downloadLayer2PDF() {
         topic: State.topic || ''
       })
     });
+    if (res.status === 401) {
+      showToast('ログインが必要です。右上の「ログイン」からログインしてください。', 'error');
+      return;
+    }
     if (!res.ok) throw new Error('生成失敗');
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
@@ -1392,6 +1400,10 @@ async function downloadLayer3PDF() {
         topic: State.topic || ''
       })
     });
+    if (res.status === 401) {
+      showToast('ログインが必要です。右上の「ログイン」からログインしてください。', 'error');
+      return;
+    }
     if (!res.ok) throw new Error('生成失敗');
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
