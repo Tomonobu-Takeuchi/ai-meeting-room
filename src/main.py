@@ -762,33 +762,34 @@ CATEGORY_PATTERNS = {
         ]
     },
     'practice': {
-        'name': '発表・プレゼン練習',
-        'description': '厳格な審査員・多角的視点・創造的視点・科学的視点の4人が発表を評価します',
+        'name': '提案・企画強化',
+        'description': '意思決定者・社会的整合性・厳格な審査員・実行推進・論理補強の5人で企画を鍛えます',
         'roles': [
-            {'role': '厳格な審査員', 'persona_id': 'professor'},
-            {'role': '多角的視点',     'persona_id': 'koumei'},
-            {'role': '創造的視点',     'persona_id': 'davinci'},
-            {'role': '科学的視点',     'persona_id': 'curie'},
+            {'role': '意思決定者役', 'persona_id': 'iwasaki'},
+            {'role': '社会的整合性', 'persona_id': 'shibusawa'},
+            {'role': '厳格な審査員', 'persona_id': 'critic'},
+            {'role': '実行推進',     'persona_id': 'hideyoshi'},
+            {'role': '論理補強',     'persona_id': 'fukuzawa'},
         ]
     },
     'study': {
-        'name': '学習・研究',
-        'description': '指導者・査読者・同期・応援者の4人が学習をサポートします',
+        'name': '学習・創作',
+        'description': '専門的壁打ち・継続伴走・批評・文系壁打ちの4人が学習と創作を支援します',
         'roles': [
-            {'role': '指導者', 'persona_id': 'professor'},
-            {'role': '査読者', 'persona_id': 'turing'},
-            {'role': '同期',   'persona_id': 'curie'},
-            {'role': '応援者', 'persona_id': 'shisho'},
+            {'role': '専門的壁打ち（理系）', 'persona_id': 'einstein'},
+            {'role': '継続の伴走',           'persona_id': 'edison'},
+            {'role': '批評・厳しさ',         'persona_id': 'critic'},
+            {'role': '専門的壁打ち（文系）', 'persona_id': 'murasaki'},
         ]
     },
     'consulting': {
-        'name': '人生相談',
-        'description': '傾聴者・論理家・経験者・背中押し役の4人が寄り添います',
+        'name': 'キャリア・転機',
+        'description': '人生経験者・精神的支柱・独立論理家・実行の伴走の4人が転機を支援します',
         'roles': [
-            {'role': '傾聴者',     'persona_id': 'obaa'},
-            {'role': '論理家',     'persona_id': 'koumei'},
-            {'role': '経験者',     'persona_id': 'yako'},
-            {'role': '背中押し役', 'persona_id': 'fukuzawa'},
+            {'role': '人生経験者', 'persona_id': 'shibusawa'},
+            {'role': '精神的支柱', 'persona_id': 'teresa'},
+            {'role': '独立論理家', 'persona_id': 'fukuzawa'},
+            {'role': '実行の伴走', 'persona_id': 'nightingale'},
         ]
     },
     'relationship': {
@@ -1023,8 +1024,8 @@ LAYER1_TEMPLATES = {
         'json_schema': '{"conclusion": "結論を2〜3文で", "actions": ["次にやること1", "次にやること2", "次にやること3"], "user_basis": "ユーザーの発言を踏まえた方針"}',
     },
     'practice': {
-        'prompt_prefix': '以下の発表練習会議から「発表前チェックリスト」を作成してください。',
-        'json_schema': '{"conclusion": "発表の全体評価を2〜3文で", "actions": ["改善すべき点1", "改善すべき点2", "本番前にやること"], "user_basis": "発表者の強みと注意点"}',
+        'prompt_prefix': '以下の提案・企画強化の会議から「企画強化アクション・ブリーフ」を作成してください。',
+        'json_schema': '{"conclusion": "提案の核心と議論の結論を2〜3文で", "actions": ["提出前にやること1", "補強すべき論点", "想定反論への準備"], "user_basis": "ユーザーの提案の強みと改善ポイント"}',
     },
     'study': {
         'prompt_prefix': '以下の学習・研究会議から「学習アクション・ブリーフ」を作成してください。',
@@ -1655,37 +1656,42 @@ def generate_brief_pdf_layer3(session_id):
             story.append(Spacer(1, 4*mm))
 
         if category == 'practice':
-            evaluation = l3.get('evaluation', {})
-            strengths = evaluation.get('strengths', [])
-            weaknesses = evaluation.get('weaknesses', [])
-            if strengths or weaknesses:
-                story.append(Paragraph('■ 評価', styles_h2))
-                if strengths:
-                    story.append(Paragraph('【うまくいった点】', styles_base))
-                    for s in strengths:
-                        story.append(Paragraph(f'・{s}', styles_base))
-                    story.append(Spacer(1, 2*mm))
-                if weaknesses:
-                    story.append(Paragraph('【改善すべき点】', styles_base))
-                    for w in weaknesses:
-                        story.append(Paragraph(f'・{w}', styles_base))
+            if l3.get('summary'):
+                story.append(Paragraph('■ 要点サマリー', styles_h2))
+                story.append(Paragraph(l3['summary'], styles_base))
                 story.append(Spacer(1, 4*mm))
-            qa_list = l3.get('qa_list', [])
-            if qa_list:
+            lc = l3.get('logic_check', {})
+            if lc.get('strengths') or lc.get('gaps'):
+                story.append(Paragraph('■ 論理構造分析', styles_h2))
+                for s in lc.get('strengths', []):
+                    story.append(Paragraph(f'✅ {s}', styles_base))
+                for g in lc.get('gaps', []):
+                    story.append(Paragraph(f'⚠ {g}', styles_base))
+                story.append(Spacer(1, 4*mm))
+            objections = l3.get('objections', [])
+            if objections:
+                story.append(Paragraph('■ 反論予測と対処法', styles_h2))
+                for o in objections:
+                    story.append(Paragraph(f"【反論】{o.get('objection','')}", styles_base))
+                    story.append(Paragraph(f"  → {o.get('counter','')}", styles_base))
+                    story.append(Spacer(1, 2*mm))
+                story.append(Spacer(1, 2*mm))
+            qa = l3.get('qa_list', [])
+            if qa:
                 story.append(Paragraph('■ 想定Q&A', styles_h2))
-                for q in qa_list:
+                for q in qa:
                     styles_q = ParagraphStyle('q', fontName='HeiseiMin-W3', fontSize=11, leading=16, textColor=HexColor('#60A5FA'))
                     story.append(Paragraph(f"Q: {q.get('question','')}", styles_q))
                     story.append(Paragraph(f"A: {q.get('answer','')}", styles_base))
                     story.append(Spacer(1, 3*mm))
                 story.append(Spacer(1, 2*mm))
             if l3.get('improvement'):
-                story.append(Paragraph('■ 総合改善アドバイス', styles_h2))
+                story.append(Paragraph('■ 改善アドバイス', styles_h2))
                 story.append(Paragraph(l3['improvement'], styles_base))
                 story.append(Spacer(1, 4*mm))
             checklist = l3.get('checklist', [])
             if checklist:
-                story.append(Paragraph('■ 本番前チェックリスト', styles_h2))
+                story.append(Paragraph('■ 提出前チェックリスト', styles_h2))
                 for c in checklist:
                     story.append(Paragraph(f'□ {c}', styles_base))
                     story.append(Spacer(1, 1*mm))

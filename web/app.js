@@ -1193,23 +1193,42 @@ function buildLayer3HTML(l3, cat) {
       });
     }
   } else if (cat === 'practice') {
-    if (l3.evaluation) {
+    if (l3.summary) {
+      html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">📝 要点サマリー</div>`;
+      html += `<div style="padding:10px 14px;border-left:3px solid var(--accent-blue);background:rgba(37,99,235,0.06);border-radius:0 8px 8px 0;font-size:13px;line-height:1.7;margin-bottom:14px;">${l3.summary}</div>`;
+    }
+    const lc = l3.logic_check || {};
+    if ((lc.strengths||[]).length > 0 || (lc.gaps||[]).length > 0) {
+      html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">🔍 論理構造分析</div>`;
       html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">`;
-      html += `<div style="background:rgba(22,163,74,0.1);border-radius:8px;padding:10px 12px;"><div style="font-size:11px;font-weight:600;color:#16A34A;margin-bottom:6px;">うまくいった点</div>`;
-      html += (l3.evaluation.strengths||[]).map(s=>`<div style="font-size:12px;line-height:1.6;">・${s}</div>`).join('');
-      html += `</div><div style="background:rgba(220,38,38,0.1);border-radius:8px;padding:10px 12px;"><div style="font-size:11px;font-weight:600;color:#DC2626;margin-bottom:6px;">改善すべき点</div>`;
-      html += (l3.evaluation.weaknesses||[]).map(w=>`<div style="font-size:12px;line-height:1.6;">・${w}</div>`).join('');
+      html += `<div style="background:rgba(22,163,74,0.08);border-radius:8px;padding:10px 12px;"><div style="font-size:11px;font-weight:600;color:#16A34A;margin-bottom:6px;">論理的に強い点</div>`;
+      (lc.strengths||[]).forEach(s => { html += `<div style="font-size:12px;line-height:1.6;">・${s}</div>`; });
+      html += `</div><div style="background:rgba(220,38,38,0.08);border-radius:8px;padding:10px 12px;"><div style="font-size:11px;font-weight:600;color:#DC2626;margin-bottom:6px;">論理の穴・飛躍</div>`;
+      (lc.gaps||[]).forEach(g => { html += `<div style="font-size:12px;line-height:1.6;">・${g}</div>`; });
       html += `</div></div>`;
     }
-    if (l3.qa_list && l3.qa_list.length > 0) {
-      html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">❓ 想定Q&A</div>`;
+    const objections = l3.objections || [];
+    if (objections.length > 0) {
+      html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">⚔️ 反論予測と対処法</div>`;
+      objections.forEach(o => {
+        html += `<div style="margin-bottom:8px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;">`;
+        html += `<div style="font-size:12px;color:#DC2626;font-weight:600;margin-bottom:4px;">反論：${o.objection||''}</div>`;
+        html += `<div style="font-size:12px;color:#16A34A;">→ ${o.counter||''}</div></div>`;
+      });
+    }
+    if ((l3.qa_list||[]).length > 0) {
+      html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">❓ 想定Q&A</div>`;
       l3.qa_list.forEach(q => {
         html += `<div style="margin-bottom:8px;padding:8px 12px;background:var(--bg-base);border-radius:8px;font-size:12px;">`;
         html += `<b>Q: ${q.question||''}</b><br>A: ${q.answer||''}</div>`;
       });
     }
-    if (l3.checklist && l3.checklist.length > 0) {
-      html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">✅ 本番前チェックリスト</div>`;
+    if (l3.improvement) {
+      html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">💡 改善アドバイス</div>`;
+      html += `<div style="padding:10px 14px;border-left:3px solid var(--accent-purple);background:rgba(124,58,237,0.06);border-radius:0 8px 8px 0;font-size:13px;line-height:1.7;">${l3.improvement}</div>`;
+    }
+    if ((l3.checklist||[]).length > 0) {
+      html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">✅ 提出前チェックリスト</div>`;
       l3.checklist.forEach(c => {
         html += `<div style="font-size:13px;padding:5px 0;border-bottom:1px solid var(--border-subtle);">□ ${c}</div>`;
       });
