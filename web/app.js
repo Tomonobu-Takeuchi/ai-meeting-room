@@ -987,7 +987,7 @@ async function showReportModal() {
       // 案A：standardプランのみクレジット消費テキスト表示
       const layer2CostInfo = $('layer2CostInfo');
       if (layer2CostInfo) {
-        layer2CostInfo.style.display = (State.currentUser?.plan === 'standard') ? 'inline' : 'none';
+        layer2CostInfo.style.display = 'none';
       }
     } else if (!isLoggedIn) {
       DOM.downloadLayer2Btn.style.display = 'none';
@@ -1262,7 +1262,7 @@ async function useTrialLayer2() {
       // 案A：standardプランのみクレジット消費テキスト表示
       const layer2CostInfo = $('layer2CostInfo');
       if (layer2CostInfo) {
-        layer2CostInfo.style.display = (State.currentUser?.plan === 'standard') ? 'inline' : 'none';
+        layer2CostInfo.style.display = 'none';
       }
       DOM.layer2Trial.classList.add('hidden');
     } else {
@@ -1368,17 +1368,7 @@ async function downloadLayer2PDF() {
     a.download = `議論分析レポート_${State.topic?.slice(0,20)}_${new Date().toISOString().slice(0,10)}.pdf`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    if (State.currentUser?.plan === 'standard') {
-      const remaining = Math.max(0, (State.currentUser.credits || 1) - 1);
-      State.currentUser.credits = remaining;
-      const costInfo = $('layer2CostInfo');
-      if (costInfo) costInfo.style.display = 'none';
-      const costEl = $('startMeetingCostText');
-      if (costEl) costEl.textContent = `1チケット消費します（残り${remaining}枚）`;
-      showToast(`議論分析レポートをダウンロードしました（残り${remaining}クレジット）`, 'success');
-    } else {
-      showToast('PDFをダウンロードしました', 'success');
-    }
+    showToast('議論分析レポートをPDFダウンロードしました', 'success');
   } catch (e) {
     showToast('PDFの生成に失敗しました', 'error');
   } finally {
