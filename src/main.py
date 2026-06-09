@@ -1264,6 +1264,7 @@ def end_meeting(session_id):
 
 
 @app.route("/api/meeting/<session_id>/brief_pdf", methods=["POST"])
+@login_required
 def generate_brief_pdf(session_id):
     """Layer 1（アクション・ブリーフ）をPDF化して返す"""
     summary = meeting_room.get_session_summary(session_id)
@@ -1377,6 +1378,7 @@ JSONのみ出力してください。"""
 
 
 @app.route("/api/meeting/<session_id>/brief_pdf_layer2", methods=["POST"])
+@login_required
 def generate_brief_pdf_layer2(session_id):
     """Layer2（議論分析レポート）をPDF化して返す。フロントからJSONを受け取る"""
     data = request.get_json()
@@ -1452,6 +1454,7 @@ def generate_brief_pdf_layer2(session_id):
 
 
 @app.route("/api/meeting/<session_id>/brief_pdf_layer3", methods=["POST"])
+@login_required
 def generate_brief_pdf_layer3(session_id):
     """Layer3（戦略フレームワーク）をPDF化して返す。フロントからJSONを受け取る"""
     user_id = get_current_user_id()
