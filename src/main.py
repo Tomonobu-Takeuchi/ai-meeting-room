@@ -1056,6 +1056,7 @@ JSONのみ出力してください。""",
 }
 
 @app.route("/api/meeting/<session_id>/brief", methods=["POST"])
+@login_required
 def generate_brief(session_id):
     """Layer1・Layer2・Layer3をJSON返却"""
     summary = meeting_room.get_session_summary(session_id)
@@ -1653,6 +1654,7 @@ def generate_brief_pdf_layer3(session_id):
 # ===== TTS API =====
 
 @app.route("/api/tts", methods=["POST"])
+@login_required
 def text_to_speech():
     """OpenAI TTSでMP3を生成して返す"""
     data = request.json or {}
