@@ -871,6 +871,14 @@ def start_meeting():
                 "code": "PLAN_LIMIT",
                 "monthly_count": status.get('monthly_meeting_count', 0)
             }), 403
+    else:
+        guest_count = session.get('guest_meeting_count', 0)
+        if guest_count >= 3:
+            return jsonify({
+                "error": "ゲストの会議は3回までです。続けるには無料登録をしてください。",
+                "code": "GUEST_LIMIT"
+            }), 403
+        session['guest_meeting_count'] = guest_count + 1
     prefetched_members = None
     if not member_ids:
         prefetched_members = persona_manager.get_members_only(user_id)

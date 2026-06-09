@@ -1981,6 +1981,9 @@ async function startMeeting() {
   } catch (e) {
     if (e.code === 'PLAN_LIMIT') {
       openPricingModal(e.message);
+    } else if (e.code === 'GUEST_LIMIT') {
+      openAuthModal();
+      showToast('ゲストの会議は3回までです。無料登録して続けましょう！', 'error');
     } else {
       showToast(translateApiError(e.message, '会議の開始'), 'error');
     }
