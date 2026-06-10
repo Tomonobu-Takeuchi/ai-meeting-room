@@ -693,12 +693,6 @@ const MEETING_CATEGORIES = [
 ];
 
 function showCategorySelectModal() {
-  const topic = DOM.topicInput.value.trim();
-  if (!topic) {
-    showToast('議題を入力してください', 'error');
-    DOM.topicInput.focus();
-    return;
-  }
   const list = document.getElementById('categoryBtnList');
   list.innerHTML = '';
   MEETING_CATEGORIES.forEach(cat => {
@@ -728,7 +722,10 @@ function selectCategory(cat) {
   State.suggestedPersonaIds = cat.personas;
   document.getElementById('categorySelectModal').classList.add('hidden');
   const ph = CATEGORY_PLACEHOLDERS[cat.id] || CATEGORY_PLACEHOLDERS['chat'];
-  if (DOM.topicInput) DOM.topicInput.placeholder = ph;
+  if (DOM.topicInput) {
+    DOM.topicInput.placeholder = ph;
+    DOM.topicInput.focus();
+  }
   showTeamSuggestModal();
 }
 
@@ -1193,10 +1190,6 @@ function buildLayer3HTML(l3, cat) {
       });
     }
   } else if (cat === 'practice') {
-    if (l3.summary) {
-      html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">📝 要点サマリー</div>`;
-      html += `<div style="padding:10px 14px;border-left:3px solid var(--accent-blue);background:rgba(37,99,235,0.06);border-radius:0 8px 8px 0;font-size:13px;line-height:1.7;margin-bottom:14px;">${l3.summary}</div>`;
-    }
     const lc = l3.logic_check || {};
     if ((lc.strengths||[]).length > 0 || (lc.gaps||[]).length > 0) {
       html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">🔍 論理構造分析</div>`;
@@ -3638,6 +3631,8 @@ async function logout() {
     State.userAvatar = '👤';
     State.meetingCategory = null;
     State.suggestedPersonaIds = [];
+    State.attachedFiles = [];
+    if (DOM.attachmentsBar) { DOM.attachmentsBar.style.display = 'none'; DOM.attachmentsBar.innerHTML = ''; }
     renderAuthArea();
     showToast('ログアウトしました', 'success');
   } catch (e) { showToast(translateApiError(e.message, 'ログアウト'), 'error'); }

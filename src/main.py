@@ -787,9 +787,9 @@ CATEGORY_PATTERNS = {
         'description': '人生経験者・精神的支柱・独立論理家・実行の伴走の4人が転機を支援します',
         'roles': [
             {'role': '人生経験者', 'persona_id': 'shibusawa'},
-            {'role': '精神的支柱', 'persona_id': 'teresa'},
+            {'role': '精神的支柱', 'persona_id': 'nightingale'},
             {'role': '独立論理家', 'persona_id': 'fukuzawa'},
-            {'role': '実行の伴走', 'persona_id': 'nightingale'},
+            {'role': '実行の伴走', 'persona_id': 'tsuda'},
         ]
     },
     'relationship': {
