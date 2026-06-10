@@ -156,10 +156,12 @@ class MeetingRoom:
             yield f"data: {_dumps({'type': 'done', 'persona_id': 'facilitator', 'message': msg})}\n\n"
         except Exception as e:
             err_msg = str(e)
-            if '401' in err_msg or 'authentication_error' in err_msg.lower() or 'invalid' in err_msg.lower() and 'key' in err_msg.lower():
+            if '401' in err_msg or 'authentication_error' in err_msg.lower() or ('invalid' in err_msg.lower() and 'key' in err_msg.lower()):
                 err_msg = "AIサービスの認証エラーです。APIキーをご確認ください。"
             elif 'overloaded' in err_msg.lower():
                 err_msg = "AIサーバーが混雑しています。しばらく待ってから再試行してください。"
+            else:
+                err_msg = f"エラーが発生しました: {err_msg[:100]}"
             yield f"data: {_dumps({'type': 'error', 'message': err_msg})}\n\n"
 
     def generate_auto_discussion_stream(self, session_id, rounds=1):
