@@ -860,7 +860,7 @@ def suggest_team():
         try:
             haiku_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
             haiku_res = haiku_client.messages.create(
-                model="claude-haiku-4-5-20251001",
+                model="claude-haiku-4-5",
                 max_tokens=20,
                 messages=[{"role": "user", "content": f"""以下の議題から最も適切なカテゴリを1つ選んでください。
 議題：{topic}
@@ -880,7 +880,7 @@ def suggest_team():
         try:
             haiku_client2 = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
             opponent_res = haiku_client2.messages.create(
-                model="claude-haiku-4-5-20251001",
+                model="claude-haiku-4-5",
                 max_tokens=30,
                 messages=[{"role": "user", "content": f"""以下の議題から相手役のタイプを1つ選んでください。
 議題：{topic}
@@ -1014,7 +1014,7 @@ def detect_crisis(text):
     try:
         _client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
         response = _client.messages.create(
-            model='claude-haiku-4-5-20251001',
+            model='claude-haiku-4-5',
             max_tokens=10,
             messages=[{
                 'role': 'user',
@@ -1303,7 +1303,7 @@ def generate_brief(session_id):
 JSONのみ出力してください。"""
 
         layer1_res = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-6",
             max_tokens=800,
             messages=[{"role": "user", "content": layer1_prompt}]
         )
@@ -1327,7 +1327,7 @@ JSONのみ出力してください。"""
 {discussion if discussion else "（議論なし）"}"""
 
             layer2_res = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-6",
                 max_tokens=1200,
                 messages=[{"role": "user", "content": l2_prompt}]
             )
@@ -1386,7 +1386,7 @@ JSONのみ出力してください。"""
 {discussion if discussion else "（議論なし）"}"""
 
             layer3_res = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-6",
                 max_tokens=1500,
                 messages=[{"role": "user", "content": layer3_prompt}]
             )
@@ -1495,7 +1495,7 @@ def generate_brief_pdf(session_id):
 JSONのみ出力してください。"""
 
         res = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-6",
             max_tokens=800,
             messages=[{"role": "user", "content": layer1_prompt}]
         )
