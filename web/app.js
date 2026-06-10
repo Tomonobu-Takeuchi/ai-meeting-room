@@ -2117,6 +2117,8 @@ async function resetMeeting() {
   if (DOM.mobileActionBar) { DOM.mobileActionBar.classList.remove('visible'); }
   if (DOM.mobileSummarizeBtn) DOM.mobileSummarizeBtn.disabled = true;
   if (DOM.mobileFacilitatorBtn) DOM.mobileFacilitatorBtn.disabled = true;
+  State.attachedFiles = [];
+  if (DOM.attachmentsBar) { DOM.attachmentsBar.style.display = 'none'; DOM.attachmentsBar.innerHTML = ''; }
   await reloadPersonas();
 }
 
