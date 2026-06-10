@@ -2327,6 +2327,7 @@ async function invokeFacilitator() {
       evtSource.close(); State.isStreaming = false; setStreamingButtons(false); scrollToBottom();
       if (fullText.includes('【質問】')) {
         showQuestionBadge();
+        State.waitingForUser = true;
       }
       if (State.voiceMode && fullText) speakText(fullText.replace(/【質問】/g, '').trim(), 'facilitator', streamEl?.querySelector('.facilitator-banner'));
     } else if (data.type === 'error') {
@@ -2532,7 +2533,10 @@ function addMessage(msg) {
       : (getAvatarImg(persona) ? `<img src="${getAvatarImg(persona)}" alt="${persona.name}" />` : (persona.avatar || '👤'));
     row.innerHTML = `
       <div class="msg-avatar" style="background:${persona.color||'#888'}22;border:2px solid ${persona.color||'#888'}44;">${avatarContent}</div>
-      <div class="msg-body"><div class="msg-name">${persona.name||'メンバー'}</div><div class="msg-bubble">${escapeHtml(msg.content)}</div></div>`;
+      <div class="msg-body"><div class="msg-name">${(() => {
+  const oRole = State.suggestedRoles?.find(r => r.persona_id === msg.persona_id && r.role?.includes('相手役'));
+  return oRole ? `${persona.name}<div style="font-size:10px;color:var(--accent-purple);margin-top:1px;">${oRole.role}</div>` : (persona.name||'メンバー');
+})()}</div><div class="msg-bubble">${escapeHtml(msg.content)}</div></div>`;
   }
   DOM.chatMessages.appendChild(row); scrollToBottom(); return row;
 }
@@ -2589,7 +2593,10 @@ function addStreamingBubble(persona) {
     : (persona.avatar && !persona.avatar.startsWith('data:') ? persona.avatar : '👤');
   row.innerHTML = `
     <div class="msg-avatar" style="background:${persona.color}22;border:2px solid ${persona.color}44;">${avatarContent}</div>
-    <div class="msg-body"><div class="msg-name">${persona.name}</div><div class="msg-bubble streaming"></div></div>`;
+    <div class="msg-body"><div class="msg-name">${(() => {
+  const oRole = State.suggestedRoles?.find(r => r.persona_id === persona.id && r.role?.includes('相手役'));
+  return oRole ? `${persona.name}<div style="font-size:10px;color:var(--accent-purple);margin-top:1px;">${oRole.role}</div>` : persona.name;
+})()}</div><div class="msg-bubble streaming"></div></div>`;
   DOM.chatMessages.appendChild(row); scrollToBottom(); return row;
 }
 
