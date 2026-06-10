@@ -28,7 +28,7 @@ class MeetingRoom:
         self.data_dir = data_dir
         os.makedirs(data_dir, exist_ok=True)
         self.client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-        self.model = "claude-sonnet-4-20250514"
+        self.model = "claude-sonnet-4-6"
         self.sessions = {}
 
     def _stream_with_retry(self, max_tokens, system, messages, max_retries=3):
