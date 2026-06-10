@@ -156,6 +156,7 @@ class MeetingRoom:
             yield f"data: {_dumps({'type': 'done', 'persona_id': 'facilitator', 'message': msg})}\n\n"
         except Exception as e:
             err_msg = str(e)
+            print(f"[FACILITATOR_ERROR] {err_msg}", flush=True)
             if '401' in err_msg or 'authentication_error' in err_msg.lower() or ('invalid' in err_msg.lower() and 'key' in err_msg.lower()):
                 err_msg = "AIサービスの認証エラーです。APIキーをご確認ください。"
             elif 'overloaded' in err_msg.lower():
