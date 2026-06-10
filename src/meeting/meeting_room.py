@@ -47,7 +47,7 @@ class MeetingRoom:
                 else:
                     raise
 
-    def create_session(self, topic, member_ids, user_id=None, prefetched_members=None, category=None):
+    def create_session(self, topic, member_ids, user_id=None, prefetched_members=None, category=None, opponent_persona_id=None, opponent_name=None):
         session_id = str(uuid.uuid4())[:8]
         members = prefetched_members if prefetched_members is not None else self.persona_manager.get_personas_by_ids(member_ids, user_id=user_id)
         facilitator = self.persona_manager.get_facilitator()
@@ -61,7 +61,9 @@ class MeetingRoom:
             "category": category,
             "created_at": datetime.now().isoformat(),
             "status": "active",
-            "crisis_flag": False
+            "crisis_flag": False,
+            "opponent_persona_id": opponent_persona_id,
+            "opponent_name": opponent_name,
         }
         self.sessions[session_id] = session
         return session
@@ -102,9 +104,14 @@ class MeetingRoom:
             yield "data: [ERROR] ペルソナが見つかりません\n\n"
             return
         messages = self._build_conversation_history(session, persona_id, trigger_message)
+        is_opponent = (session.get("opponent_persona_id") == persona_id)
+        opponent_name = session.get("opponent_name") if is_opponent else None
         system_prompt = self.persona_manager.build_system_prompt(
             persona, session["topic"], user_id=session.get("user_id"),
-            crisis_mode=session.get("crisis_flag", False)
+            crisis_mode=session.get("crisis_flag", False),
+            category=session.get("category"),
+            opponent_name=opponent_name,
+            is_opponent=is_opponent
         )
         try:
             full_response = ""
@@ -136,7 +143,8 @@ class MeetingRoom:
         system_prompt = self.persona_manager.build_facilitator_prompt(
             session["facilitator"], session["topic"], discussion_text,
             mode=mode, member_ids=member_ids,
-            crisis_mode=session.get("crisis_flag", False)
+            crisis_mode=session.get("crisis_flag", False),
+            category=session.get("category")
         )
         try:
             full_response = ""

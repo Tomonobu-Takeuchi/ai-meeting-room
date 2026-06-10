@@ -897,10 +897,27 @@ def suggest_team():
             }
             raw_type = opponent_res.content[0].text.strip()
             opponent_pid = type_map.get(raw_type, 'amanojaku')
+            # 議題から相手名を抽出
+            import re
+            name_patterns = [
+                r'([^\s　、。]{1,8}さん)',
+                r'([^\s　、。]{1,6}部長)',
+                r'([^\s　、。]{1,6}課長)',
+                r'([^\s　、。]{1,6}先輩)',
+                r'([^\s　、。]{1,6}上司)',
+                r'([^\s　、。]{1,6}同僚)',
+                r'([^\s　、。]{1,6}後輩)',
+            ]
+            opponent_label = '相手役'
+            for pat in name_patterns:
+                m = re.search(pat, topic)
+                if m:
+                    opponent_label = m.group(1)
+                    break
             opponent_persona = persona_manager.get_persona(opponent_pid, user_id) or persona_manager.get_persona(opponent_pid)
             if opponent_persona:
                 opponent_role = {
-                    'role': f'相手役（{raw_type}）',
+                    'role': f'相手役（{opponent_label}役）',
                     'persona_id': opponent_pid,
                     'persona_name': opponent_persona['name'],
                     'persona_avatar': opponent_persona.get('avatar') or '👤',
@@ -920,6 +937,8 @@ def suggest_team():
         'roles': enriched_roles,
         'suggested_category': suggested_category,
         'opponent_type': opponent_role['role'] if opponent_role else None,
+        'opponent_persona_id': opponent_role['persona_id'] if opponent_role else None,
+        'opponent_name': opponent_label if opponent_role else None,
     })
 
 # ===== 会議API =====
@@ -955,7 +974,15 @@ def start_meeting():
         prefetched_members = persona_manager.get_members_only(user_id)
         member_ids = [p["id"] for p in prefetched_members]
     category = data.get("meeting_category", "chat")
-    session_data = meeting_room.create_session(topic, member_ids, user_id, prefetched_members=prefetched_members, category=category)
+    opponent_persona_id = data.get("opponent_persona_id")
+    opponent_name = data.get("opponent_name")
+    session_data = meeting_room.create_session(
+        topic, member_ids, user_id,
+        prefetched_members=prefetched_members,
+        category=category,
+        opponent_persona_id=opponent_persona_id,
+        opponent_name=opponent_name
+    )
     updated_count = 0
     if user_id:
         from src.database import get_user_payment_status

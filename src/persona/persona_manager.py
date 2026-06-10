@@ -600,7 +600,7 @@ class PersonaManager:
 
     # ===== プロンプト生成 =====
 
-    def build_system_prompt(self, persona, topic, history_text='', learn_data='', user_id=None, crisis_mode=False):
+    def build_system_prompt(self, persona, topic, history_text='', learn_data='', user_id=None, crisis_mode=False, category=None, opponent_name=None, is_opponent=False):
         rag_data = self.get_relevant_learn_data(persona['id'], topic, user_id)
         combined_learn = ''
         if rag_data:
@@ -670,11 +670,59 @@ class PersonaManager:
 """
         if crisis_mode:
             prompt += "\n- 会議中にユーザーが深刻な精神的苦痛を訴えています。専門家への相談・助けを求める行動を否定・批判する発言は絶対にしないこと。ユーザーが相談や支援を求めることを肯定する立場を取ること（キャラクター設定より優先）。\n"
+
+        # カテゴリ別の役割指示
+        category_instructions = {
+            'study': f"""
+【今回の会議の特別な役割（学習・創作カテゴリ）】
+この会議は「{topic}」に取り組むユーザーへの技術・創作指導の場です。
+あなたの専門知識・経験を活かして以下を実践してください：
+・現在の取り組みや作品の「何が優れているか」「何が問題か」を具体的に評価する
+・「次に何をすべきか」を優先順位をつけて提示する
+・ユーザーが実際に行動できる具体的な方法・インプット源（書籍・手法・参考作品）を示す
+・続かない理由を先回りして、仕組みで解決する方法を提案する
+抽象的なアドバイスではなく、あなたの専門家としての視点から具体的な評価と指針を与えてください。
+""",
+            'consulting': f"""
+【今回の会議の特別な役割（キャリア・転機カテゴリ）】
+この会議は人生の転機・キャリアの決断に向き合うユーザーの支援の場です。
+あなたの人生経験・専門性を活かして以下を実践してください：
+・ユーザーの現在地（スキル・経験・強み）を具体的に評価する
+・複数のシナリオ（現状維持・転換・段階的移行）を比較検討する
+・「80歳の自分が振り返ったときに後悔しないか」という問いを軸に判断を促す
+・感情と論理の両面から寄り添いながら、最終的にはユーザー自身が決断できるよう支援する
+""",
+            'relationship': f"""
+【今回の会議の特別な役割（人間関係・交渉カテゴリ）】
+この会議は人間関係の課題に向き合うユーザーへの支援の場です。
+・問題の本質を「相手の性格の問題」と「役割構造の問題」に切り分けて整理する
+・ユーザーの立場・感情・ニーズと、相手の立場・感情・ニーズの両方を推定する
+・「境界線の設定」「対話と理解」「適切な距離の確保」の3つのアプローチから助言する
+・深刻なハラスメント・精神的苦痛を感じている場合は専門家への相談を促す
+""",
+        }
+        if category and category in category_instructions:
+            prompt += category_instructions[category]
+
+        # 相手役の特別な役割ブロック
+        if is_opponent and opponent_name:
+            prompt += f"""
+【今回の特別な役割（相手役）】
+あなたは「{opponent_name}役」として発言してください。
+ユーザーの状況：{topic}
+相手の立場から、あなたのキャラクターで自然に応答してください。
+
+守るべき制約：
+・ユーザーを過度に攻撃・否定し続けるのではなく、「相手の言い分がある人物」として振る舞うこと
+・自傷・自殺・逃避を肯定する発言は絶対にしないこと
+・会議の最後には必ず1つ「理解できる点」を認めること
+"""
+
         if history_text:
             prompt += f"\n【これまでの会話】\n{history_text}"
         return prompt
 
-    def build_facilitator_prompt(self, facilitator, topic, history_text, mode='guide', member_ids=None, crisis_mode=False):
+    def build_facilitator_prompt(self, facilitator, topic, history_text, mode='guide', member_ids=None, crisis_mode=False, category=None):
         if mode == 'opening':
             instruction = (
                 "【質問】と冒頭に必ず付けて、相談者（ユーザー）に直接語りかけてください。\n"
@@ -700,7 +748,31 @@ class PersonaManager:
         elif mode == 'summarize':
             instruction = "議論全体を振り返り、各メンバーの主な意見・共通点・相違点・結論を整理してください。"
         else:
-            instruction = "議論の進行を促し、次の論点や深掘りすべき点を提示してください。"
+            # カテゴリ別の進行指示
+            category_guide = {
+                'study': (
+                    "この会議は学習・創作支援の場です。以下の流れで進行してください。\n"
+                    "序盤：「まず現在どこまで取り組んでいるか教えてください」と現在地確認から入る。\n"
+                    "中盤：賢人たちの評価・改善点が出てきたら「では具体的にどう進めるか考えましょう」と行動計画に誘導する。\n"
+                    "終盤：「続けるための仕組みを一緒に考えましょう」と継続設計に誘導する。\n"
+                    "議論の進行を促し、次の論点や深掘りすべき点を提示してください。"
+                ),
+                'consulting': (
+                    "この会議はキャリア・転機の支援の場です。以下の流れで進行してください。\n"
+                    "序盤：「まず今の仕事で得てきたものを整理しましょう」とキャリア資産の棚卸しから入る。\n"
+                    "中盤：「3つの選択肢（現状維持・転換・段階的移行）をそれぞれ考えてみましょう」とシナリオ設計に移行する。\n"
+                    "終盤：「80歳の自分が振り返ったとき」という問いを投げかけて後悔最小化の軸に着地させる。\n"
+                    "議論の進行を促し、次の論点や深掘りすべき点を提示してください。"
+                ),
+                'relationship': (
+                    "この会議は人間関係・交渉の支援の場です。以下の流れで進行してください。\n"
+                    "序盤：「まず状況を整理しましょう。相手はどんな立場・役割の方ですか？」と関係性の構造把握から入る。\n"
+                    "中盤：「相手の立場から見るとどう見えているでしょうか」と相手視点の推定に誘導する。\n"
+                    "終盤：「では明日の朝礼で何を言うか、3つのアプローチを考えてみましょう」と対話シナリオに着地させる。\n"
+                    "議論の進行を促し、次の論点や深掘りすべき点を提示してください。"
+                ),
+            }
+            instruction = category_guide.get(category, "議論の進行を促し、次の論点や深掘りすべき点を提示してください。")
 
         if isinstance(facilitator, dict):
             facilitator_name = facilitator.get('name', 'ファシリテータ')

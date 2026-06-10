@@ -688,7 +688,7 @@ const MEETING_CATEGORIES = [
   { id: 'practice',     icon: '💡', label: '提案・企画強化', desc: '企画書レビュー・プレゼン準備・反論対策',       personas: ['professor','koumei','davinci','critic'] },
   { id: 'consulting',   icon: '🧭', label: 'キャリア・転機', desc: '転職・独立・定年後・人生の岐路の決断',         personas: ['shibusawa','teresa','fukuzawa','nightingale'] },
   { id: 'relationship', icon: '🤝', label: '人間関係・交渉', desc: '職場の悩み・上司部下・交渉・ハラスメント対処', personas: ['koumei','tsuda','ojii'] },
-  { id: 'study',        icon: '📚', label: '学習・創作',     desc: '独学ロードマップ・研究壁打ち・創作批評',       personas: ['einstein','edison','critic','murasaki'] },
+  { id: 'study',        icon: '📚', label: '学習・創作',     desc: '技術・創作への賢人アドバイス・上達ロードマップ・継続設計', personas: ['einstein','edison','critic','murasaki'] },
   { id: 'chat',         icon: '☕', label: 'カテゴリ未選択', desc: '自由に話したい・フレームワークなし',           personas: [] },
 ];
 
@@ -825,6 +825,10 @@ function confirmSuggestedTeam() {
   // 提案されたpersona_idをselectedMemberIdsにセット
   State.selectedMemberIds = State.suggestedRoles.map(r => r.persona_id);
   DOM.teamSuggestModal.classList.add('hidden');
+  // opponent情報をStateに保持
+  const opponentRole = State.suggestedRoles?.find(r => r.role?.includes('相手役'));
+  State.opponentPersonaId = opponentRole?.persona_id || null;
+  State.opponentName = opponentRole ? (opponentRole.role.match(/（(.+?)役）/)?.[1] || null) : null;
   startMeeting();
 }
 
@@ -2038,7 +2042,9 @@ async function startMeeting() {
     const data = await API.post('/api/meeting/start', {
       topic,
       member_ids: State.selectedMemberIds,
-      meeting_category: State.meetingCategory || 'chat'
+      meeting_category: State.meetingCategory || 'chat',
+      ...(State.opponentPersonaId ? { opponent_persona_id: State.opponentPersonaId } : {}),
+      ...(State.opponentName ? { opponent_name: State.opponentName } : {}),
     });
     State.sessionId = data.session_id; State.topic = data.topic;
     console.log('[LOG] 会議開始 sessionId=' + State.sessionId);
