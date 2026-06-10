@@ -1028,8 +1028,8 @@ LAYER1_TEMPLATES = {
         'json_schema': '{"conclusion": "提案の核心と議論の結論を2〜3文で", "actions": ["提出前にやること1", "補強すべき論点", "想定反論への準備"], "user_basis": "ユーザーの提案の強みと改善ポイント"}',
     },
     'study': {
-        'prompt_prefix': '以下の学習・研究会議から「学習アクション・ブリーフ」を作成してください。',
-        'json_schema': '{"conclusion": "今日の学びを2〜3文で", "actions": ["今週やること1", "今週やること2", "今週やること3"], "user_basis": "ユーザーの現在地と次のステップ"}',
+        'prompt_prefix': '以下の学習・創作に関する会議から「賢人アドバイス・ブリーフ」を作成してください。',
+        'json_schema': '{"conclusion": "賢人たちの評価の核心を2〜3文で", "actions": ["最初に取り組むこと", "次に取り組むこと", "中長期で取り組むこと"], "user_basis": "ユーザーの現在地と上達のための最重要ポイント"}',
     },
     'consulting': {
         'prompt_prefix': '以下のキャリア・転機に関する会議から「今日からできること」を作成してください。',
@@ -1180,29 +1180,30 @@ JSONのみ出力してください。""",
   "caution": "⚠ このレポートはAI参考情報です。深刻な問題・ハラスメント・精神的苦しさを感じている場合は産業カウンセラー・専門機関への相談をお勧めします。"
 }
 JSONのみ出力してください。""",
-    'study': """以下の学習・創作会議から「学習ロードマップ」を作成してください。
-フレームワーク：ギャップ分析＋90日ロードマップ＋継続設計
+    'study': """以下の学習・創作に関する会議から「賢人評価レポート」を作成してください。
+フレームワーク：賢人の評価（意図的練習のフィードバック）＋改善の優先順位（70:20:10の実践設計）＋OKR形式のロードマップ＋継続の仕組み
 
 以下のJSON形式のみで出力してください：
 {
-  "current_level": "現在地の評価を2〜3文で",
-  "goal": "目標を1〜2文で明確に",
-  "gap_analysis": [
-    {"axis": "知識", "gap": "不足している点"},
-    {"axis": "スキル", "gap": "不足している点"},
-    {"axis": "習慣", "gap": "不足している点"},
-    {"axis": "環境", "gap": "不足している点"}
+  "expert_evaluation": {
+    "strengths": "現在の取り組みや作品の優れている点を2〜3文で",
+    "issues": "改善が必要な核心的な問題を2〜3文で",
+    "overall": "賢人たちの総合評価を1〜2文で"
+  },
+  "improvement_priority": [
+    {"rank": 1, "action": "最初に取り組むこと（具体的に）", "reason": "なぜ最優先か"},
+    {"rank": 2, "action": "次に取り組むこと（具体的に）", "reason": "なぜ2番目か"},
+    {"rank": 3, "action": "中長期で取り組むこと（具体的に）", "reason": "なぜ中長期か"}
   ],
-  "roadmap_90days": [
-    {"period": "1ヶ月目", "theme": "テーマ", "action": "具体的な行動"},
-    {"period": "2ヶ月目", "theme": "テーマ", "action": "具体的な行動"},
-    {"period": "3ヶ月目", "theme": "テーマ", "action": "具体的な行動"}
+  "roadmap": [
+    {"phase": "フェーズ1", "period": "期間（例：1〜3ヶ月）", "theme": "テーマ", "actions": ["具体的行動1", "具体的行動2"], "input_source": "参照すべき書籍・手法・参考作品"},
+    {"phase": "フェーズ2", "period": "期間", "theme": "テーマ", "actions": ["具体的行動1", "具体的行動2"], "input_source": "参照すべき書籍・手法"},
+    {"phase": "フェーズ3", "period": "期間", "theme": "テーマ", "actions": ["具体的行動1", "具体的行動2"], "input_source": "参照すべき書籍・手法"}
   ],
   "continuity": {
-    "obstacles": ["続かない理由の先回り1", "先回り2"],
-    "solutions": ["仕組みで解決する方法1", "方法2"]
-  },
-  "motivation": "継続のためのアドバイスを2〜3文で"
+    "obstacles": ["続かない理由の先回り1", "続かない理由の先回り2"],
+    "solutions": ["仕組みで解決する方法1", "仕組みで解決する方法2"]
+  }
 }
 JSONのみ出力してください。""",
 }
@@ -1697,40 +1698,45 @@ def generate_brief_pdf_layer3(session_id):
                     story.append(Spacer(1, 1*mm))
 
         elif category == 'study':
-            if l3.get('current_level'):
-                story.append(Paragraph('■ 現在地の評価', styles_h2))
-                story.append(Paragraph(l3['current_level'], styles_base))
+            ev = l3.get('expert_evaluation', {})
+            if ev.get('overall'):
+                story.append(Paragraph('■ 賢人の総合評価', styles_h2))
+                story.append(Paragraph(ev['overall'], styles_base))
                 story.append(Spacer(1, 4*mm))
-            if l3.get('goal'):
-                story.append(Paragraph('■ 目標', styles_h2))
-                story.append(Paragraph(l3['goal'], styles_base))
+            if ev.get('strengths'):
+                story.append(Paragraph('■ 優れている点', styles_h2))
+                story.append(Paragraph(ev['strengths'], styles_base))
+                story.append(Spacer(1, 2*mm))
+            if ev.get('issues'):
+                story.append(Paragraph('■ 改善が必要な点', styles_h2))
+                story.append(Paragraph(ev['issues'], styles_base))
                 story.append(Spacer(1, 4*mm))
-            gap = l3.get('gap_analysis', [])
-            if gap:
-                story.append(Paragraph('■ ギャップ分析', styles_h2))
-                for g in gap:
-                    story.append(Paragraph(f"・【{g.get('axis','')}】{g.get('gap','')}", styles_base))
-                story.append(Spacer(1, 4*mm))
-            roadmap = l3.get('roadmap_90days', [])
-            if roadmap:
-                story.append(Paragraph('■ 90日ロードマップ', styles_h2))
-                for r in roadmap:
-                    story.append(Paragraph(f"【{r.get('period','')}】{r.get('theme','')}：{r.get('action','')}", styles_base))
+            priorities = l3.get('improvement_priority', [])
+            if priorities:
+                story.append(Paragraph('■ 改善の優先順位', styles_h2))
+                for p in priorities:
+                    story.append(Paragraph(f"【{p.get('rank','')}位】{p.get('action','')}", styles_base))
+                    story.append(Paragraph(f"  理由：{p.get('reason','')}", styles_base))
                     story.append(Spacer(1, 2*mm))
                 story.append(Spacer(1, 2*mm))
+            roadmap = l3.get('roadmap', [])
+            if roadmap:
+                story.append(Paragraph('■ 習得・上達ロードマップ', styles_h2))
+                for r in roadmap:
+                    story.append(Paragraph(f"【{r.get('phase','')}：{r.get('period','')}】{r.get('theme','')}", styles_base))
+                    for act in r.get('actions', []):
+                        story.append(Paragraph(f"  ・{act}", styles_base))
+                    if r.get('input_source'):
+                        story.append(Paragraph(f"  📚 {r.get('input_source','')}", styles_base))
+                    story.append(Spacer(1, 3*mm))
+                story.append(Spacer(1, 2*mm))
             cont = l3.get('continuity', {})
-            obs = cont.get('obstacles', [])
-            sols = cont.get('solutions', [])
-            if obs or sols:
-                story.append(Paragraph('■ 継続設計', styles_h2))
-                for o in obs:
+            if cont.get('obstacles') or cont.get('solutions'):
+                story.append(Paragraph('■ 継続の仕組み', styles_h2))
+                for o in cont.get('obstacles', []):
                     story.append(Paragraph(f'・続かない理由：{o}', styles_base))
-                for s in sols:
-                    story.append(Paragraph(f'・仕組みで解決：{s}', styles_base))
-                story.append(Spacer(1, 4*mm))
-            if l3.get('motivation'):
-                story.append(Paragraph('■ 継続のアドバイス', styles_h2))
-                story.append(Paragraph(l3['motivation'], styles_base))
+                for s in cont.get('solutions', []):
+                    story.append(Paragraph(f'・仕組み：{s}', styles_base))
 
         elif category == 'consulting':
             inv = l3.get('asset_inventory', {})
