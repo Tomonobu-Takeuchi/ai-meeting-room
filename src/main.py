@@ -908,7 +908,7 @@ def suggest_team():
                 r'([^\s　、。]{1,6}同僚)',
                 r'([^\s　、。]{1,6}後輩)',
             ]
-            opponent_label = '相手役'
+            opponent_label = None
             for pat in name_patterns:
                 m = re.search(pat, topic)
                 if m:
@@ -917,7 +917,7 @@ def suggest_team():
             opponent_persona = persona_manager.get_persona(opponent_pid, user_id) or persona_manager.get_persona(opponent_pid)
             if opponent_persona:
                 opponent_role = {
-                    'role': f'相手役（{opponent_label}役）',
+                    'role': f'相手役（{opponent_label}役）' if opponent_label else '相手役',
                     'persona_id': opponent_pid,
                     'persona_name': opponent_persona['name'],
                     'persona_avatar': opponent_persona.get('avatar') or '👤',
@@ -938,7 +938,7 @@ def suggest_team():
         'suggested_category': suggested_category,
         'opponent_type': opponent_role['role'] if opponent_role else None,
         'opponent_persona_id': opponent_role['persona_id'] if opponent_role else None,
-        'opponent_name': opponent_label if opponent_role else None,
+        'opponent_name': (opponent_label or '相手') if opponent_role else None,
     })
 
 # ===== 会議API =====
@@ -1308,7 +1308,10 @@ JSONのみ出力してください。"""
             messages=[{"role": "user", "content": layer1_prompt}]
         )
         layer1_text = layer1_res.content[0].text.strip().replace("```json", "").replace("```", "").strip()
-        layer1_data = json.loads(layer1_text)
+        try:
+            layer1_data = json.loads(layer1_text)
+        except (json.JSONDecodeError, ValueError):
+            layer1_data = {"conclusion": layer1_text, "actions": [], "user_basis": ""}
 
         # ===== Layer2（standard/pro は常時、free は未使用時のみ、chatカテゴリは除外） =====
         layer2_data = None
@@ -1332,7 +1335,10 @@ JSONのみ出力してください。"""
                 messages=[{"role": "user", "content": l2_prompt}]
             )
             layer2_text = layer2_res.content[0].text.strip().replace("```json", "").replace("```", "").strip()
-            layer2_data = json.loads(layer2_text)
+            try:
+                layer2_data = json.loads(layer2_text)
+            except (json.JSONDecodeError, ValueError):
+                layer2_data = {"conclusion": layer2_text, "persona_views": [], "risks": [], "next_actions": []}
 
             # freeプランのお試し使用済みフラグを更新
             if plan == 'free' and not trial_layer2_used and user_id:
@@ -1391,7 +1397,10 @@ JSONのみ出力してください。"""
                 messages=[{"role": "user", "content": layer3_prompt}]
             )
             layer3_text = layer3_res.content[0].text.strip().replace("```json", "").replace("```", "").strip()
-            layer3_data = json.loads(layer3_text)
+            try:
+                layer3_data = json.loads(layer3_text)
+            except (json.JSONDecodeError, ValueError):
+                layer3_data = {"error": "レポートの生成に失敗しました", "raw": layer3_text[:500]}
 
             # free/standardプランのお試し使用済みフラグを更新
             if plan in ('free', 'standard') and not trial_layer3_used and user_id:
