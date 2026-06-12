@@ -877,6 +877,7 @@ def suggest_team():
 
     # 人間関係カテゴリの相手役ペルソナ自動判定
     opponent_role = None
+    opponent_label = None
     if category == 'relationship' or suggested_category == 'relationship':
         try:
             haiku_client2 = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
