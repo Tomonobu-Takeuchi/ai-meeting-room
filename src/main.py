@@ -1304,14 +1304,19 @@ JSONのみ出力してください。"""
 
         layer1_res = client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=800,
+            max_tokens=2000,
             messages=[{"role": "user", "content": layer1_prompt}]
         )
+        if layer1_res.stop_reason == "max_tokens":
+            app.logger.warning(f"[LAYER1_TRUNCATED] session={session_id} category={category} stop_reason=max_tokens")
         layer1_text = layer1_res.content[0].text.strip().replace("```json", "").replace("```", "").strip()
+        layer1_parse_ok = False
         try:
             layer1_data = json.loads(layer1_text)
+            layer1_parse_ok = True
         except (json.JSONDecodeError, ValueError):
-            layer1_data = {"conclusion": layer1_text, "actions": [], "user_basis": ""}
+            app.logger.error(f"[LAYER1_PARSE_ERROR] session={session_id} category={category} raw={layer1_text[:200]}")
+            layer1_data = {"conclusion": "レポートの生成に失敗しました。もう一度お試しください。", "actions": [], "user_basis": ""}
 
         # ===== Layer2（standard/pro は常時、free は未使用時のみ、chatカテゴリは除外） =====
         layer2_data = None

@@ -1542,7 +1542,22 @@ async function downloadLayer3PDF() {
   } catch (e) {
     showToast('PDFの生成に失敗しました', 'error');
   } finally {
-    btn.disabled = false; btn.textContent = '📄 戦略レポートをPDF保存';
+    btn.disabled = false;
+    btn.innerHTML = '📄 戦略レポートをPDF保存<br>'
+      + '<span id="layer3RemainingInfo" style="display:none;font-size:11px;opacity:0.8;"></span><br>'
+      + '<span id="layer3CostInfo" style="display:none;font-size:11px;opacity:0.8;">💳 1クレジット消費します</span>';
+    // span復元後、残り回数を再表示
+    if (_briefData?.layer3_remaining !== null && _briefData?.layer3_remaining !== undefined) {
+      const ri = document.getElementById('layer3RemainingInfo');
+      if (ri) {
+        ri.textContent = `🔄 今月の残り生成回数：${_briefData.layer3_remaining} / 30回`;
+        ri.style.cssText = 'display:inline;font-size:11px;opacity:0.8;';
+      }
+    }
+    if (State.currentUser?.plan === 'pro') {
+      const ci = document.getElementById('layer3CostInfo');
+      if (ci) ci.style.display = 'inline';
+    }
   }
 }
 
