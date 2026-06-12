@@ -1140,6 +1140,11 @@ function buildLayer2HTML(l2, cat) {
 
 function buildLayer3HTML(l3, cat) {
   let html = '';
+  if (l3.error) {
+    return `<div style="padding:16px;text-align:center;color:var(--text-secondary);font-size:13px;">
+      ⚠️ ${l3.error}<br><span style="font-size:12px;margin-top:6px;display:block;">時間をおいて再度「レポートを見る」をお試しください。</span>
+    </div>`;
+  }
   if (l3.summary) {
     html += `<div style="background:var(--bg-base);border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;line-height:1.7;">${l3.summary}</div>`;
   }

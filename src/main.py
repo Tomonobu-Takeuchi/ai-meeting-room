@@ -1331,17 +1331,22 @@ JSONのみ出力してください。"""
 
             layer2_res = client.messages.create(
                 model="claude-sonnet-4-6",
-                max_tokens=1200,
+                max_tokens=3000,
                 messages=[{"role": "user", "content": l2_prompt}]
             )
+            if layer2_res.stop_reason == "max_tokens":
+                app.logger.warning(f"[LAYER2_TRUNCATED] session={session_id} category={category} stop_reason=max_tokens")
             layer2_text = layer2_res.content[0].text.strip().replace("```json", "").replace("```", "").strip()
+            layer2_parse_ok = False
             try:
                 layer2_data = json.loads(layer2_text)
+                layer2_parse_ok = True
             except (json.JSONDecodeError, ValueError):
-                layer2_data = {"conclusion": layer2_text, "persona_views": [], "risks": [], "next_actions": []}
+                app.logger.error(f"[LAYER2_PARSE_ERROR] session={session_id} raw={layer2_text[:200]}")
+                layer2_data = {"conclusion": "レポートの生成に失敗しました。もう一度お試しください。", "persona_views": [], "risks": [], "next_actions": []}
 
-            # freeプランのお試し使用済みフラグを更新
-            if plan == 'free' and not trial_layer2_used and user_id:
+            # freeプランのお試し使用済みフラグを更新（parse成功時のみ）
+            if layer2_parse_ok and plan == 'free' and not trial_layer2_used and user_id:
                 from src.database import get_connection
                 conn2 = get_connection()
                 try:
@@ -1393,17 +1398,22 @@ JSONのみ出力してください。"""
 
             layer3_res = client.messages.create(
                 model="claude-sonnet-4-6",
-                max_tokens=1500,
+                max_tokens=4000,
                 messages=[{"role": "user", "content": layer3_prompt}]
             )
+            if layer3_res.stop_reason == "max_tokens":
+                app.logger.warning(f"[LAYER3_TRUNCATED] session={session_id} category={category} stop_reason=max_tokens")
             layer3_text = layer3_res.content[0].text.strip().replace("```json", "").replace("```", "").strip()
+            layer3_parse_ok = False
             try:
                 layer3_data = json.loads(layer3_text)
+                layer3_parse_ok = True
             except (json.JSONDecodeError, ValueError):
-                layer3_data = {"error": "レポートの生成に失敗しました", "raw": layer3_text[:500]}
+                app.logger.error(f"[LAYER3_PARSE_ERROR] session={session_id} category={category} raw={layer3_text[:200]}")
+                layer3_data = {"error": "レポートの生成に失敗しました。もう一度お試しください。"}
 
-            # free/standardプランのお試し使用済みフラグを更新
-            if plan in ('free', 'standard') and not trial_layer3_used and user_id:
+            # free/standardプランのお試し使用済みフラグを更新（parse成功時のみ）
+            if layer3_parse_ok and plan in ('free', 'standard') and not trial_layer3_used and user_id:
                 from src.database import get_connection
                 conn3 = get_connection()
                 try:
