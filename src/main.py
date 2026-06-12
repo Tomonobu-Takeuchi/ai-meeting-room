@@ -814,15 +814,33 @@ def suggest_team():
 
     category = data.get("category", "")
 
-    # chatカテゴリはチーム提案なし（フロントでスキップ）
+    # chatカテゴリ（カテゴリ未選択）：Haikuで議題を判定し、chatならスキップ・他カテゴリならチーム提案
     if category == 'chat':
-        return jsonify({
-            'pattern': 'chat',
-            'pattern_name': '雑談・その他',
-            'description': 'メンバーを自由に選んでください',
-            'roles': [],
-            'skip_suggest': True,
-        })
+        try:
+            haiku_client_pre = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+            haiku_pre_res = haiku_client_pre.messages.create(
+                model="claude-haiku-4-5",
+                max_tokens=20,
+                messages=[{"role": "user", "content": f"""以下の議題から最も適切なカテゴリを1つ選んでください。
+議題：{topic}
+選択肢：strategy（ビジネス戦略）/ practice（提案・企画強化）/ consulting（キャリア・転機）/ relationship（人間関係・交渉）/ study（学習・創作）/ chat（その他）
+カテゴリ名のみ返答してください。"""}]
+            )
+            raw_pre = haiku_pre_res.content[0].text.strip().lower()
+            valid_cats = {'strategy', 'practice', 'consulting', 'relationship', 'study', 'chat'}
+            category = raw_pre if raw_pre in valid_cats else ''
+        except Exception:
+            category = ''
+        # chatと判定・判定失敗の場合はスキップ
+        if not category or category == 'chat':
+            return jsonify({
+                'pattern': 'chat',
+                'pattern_name': '雑談・その他',
+                'description': 'メンバーを自由に選んでください',
+                'roles': [],
+                'skip_suggest': True,
+            })
+        # 他カテゴリと判定された場合は以降の処理へ続行（category変数に判定結果が入った状態）
 
     # カテゴリが指定されている場合はCATEGORY_PATTERNSを優先
     if category and category in CATEGORY_PATTERNS:
