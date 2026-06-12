@@ -829,15 +829,33 @@ def suggest_team():
         pattern = CATEGORY_PATTERNS[category]
         matched_pattern = category
     else:
-        # 既存のキーワードマッチにフォールバック
-        matched_pattern = 'E'
-        for pattern_key, pat in TEAM_PATTERNS.items():
-            if pattern_key == 'E':
-                continue
-            if any(kw in topic for kw in pat['keywords']):
-                matched_pattern = pattern_key
-                break
-        pattern = TEAM_PATTERNS[matched_pattern]
+        # カテゴリ未選択時：Haikuで判定してCATEGORY_PATTERNSからペルソナを決める
+        try:
+            haiku_client_pre = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+            haiku_pre_res = haiku_client_pre.messages.create(
+                model="claude-haiku-4-5",
+                max_tokens=20,
+                messages=[{"role": "user", "content": f"""以下の議題から最も適切なカテゴリを1つ選んでください。
+議題：{topic}
+選択肢：strategy（ビジネス戦略）/ practice（提案・企画強化）/ consulting（キャリア・転機）/ relationship（人間関係・交渉）/ study（学習・創作）/ chat（その他）
+カテゴリ名のみ返答してください。"""}]
+            )
+            raw_pre = haiku_pre_res.content[0].text.strip().lower()
+            valid_cats = {'strategy', 'practice', 'consulting', 'relationship', 'study', 'chat'}
+            matched_pattern = raw_pre if raw_pre in valid_cats else 'study'
+        except Exception:
+            matched_pattern = 'study'
+        # chatと判定された場合はスキップレスポンスを返す
+        if matched_pattern == 'chat':
+            return jsonify({
+                'pattern': 'chat',
+                'pattern_name': '雑談・その他',
+                'description': 'メンバーを自由に選んでください',
+                'roles': [],
+                'skip_suggest': True,
+                'suggested_category': 'chat',
+            })
+        pattern = CATEGORY_PATTERNS.get(matched_pattern, CATEGORY_PATTERNS['study'])
 
     # ペルソナ情報を取得してrolesに付加
     enriched_roles = []
@@ -854,25 +872,8 @@ def suggest_team():
             'persona_color': persona.get('color', '#8B5CF6') if persona else '#8B5CF6',
         })
 
-    # Haikuによるカテゴリ自動判定（カテゴリ未指定時のみ）
-    suggested_category = matched_pattern if category else None
-    if not category:
-        try:
-            haiku_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-            haiku_res = haiku_client.messages.create(
-                model="claude-haiku-4-5",
-                max_tokens=20,
-                messages=[{"role": "user", "content": f"""以下の議題から最も適切なカテゴリを1つ選んでください。
-議題：{topic}
-選択肢：strategy（ビジネス戦略）/ practice（提案・企画強化）/ consulting（キャリア・転機）/ relationship（人間関係・交渉）/ study（学習・創作）/ chat（その他）
-カテゴリ名のみ返答してください。"""}]
-            )
-            raw = haiku_res.content[0].text.strip().lower()
-            valid = {'strategy', 'practice', 'consulting', 'relationship', 'study', 'chat'}
-            if raw in valid:
-                suggested_category = raw
-        except Exception:
-            suggested_category = None
+    # suggested_categoryは判定済みのmatched_patternをそのまま使用
+    suggested_category = matched_pattern
 
     # 人間関係カテゴリの相手役ペルソナ自動判定
     opponent_role = None
