@@ -171,6 +171,7 @@ const API = {
         const e = await res.json().catch(() => ({ error: res.statusText }));
         const err = new Error(e.error || res.statusText);
         err.code = e.code;
+        err.status = res.status;
         throw err;
       }
       return res.json();
