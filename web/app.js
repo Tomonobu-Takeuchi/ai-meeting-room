@@ -1198,6 +1198,27 @@ function buildLayer3HTML(l3, cat) {
         html += `<div style="font-size:12px;color:var(--text-secondary);line-height:1.5;">${i.why||''}</div></div>`;
       });
     }
+    if (l3.okr) {
+      html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">🎯 OKR（3ヶ月）</div>`;
+      html += `<div style="padding:10px 14px;border-left:3px solid var(--accent-purple);background:rgba(124,58,237,0.06);border-radius:0 8px 8px 0;margin-bottom:10px;">`;
+      html += `<div style="font-size:13px;font-weight:600;margin-bottom:6px;">O：${l3.okr.objective||''}</div>`;
+      (l3.okr.key_results||[]).forEach((kr, i) => {
+        html += `<div style="font-size:12px;line-height:1.6;color:var(--text-secondary);">KR${i+1}：${kr}</div>`;
+      });
+      html += `</div>`;
+    }
+    if (l3.competitive && l3.competitive.differentiation) {
+      html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">⚔️ 競合との差別化</div>`;
+      html += `<div style="padding:10px 14px;border-left:3px solid var(--accent-blue);background:rgba(37,99,235,0.06);border-radius:0 8px 8px 0;font-size:13px;line-height:1.7;margin-bottom:10px;">${l3.competitive.differentiation}</div>`;
+    }
+    if (l3.risks && l3.risks.length > 0) {
+      html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">🛡️ リスクと対策</div>`;
+      l3.risks.forEach(r => {
+        html += `<div style="margin-bottom:8px;padding:10px 12px;border-radius:8px;background:var(--bg-base);">`;
+        html += `<div style="font-size:12px;font-weight:600;color:#DC2626;margin-bottom:4px;">⚠ ${r.risk||''}</div>`;
+        html += `<div style="font-size:12px;color:var(--text-secondary);line-height:1.5;">→ ${r.advice||''}</div></div>`;
+      });
+    }
   } else if (cat === 'practice') {
     const lc = l3.logic_check || {};
     if ((lc.strengths||[]).length > 0 || (lc.gaps||[]).length > 0) {
