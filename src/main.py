@@ -2451,6 +2451,11 @@ def privacy():
     return send_from_directory(app.static_folder, "privacy.html")
 
 
+@app.route("/tokutori")
+def tokutori():
+    return send_from_directory(app.static_folder, "tokutori.html")
+
+
 @app.route("/api/health")
 def health():
     user_id = get_current_user_id()
