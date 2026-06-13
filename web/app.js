@@ -1464,7 +1464,12 @@ async function useTrialLayer3() {
     btn.disabled = false; btn.textContent = '無料で体験する';
     DOM.layer3Trial.querySelector('div').textContent =
       '🎁 戦略フレームワーク・レポートを1回無料で体験できます';
-    showToast('生成に失敗しました', 'error');
+    const isExtBlock = (e?.message || '').toLowerCase().includes('message port');
+    if (isExtBlock) {
+      showToast('ブラウザ拡張機能が通信を遮断しました\nシークレットモード（Ctrl+Shift+N）でお試しください', 'warning');
+    } else {
+      showToast('生成に失敗しました', 'error');
+    }
   }
 }
 

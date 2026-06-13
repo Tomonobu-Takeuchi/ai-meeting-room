@@ -179,6 +179,7 @@
     .toast{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;font-size:13px;color:var(--text-primary);box-shadow:var(--shadow);animation:slideIn 0.3s ease;}
     .toast.error{border-color:var(--accent-red);color:#FCA5A5;}
     .toast.success{border-color:var(--accent-green);color:#86EFAC;}
+    .toast.warning{border-color:var(--accent-orange);color:#FCD34D;}
     @keyframes slideIn{from{transform:translateX(40px);opacity:0;}to{transform:translateX(0);opacity:1;}}
     .session-bar{padding:6px 20px;background:rgba(37,99,235,0.1);border-bottom:1px solid rgba(37,99,235,0.2);font-size:12px;color:#60A5FA;display:flex;align-items:center;gap:8px;flex-shrink:0;}
     .session-bar.hidden{display:none;}
@@ -1111,7 +1112,7 @@
   </div>
 </div>
 
-<script src="app.js?v=20260614001"></script>
+<script src="app.js?v=20260614002"></script>
 
 <!-- ===== 使い方モーダル ===== -->
 <div class="modal-overlay hidden" id="howToModal" onclick="if(event.target===this)closeHowToModal()">
