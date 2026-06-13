@@ -1095,8 +1095,14 @@ async function showReportModal() {
     }
 
   } catch (e) {
-    DOM.briefConclusion.textContent = 'レポートの生成に失敗しました。';
-    showToast(translateApiError(e.message, 'レポートの生成'), 'error');
+    if (e.status === 401) {
+      DOM.briefConclusion.textContent = '📋 無料登録するとレポートを利用できます';
+      DOM.layer2Locked.classList.remove('hidden');
+      DOM.layer3Locked.classList.remove('hidden');
+    } else {
+      DOM.briefConclusion.textContent = 'レポートの生成に失敗しました。';
+      showToast(translateApiError(e.message, 'レポートの生成'), 'error');
+    }
   }
 }
 
@@ -1559,6 +1565,12 @@ async function downloadLayer3PDF() {
     a.download = `戦略レポート_${State.topic?.slice(0,20)}_${new Date().toISOString().slice(0,10)}.pdf`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    // BUG-17修正：PDF保存成功後に残り回数表示を-1更新
+    if (State.currentUser?.plan === 'pro' && _briefData) {
+      if (_briefData.layer3_remaining !== null && _briefData.layer3_remaining !== undefined) {
+        _briefData.layer3_remaining = Math.max(0, _briefData.layer3_remaining - 1);
+      }
+    }
     showToast('PDFをダウンロードしました', 'success');
   } catch (e) {
     showToast('PDFの生成に失敗しました', 'error');
@@ -2146,8 +2158,7 @@ async function startMeeting() {
     if (e.code === 'PLAN_LIMIT') {
       openPricingModal(e.message);
     } else if (e.code === 'GUEST_LIMIT') {
-      openAuthModal();
-      showToast('ゲストの会議は3回までです。無料登録して続けましょう！', 'error');
+      showGuestLimitModal();
     } else {
       showToast(translateApiError(e.message, '会議の開始'), 'error');
     }
@@ -3435,6 +3446,15 @@ function closeAuthModal() {
   $('authModalOverlay').classList.add('hidden');
   $('loginError').textContent = '';
   $('registerError').textContent = '';
+}
+
+function showGuestLimitModal() {
+  const m = $('guestLimitModal');
+  if (m) m.classList.remove('hidden');
+}
+function closeGuestLimitModal() {
+  const m = $('guestLimitModal');
+  if (m) m.classList.add('hidden');
 }
 
 function startFree() {

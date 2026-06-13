@@ -1111,7 +1111,7 @@
   </div>
 </div>
 
-<script src="app.js?v=20260613003"></script>
+<script src="app.js?v=20260614001"></script>
 
 <!-- ===== 使い方モーダル ===== -->
 <div class="modal-overlay hidden" id="howToModal" onclick="if(event.target===this)closeHowToModal()">
@@ -1513,6 +1513,25 @@
       安全なStripe決済 · SSL暗号化 · いつでもキャンセル可能<br>
       <a onclick="closePricingModal()" style="cursor:pointer;color:var(--text-secondary);text-decoration:underline;font-size:12px;">閉じる</a>
     </div>
+  </div>
+</div>
+
+<div id="guestLimitModal" class="modal-overlay hidden" style="z-index:10001;display:flex;align-items:center;justify-content:center;">
+  <div style="background:var(--bg-card);border-radius:16px;border:0.5px solid var(--border-subtle);padding:32px 28px 24px;max-width:400px;width:90%;text-align:center;">
+    <div style="width:56px;height:56px;border-radius:50%;background:rgba(245,158,11,0.15);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:26px;">🔒</div>
+    <p style="font-size:18px;font-weight:500;color:var(--text-primary);margin:0 0 8px;">ゲストの会議は3回までです</p>
+    <p style="font-size:14px;color:var(--text-secondary);margin:0 0 20px;line-height:1.6;">無料アカウントを作成すると、会議を続けられます。<br>レポート機能やペルソナ育成も使えるようになります。</p>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <button onclick="closeGuestLimitModal();openAuthModal();showRegisterPanel();"
+        style="width:100%;padding:12px;border-radius:8px;background:#7F77DD;border:none;color:#fff;font-size:15px;font-weight:500;cursor:pointer;">
+        ✨ 無料で登録して続ける
+      </button>
+      <button onclick="closeGuestLimitModal();openAuthModal();"
+        style="width:100%;padding:12px;border-radius:8px;background:transparent;border:0.5px solid var(--border-subtle);color:var(--text-secondary);font-size:14px;cursor:pointer;">
+        🔑 すでにアカウントをお持ちの方はログイン
+      </button>
+    </div>
+    <p style="font-size:12px;color:var(--text-muted);margin:12px 0 0;">登録は1分で完了・クレジットカード不要</p>
   </div>
 </div>
 

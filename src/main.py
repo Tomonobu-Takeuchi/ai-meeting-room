@@ -1450,6 +1450,34 @@ JSONのみ出力してください。"""
                     conn3.close()
                 trial_layer3_used = True
 
+            # BUG-16修正：proプランのLayer3月次カウントを/brief時に+1（仕様：コンテンツ生成から制限）
+            if layer3_parse_ok and plan == 'pro' and user_id:
+                from src.database import get_connection
+                from datetime import datetime, timezone
+                conn_l3 = get_connection()
+                try:
+                    now = datetime.now(timezone.utc)
+                    needs_reset_now = (
+                        layer3_monthly_reset_at is None or
+                        layer3_monthly_reset_at.year < now.year or
+                        (layer3_monthly_reset_at.year == now.year and
+                         layer3_monthly_reset_at.month < now.month)
+                    )
+                    if needs_reset_now:
+                        conn_l3.run(
+                            "UPDATE users SET layer3_monthly_count=1, layer3_monthly_reset_at=NOW() WHERE id=:uid",
+                            uid=user_id
+                        )
+                        layer3_remaining = 29
+                    else:
+                        conn_l3.run(
+                            "UPDATE users SET layer3_monthly_count=layer3_monthly_count+1 WHERE id=:uid",
+                            uid=user_id
+                        )
+                        layer3_remaining = max(0, layer3_remaining - 1)
+                finally:
+                    conn_l3.close()
+
         return jsonify({
             "plan": plan,
             "topic": summary["topic"],
@@ -1684,10 +1712,7 @@ def generate_brief_pdf_layer3(session_id):
     user_id = get_current_user_id()
     if not user_id:
         return jsonify({"error": "ログインが必要です"}), 401
-    from src.database import check_and_use_layer3
-    ok, reason = check_and_use_layer3(user_id)
-    if not ok:
-        return jsonify({"error": reason, "code": "LAYER3_LIMIT"}), 403
+    # BUG-16修正：カウントは/brief時に実施済みのため/brief_pdf_layer3ではカウントしない
     data = request.get_json()
     l3 = data.get('layer3', {})
     category = data.get('category', 'strategy')
