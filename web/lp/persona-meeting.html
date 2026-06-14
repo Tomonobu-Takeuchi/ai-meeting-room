@@ -134,10 +134,15 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 #cta{text-align:center;padding:90px 5%}
 .cta-title{font-size:clamp(22px,4vw,38px);font-weight:900;margin-bottom:14px}
 .cta-desc{font-size:14px;color:var(--gray);margin-bottom:28px}
-.cta-note{font-size:11px;color:var(--gray2);margin-top:14px}
+.cta-note{font-size:12px;color:#B0C8E0;margin-top:14px;line-height:1.8}
 .cta-links{display:flex;gap:20px;justify-content:center;margin-top:28px;flex-wrap:wrap}
 .cta-link{font-size:12px;color:var(--gray);text-decoration:none}
 .cta-link:hover{color:var(--cyan)}
+.cta-btns{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-top:8px}
+.cta-btn-pri{display:inline-flex;align-items:center;gap:8px;padding:16px 36px;background:var(--cyan);color:#041020;font-size:15px;font-weight:800;border-radius:8px;text-decoration:none;transition:.2s;border:none}
+.cta-btn-pri:hover{background:var(--cyan2);transform:translateY(-2px)}
+.cta-btn-sec{display:inline-flex;align-items:center;gap:8px;padding:16px 36px;border:2px solid var(--cyan);color:var(--cyan);font-size:15px;font-weight:700;border-radius:8px;text-decoration:none;transition:.2s}
+.cta-btn-sec:hover{background:rgba(0,200,232,0.1);transform:translateY(-2px)}
 
 @media(max-width:768px){.steps,.plans{grid-template-columns:1fr}}
 </style>
@@ -360,9 +365,9 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
   <div>
     <h2 class="cta-title">まず、無料で体験してみてください。</h2>
     <p class="cta-desc">クレジットカード不要。5分で登録完了。あなたのアイデアを最初の会議で試してみましょう。</p>
-    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-      <a href="/app" class="btn-pri" style="display:inline-flex">無料アカウントを作成する →</a>
-      <a href="/app" class="btn-sec" style="display:inline-flex">AI-PERSONA会議室へ →</a>
+    <div class="cta-btns">
+      <a href="/app" class="cta-btn-pri">🚀 無料アカウントを作成する</a>
+      <a href="/app" class="cta-btn-sec">▶ AI-PERSONA会議室へ入る</a>
     </div>
     <p class="cta-note">18歳以上対象 ／ Stripe決済（Standard・Proプラン）／ いつでも解約可能</p>
     <div class="cta-links">
