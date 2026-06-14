@@ -94,8 +94,8 @@ def login_required(f):
 
 # ===== 静的ファイル =====
 
-@app.route("/")
-def index():
+@app.route("/app")
+def spa():
     response = send_from_directory(app.static_folder, "index.html")
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Pragma"] = "no-cache"
@@ -2122,8 +2122,8 @@ def payment_checkout():
                     'quantity': 1,
                 }],
                 mode='payment',
-                success_url=f'{base_url}/?payment=success&session_id={{CHECKOUT_SESSION_ID}}',
-                cancel_url=f'{base_url}/?payment=cancel',
+                success_url=f'{base_url}/app?payment=success&session_id={{CHECKOUT_SESSION_ID}}',
+                cancel_url=f'{base_url}/app?payment=cancel',
                 metadata=meta_to_send,
             )
         else:
@@ -2142,8 +2142,8 @@ def payment_checkout():
                     'quantity': 1,
                 }],
                 mode='subscription',
-                success_url=f'{base_url}/?payment=success&session_id={{CHECKOUT_SESSION_ID}}',
-                cancel_url=f'{base_url}/?payment=cancel',
+                success_url=f'{base_url}/app?payment=success&session_id={{CHECKOUT_SESSION_ID}}',
+                cancel_url=f'{base_url}/app?payment=cancel',
                 metadata=meta_to_send,
                 subscription_data={'metadata': {'user_id': str(user_id)}},
             )
@@ -2474,6 +2474,23 @@ def payment_status():
         return jsonify({"error": "ユーザーが見つかりません"}), 404
     status['public_key'] = STRIPE_PUBLIC_KEY
     return jsonify(status)
+
+
+@app.route("/")
+def lp_top():
+    return send_from_directory(os.path.join(app.static_folder, "lp"), "index.html")
+
+@app.route("/persona-meeting")
+def lp_persona_meeting():
+    return send_from_directory(os.path.join(app.static_folder, "lp"), "persona-meeting.html")
+
+@app.route("/digital-persona")
+def lp_digital_persona():
+    return send_from_directory(os.path.join(app.static_folder, "lp"), "digital-persona.html")
+
+@app.route("/ai-task")
+def lp_ai_task():
+    return send_from_directory(os.path.join(app.static_folder, "lp"), "ai-task.html")
 
 
 @app.route("/terms")

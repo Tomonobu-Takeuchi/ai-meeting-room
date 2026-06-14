@@ -3694,7 +3694,7 @@ async function deleteAccount() {
   setAcctMsg('deleteAccountMsg', '', '');
   try {
     await API.delete('/api/auth/account', { current_password: currentPassword });
-    window.location.href = '/';
+    window.location.href = '/app';
   } catch (e) {
     setAcctMsg('deleteAccountMsg', e.message || '削除に失敗しました', 'error');
     btn.disabled = false;

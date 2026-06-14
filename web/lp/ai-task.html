@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<title>AI-Task広場 | AI-Paradise</title>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#080E1A;--bg2:#0D1829;--bg3:#111E33;
+  --cyan:#00C8E8;--cyan2:#00A8C8;
+  --white:#EEF4FF;--gray:#7A8FA8;--gray2:#4A5F78;
+  --blue:#1E5AA0;--purple:#7B2FBE;--green:#1A7A4A;
+  --orange:#D87000;--card:#0E1B2F;--border:rgba(0,200,232,0.15);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--white);font-family:'Noto Sans JP',sans-serif;font-size:15px;line-height:1.7;overflow-x:hidden}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(8,14,26,0.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+.nav-inner{display:flex;align-items:center;justify-content:space-between;height:60px;max-width:1100px;margin:0 auto;padding:0 5%}
+.nav-brand{font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;color:var(--cyan);text-decoration:none;letter-spacing:0.08em}
+.nav-tabs{display:flex;gap:4px}
+.nav-tab{padding:7px 16px;border-radius:4px;font-size:13px;font-weight:500;cursor:pointer;border:1px solid transparent;color:var(--gray);background:transparent;text-decoration:none;transition:all .2s;white-space:nowrap}
+.nav-tab:hover{color:var(--cyan);border-color:rgba(0,200,232,0.3);background:rgba(0,200,232,0.06)}
+.nav-tab.active{color:var(--cyan);border-color:rgba(0,200,232,0.4);background:rgba(0,200,232,0.08)}
+.nav-tab.wip{color:var(--gray2);font-size:12px}
+.nav-tab.wip:hover{color:var(--gray2);border-color:transparent;background:transparent;cursor:default}
+.nav-cta{padding:8px 20px;border-radius:4px;font-size:13px;font-weight:700;background:var(--cyan);color:#041020;text-decoration:none;white-space:nowrap}
+.nav-cta:hover{background:var(--cyan2)}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:500;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.open{display:flex}
+.modal-box{position:relative;max-width:880px;width:100%;border-radius:10px;overflow:hidden;border:1px solid rgba(0,200,232,0.25);box-shadow:0 24px 80px rgba(0,0,0,0.7);animation:min .18s ease}
+@keyframes min{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+.modal-box img{width:100%;display:block}
+.modal-close{position:absolute;top:12px;right:14px;background:rgba(0,0,0,0.65);border:1px solid rgba(255,255,255,0.2);color:#fff;font-size:18px;width:34px;height:34px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s}
+.modal-close:hover{background:rgba(255,255,255,0.15)}
+.modal-caption{background:rgba(8,14,26,0.95);color:#9AB0C8;font-size:12px;padding:10px 16px;text-align:center}
+
+/* SCREEN BUTTON */
+.screen-btn{display:inline-flex;align-items:center;gap:8px;padding:11px 24px;background:transparent;border:1.5px solid var(--cyan);color:var(--cyan);font-size:13px;font-weight:700;border-radius:6px;cursor:pointer;transition:.2s;font-family:'Noto Sans JP',sans-serif;margin-top:16px}
+.screen-btn:hover{background:rgba(0,200,232,0.1)}
+
+/* COMMON SECTION */
+.sec{padding:80px 5%}
+.sec-inner{max-width:1100px;margin:0 auto}
+.label{font-size:11px;font-weight:700;color:var(--cyan);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:10px}
+.title{font-size:clamp(24px,4vw,42px);font-weight:900;line-height:1.15;letter-spacing:-0.02em;margin-bottom:14px}
+.desc{font-size:14px;color:#9AB0C8;line-height:1.85;max-width:680px}
+
+@media(max-width:768px){.nav-tabs{display:none}}
+</style>
+<script>
+function openModal(src,cap){
+  document.getElementById('mImg').src=src;
+  document.getElementById('mCap').textContent=cap||'';
+  document.getElementById('modal').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeModal(e){
+  if(!e||e.target===document.getElementById('modal')){
+    document.getElementById('modal').classList.remove('open');
+    document.body.style.overflow='';
+  }
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
+</script>
+
+<style>
+.wip-wrap{min-height:80vh;display:flex;align-items:center;justify-content:center;padding:120px 5% 80px;text-align:center}
+.wip-icon{font-size:64px;margin-bottom:24px}
+.wip-title{font-size:clamp(28px,5vw,48px);font-weight:900;margin-bottom:16px;color:#82D9A5}
+.wip-desc{font-size:15px;color:#9AB0C8;line-height:1.85;max-width:480px;margin:0 auto 32px}
+.wip-badge{display:inline-block;background:rgba(0,200,232,0.08);border:1px solid rgba(0,200,232,0.25);color:var(--cyan);font-size:12px;font-weight:700;padding:6px 18px;border-radius:20px;margin-bottom:28px}
+</style>
+</head>
+<body>
+<nav><div class="nav-inner"><a href="/" class="nav-brand">AI-Paradise</a><div class="nav-tabs"><a href="/" class="nav-tab">AI-Paradise</a><a href="/persona-meeting" class="nav-tab">AI-PERSONA会議室</a><span class="nav-tab wip">Digital-Persona相談室 🔧</span><span class="nav-tab wip">AI-Task広場 🔧</span></div><a href="/app" class="nav-cta">無料で始める</a></div></nav>
+<div class="wip-wrap">
+  <div>
+    <div class="wip-icon">🔧</div>
+    <div class="wip-badge">準備中</div>
+    <h1 class="wip-title">AI-Task広場</h1>
+    <p class="wip-desc">簡単な設定でエージェントAIを活用し、日々の煩雑な作業をAIに代行させて生活を豊かにするサービスです。<br><br>AI-PERSONA会議室が安定稼働した後、順次リリース予定です。</p>
+    <a href="/" class="btn-pri" style="display:inline-flex">AI-Paradiseトップへ戻る</a>
+  </div>
+</div>
+</body>
+</html>
