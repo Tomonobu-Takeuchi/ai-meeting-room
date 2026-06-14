@@ -43,6 +43,16 @@ STANDARD_PRICE_JPY = 480
 PRO_PRICE_JPY = 980
 STANDARD_CREDITS = 50
 
+import sentry_sdk
+from sentry_sdk.integrations.flask import FlaskIntegration
+
+sentry_sdk.init(
+    dsn=os.getenv("SENTRY_DSN"),
+    integrations=[FlaskIntegration()],
+    traces_sample_rate=0.1,
+    send_default_pii=False,
+)
+
 app = Flask(
     __name__,
     static_folder=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web"),
