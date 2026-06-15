@@ -393,23 +393,26 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 
 <!-- フレームワークモーダル -->
 <div id="framework-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;" onclick="if(event.target===this)this.style.display='none'">
-  <div style="background:#0d1b2e;border:1px solid #1e3a5f;border-radius:16px;max-width:860px;width:100%;max-height:90vh;overflow-y:auto;padding:32px;position:relative;">
+  <div style="background:#0d1b2e;border:1px solid #1e3a5f;border-radius:16px;max-width:860px;width:100%;max-height:92vh;overflow-y:auto;padding:32px;position:relative;">
     <button onclick="document.getElementById('framework-modal').style.display='none'" style="position:absolute;top:16px;right:16px;background:none;border:none;color:#8ab4c8;font-size:24px;cursor:pointer;line-height:1;">✕</button>
     <img src="/static/images/report_examples/framework_table.png" alt="戦略フレームワークレポートとは" style="width:100%;border-radius:8px;margin-bottom:20px;">
-    <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;">
+    <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:16px;">
       <button class="screen-btn" onclick="document.getElementById('sub-modal-img').src='/static/images/report_examples/report_business.png';document.getElementById('sub-modal-wrap').style.display='flex'">📋 戦略レポート例</button>
       <button class="screen-btn" onclick="document.getElementById('sub-modal-img').src='/static/images/report_examples/report_review.png';document.getElementById('sub-modal-wrap').style.display='flex'">📋 レビューレポート例</button>
       <button class="screen-btn" onclick="document.getElementById('sub-modal-img').src='/static/images/report_examples/report_career.png';document.getElementById('sub-modal-wrap').style.display='flex'">📋 キャリアシナリオ例</button>
       <button class="screen-btn" onclick="document.getElementById('sub-modal-img').src='/static/images/report_examples/report_human.png';document.getElementById('sub-modal-wrap').style.display='flex'">📋 対話シナリオ例</button>
       <button class="screen-btn" onclick="document.getElementById('sub-modal-img').src='/static/images/report_examples/report_study.png';document.getElementById('sub-modal-wrap').style.display='flex'">📋 学習シナリオ例</button>
     </div>
+    <div style="text-align:center;">
+      <button onclick="document.getElementById('framework-modal').style.display='none'" style="background:none;border:1px solid #8ab4c8;color:#8ab4c8;padding:8px 24px;border-radius:8px;cursor:pointer;font-size:14px;">✕ 閉じる</button>
+    </div>
   </div>
 </div>
 <!-- サブモーダル（レポート例画像） -->
 <div id="sub-modal-wrap" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.92);z-index:10000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;" onclick="if(event.target===this)this.style.display='none'">
-  <div style="position:relative;max-width:600px;width:100%;">
-    <button onclick="document.getElementById('sub-modal-wrap').style.display='none'" style="position:absolute;top:-36px;right:0;background:none;border:none;color:#8ab4c8;font-size:24px;cursor:pointer;">✕</button>
-    <img id="sub-modal-img" src="" alt="レポート例" style="width:100%;border-radius:8px;">
+  <div style="position:relative;max-width:700px;width:100%;max-height:92vh;display:flex;flex-direction:column;align-items:center;">
+    <img id="sub-modal-img" src="" alt="レポート例" style="width:100%;max-height:80vh;object-fit:contain;border-radius:8px;margin-bottom:12px;">
+    <button onclick="document.getElementById('sub-modal-wrap').style.display='none'" style="background:none;border:1px solid #8ab4c8;color:#8ab4c8;padding:8px 32px;border-radius:8px;cursor:pointer;font-size:14px;">← 戻る</button>
   </div>
 </div>
 <!-- ペルソナ育成モーダル -->
