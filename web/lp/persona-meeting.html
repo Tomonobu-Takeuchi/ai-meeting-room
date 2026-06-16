@@ -464,7 +464,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 <!-- サブモーダル（レポート例画像） -->
 <div id="sub-modal-wrap" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.92);z-index:10000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;overflow-y:auto;" onclick="if(event.target===this)this.style.display='none'">
   <div style="position:relative;max-width:700px;width:100%;max-height:92vh;display:flex;flex-direction:column;align-items:center;">
-    <img id="sub-modal-img" src="" alt="レポート例" style="width:100%;border-radius:8px;margin-bottom:12px;image-rendering:crisp-edges;">
+    <img id="sub-modal-img" src="" alt="レポート例" style="max-width:100%;width:auto;display:block;margin:0 auto 12px;border-radius:8px;">
     <button onclick="document.getElementById('sub-modal-wrap').style.display='none'" style="background:none;border:1px solid #8ab4c8;color:#8ab4c8;padding:8px 32px;border-radius:8px;cursor:pointer;font-size:14px;">← 戻る</button>
   </div>
 </div>
