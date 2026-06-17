@@ -1285,6 +1285,20 @@ def _extract_issues(client, topic):
     except Exception:
         return []
 
+@app.route("/api/meeting/<session_id>/issues", methods=["POST"])
+@login_required
+def get_meeting_issues(session_id):
+    """議題から解決すべき課題を非同期で取得する"""
+    summary = meeting_room.get_session_summary(session_id)
+    if not summary:
+        return jsonify({"issues": []})
+    try:
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        issues = _extract_issues(client, summary["topic"])
+        return jsonify({"issues": issues})
+    except Exception:
+        return jsonify({"issues": []})
+
 @app.route("/api/meeting/<session_id>/brief", methods=["POST"])
 @login_required
 def generate_brief(session_id):
@@ -1511,7 +1525,6 @@ JSONのみ出力してください。"""
         return jsonify({
             "plan": plan,
             "topic": summary["topic"],
-            "issues": _extract_issues(client, summary["topic"]),
             "category": category,
             "trial_layer2_used": trial_layer2_used,
             "trial_layer3_used": trial_layer3_used,

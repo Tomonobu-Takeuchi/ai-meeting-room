@@ -1020,10 +1020,22 @@ async function showReportModal() {
     if (_topicEl) _topicEl.textContent = data.topic || '';
     const _issuesEl = document.getElementById('briefIssuesList');
     if (_issuesEl) {
-      const _iss = data.issues || [];
-      _issuesEl.innerHTML = _iss.length > 0
-        ? _iss.map(i => `<div>・${escapeHtml(i)}</div>`).join('')
-        : '<div style="color:var(--text-muted);font-size:12px;">（取得中...）</div>';
+      _issuesEl.innerHTML = '<div style="color:var(--text-muted);font-size:12px;">⏳ 分析中...</div>';
+      // issuesは非同期で別途取得
+      const _sid = sid;
+      fetch(`/api/meeting/${_sid}/issues`, { method: 'POST',
+        headers: {'Content-Type': 'application/json'} })
+        .then(r => r.json())
+        .then(d => {
+          const _iss = d.issues || [];
+          if (_issuesEl) _issuesEl.innerHTML = _iss.length > 0
+            ? _iss.map(i => `<div>・${escapeHtml(i)}</div>`).join('')
+            : '<div style="color:var(--text-muted);font-size:12px;">（取得できませんでした）</div>';
+        })
+        .catch(() => {
+          if (_issuesEl) _issuesEl.innerHTML =
+            '<div style="color:var(--text-muted);font-size:12px;">（取得できませんでした）</div>';
+        });
     }
     // ===== Layer1 =====
     const l1 = data.layer1;
