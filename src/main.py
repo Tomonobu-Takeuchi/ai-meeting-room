@@ -1632,6 +1632,10 @@ JSONのみ出力してください。"""
             return s
 
         story = []
+        story.append(Paragraph('アクション・ブリーフ', make_style(18, '#1a1a2e')))
+        story.append(Spacer(1, 2*mm))
+        story.append(HRFlowable(width='100%', thickness=1, color=HexColor('#2563EB')))
+        story.append(Spacer(1, 3*mm))
         # ===== 議題・解決すべき課題ブロック =====
         _l1_issues = _extract_issues(client, summary['topic'])
         story.append(Paragraph('📋 議題', make_style(13, '#1B4FD8')))
@@ -1650,10 +1654,6 @@ JSONのみ出力してください。"""
             story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
             story.append(Spacer(1, 4*mm))
         # ===== ここまで =====
-        story.append(Paragraph('アクション・ブリーフ', make_style(18, '#1a1a2e')))
-        story.append(Spacer(1, 2*mm))
-        story.append(HRFlowable(width='100%', thickness=1, color=HexColor('#2563EB')))
-        story.append(Spacer(1, 3*mm))
 
         for label, value in [
             ('日時', now.strftime('%Y年%m月%d日 %H:%M')),
@@ -1721,6 +1721,12 @@ def generate_brief_pdf_layer2(session_id):
         styles_small = ParagraphStyle('small', fontName='HeiseiMin-W3', fontSize=9, leading=14, textColor=HexColor('#8B949E'))
 
         story = []
+        story.append(Paragraph('🔍 議論分析レポート', styles_title))
+        story.append(Paragraph(f'議題：{topic}', styles_small))
+        story.append(Paragraph(datetime.now().strftime('%Y年%m月%d日'), styles_small))
+        story.append(Spacer(1, 6*mm))
+        story.append(HRFlowable(width='100%', color=HexColor('#30363D')))
+        story.append(Spacer(1, 4*mm))
         # ===== 議題・解決すべき課題ブロック =====
         _l2_client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
         _l2_issues = _extract_issues(_l2_client, topic)
@@ -1740,12 +1746,6 @@ def generate_brief_pdf_layer2(session_id):
             story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
             story.append(Spacer(1, 4*mm))
         # ===== ここまで =====
-        story.append(Paragraph('🔍 議論分析レポート', styles_title))
-        story.append(Paragraph(f'議題：{topic}', styles_small))
-        story.append(Paragraph(datetime.now().strftime('%Y年%m月%d日'), styles_small))
-        story.append(Spacer(1, 6*mm))
-        story.append(HRFlowable(width='100%', color=HexColor('#30363D')))
-        story.append(Spacer(1, 4*mm))
 
         if l2.get('conclusion'):
             story.append(Paragraph('■ 結論', styles_h2))
@@ -1821,6 +1821,12 @@ def generate_brief_pdf_layer3(session_id):
         styles_small = ParagraphStyle('small', fontName='HeiseiMin-W3', fontSize=9, leading=14, textColor=HexColor('#8B949E'))
 
         story = []
+        story.append(Paragraph('📊 戦略フレームワーク・レポート', styles_title))
+        story.append(Paragraph(f'議題：{topic}', styles_small))
+        story.append(Paragraph(datetime.now().strftime('%Y年%m月%d日'), styles_small))
+        story.append(Spacer(1, 6*mm))
+        story.append(HRFlowable(width='100%', color=HexColor('#30363D')))
+        story.append(Spacer(1, 4*mm))
         # ===== 議題・解決すべき課題ブロック =====
         _l3_client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
         _l3_issues = _extract_issues(_l3_client, topic)
@@ -1840,12 +1846,6 @@ def generate_brief_pdf_layer3(session_id):
             story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
             story.append(Spacer(1, 4*mm))
         # ===== ここまで =====
-        story.append(Paragraph('📊 戦略フレームワーク・レポート', styles_title))
-        story.append(Paragraph(f'議題：{topic}', styles_small))
-        story.append(Paragraph(datetime.now().strftime('%Y年%m月%d日'), styles_small))
-        story.append(Spacer(1, 6*mm))
-        story.append(HRFlowable(width='100%', color=HexColor('#30363D')))
-        story.append(Spacer(1, 4*mm))
 
         if l3.get('summary'):
             story.append(Paragraph('■ 議論概要', styles_h2))
