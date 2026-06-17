@@ -1031,6 +1031,16 @@ async function showReportModal() {
           if (_issuesEl) _issuesEl.innerHTML = _iss.length > 0
             ? _iss.map(i => `<div>・${escapeHtml(i)}</div>`).join('')
             : '<div style="color:var(--text-muted);font-size:12px;">（取得できませんでした）</div>';
+          // Layer2・Layer3を課題付きで再描画
+          const _topic = _briefData?.topic || '';
+          if (_briefData?.layer2) {
+            DOM.layer2Content.innerHTML = buildLayer2HTML(
+              _briefData.layer2, _briefData.category || 'chat', _topic, _iss);
+          }
+          if (_briefData?.layer3) {
+            DOM.layer3Content.innerHTML = buildLayer3HTML(
+              _briefData.layer3, _briefData.category || 'strategy', _topic, _iss);
+          }
         })
         .catch(() => {
           if (_issuesEl) _issuesEl.innerHTML =
@@ -1046,7 +1056,7 @@ async function showReportModal() {
     // ===== Layer2 =====
     const isLoggedIn = !!State.currentUser;
     if (data.layer2) {
-      DOM.layer2Content.innerHTML = buildLayer2HTML(data.layer2, data.category || 'chat');
+      DOM.layer2Content.innerHTML = buildLayer2HTML(data.layer2, data.category || 'chat', data.topic || '', []);
       DOM.downloadLayer2Btn.style.display = 'inline-block';
       // 案A：standardプランのみクレジット消費テキスト表示
       const layer2CostInfo = $('layer2CostInfo');
@@ -1077,7 +1087,7 @@ async function showReportModal() {
           DOM.downloadLayer3Btn.style.display = 'none';
           DOM.layer3Locked.classList.remove('hidden');
         } else {
-          DOM.layer3Content.innerHTML = buildLayer3HTML(data.layer3, data.category || 'strategy');
+          DOM.layer3Content.innerHTML = buildLayer3HTML(data.layer3, data.category || 'strategy', data.topic || '', []);
           DOM.downloadLayer3Btn.style.display = 'inline-block';
           const layer3CostInfo = $('layer3CostInfo');
           if (layer3CostInfo) {
@@ -1129,8 +1139,22 @@ async function showReportModal() {
   }
 }
 
-function buildLayer2HTML(l2, cat) {
+function buildLayer2HTML(l2, cat, topic, issues) {
   let html = '';
+  // ===== 議題・解決すべき課題ブロック =====
+  if (topic) {
+    html += `<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:10px;">`;
+    html += `<div style="font-size:12px;font-weight:700;color:var(--accent-blue);margin-bottom:6px;">📋 議題</div>`;
+    html += `<div style="font-size:13px;line-height:1.7;">${escapeHtml(topic)}</div>`;
+    html += `</div>`;
+  }
+  if (issues && issues.length > 0) {
+    html += `<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px;">`;
+    html += `<div style="font-size:12px;font-weight:700;color:var(--accent-blue);margin-bottom:6px;">🎯 解決すべき課題</div>`;
+    html += issues.map(i => `<div style="font-size:13px;line-height:1.8;">・${escapeHtml(i)}</div>`).join('');
+    html += `</div>`;
+  }
+  // ===== ここまで =====
   if (l2.conclusion) {
     html += `<div style="background:var(--bg-base);border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;line-height:1.7;">${l2.conclusion}</div>`;
   }
@@ -1167,8 +1191,22 @@ function buildLayer2HTML(l2, cat) {
   return html;
 }
 
-function buildLayer3HTML(l3, cat) {
+function buildLayer3HTML(l3, cat, topic, issues) {
   let html = '';
+  // ===== 議題・解決すべき課題ブロック =====
+  if (topic) {
+    html += `<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:10px;">`;
+    html += `<div style="font-size:12px;font-weight:700;color:var(--accent-blue);margin-bottom:6px;">📋 議題</div>`;
+    html += `<div style="font-size:13px;line-height:1.7;">${escapeHtml(topic)}</div>`;
+    html += `</div>`;
+  }
+  if (issues && issues.length > 0) {
+    html += `<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px;">`;
+    html += `<div style="font-size:12px;font-weight:700;color:var(--accent-blue);margin-bottom:6px;">🎯 解決すべき課題</div>`;
+    html += issues.map(i => `<div style="font-size:13px;line-height:1.8;">・${escapeHtml(i)}</div>`).join('');
+    html += `</div>`;
+  }
+  // ===== ここまで =====
   if (l3.error) {
     return `<div style="padding:16px;text-align:center;color:var(--text-secondary);font-size:13px;">
       ⚠️ ${l3.error}<br><span style="font-size:12px;margin-top:6px;display:block;">時間をおいて再度「レポートを見る」をお試しください。</span>
@@ -1433,7 +1471,7 @@ async function useTrialLayer2() {
     }, 120000);
     _briefData = { ..._briefData, ...data };
     if (data.layer2) {
-      DOM.layer2Content.innerHTML = buildLayer2HTML(data.layer2, data.category || 'chat');
+      DOM.layer2Content.innerHTML = buildLayer2HTML(data.layer2, data.category || 'chat', data.topic || '', []);
       DOM.downloadLayer2Btn.style.display = 'inline-block';
       // 案A：standardプランのみクレジット消費テキスト表示
       const layer2CostInfo = $('layer2CostInfo');
@@ -1470,7 +1508,7 @@ async function useTrialLayer3() {
     }, 120000);
     _briefData = { ..._briefData, ...data };
     if (data.layer3) {
-      DOM.layer3Content.innerHTML = buildLayer3HTML(data.layer3, data.category || 'strategy');
+      DOM.layer3Content.innerHTML = buildLayer3HTML(data.layer3, data.category || 'strategy', data.topic || '', []);
       DOM.downloadLayer3Btn.style.display = 'inline-block';
       const layer3CostInfo = $('layer3CostInfo');
       if (layer3CostInfo) {
