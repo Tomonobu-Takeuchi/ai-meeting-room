@@ -1015,6 +1015,16 @@ async function showReportModal() {
     }, 120000);
     _briefData = data;
 
+    // ===== 議題・解決すべき課題ブロック =====
+    const _topicEl = document.getElementById('briefTopicText');
+    if (_topicEl) _topicEl.textContent = data.topic || '';
+    const _issuesEl = document.getElementById('briefIssuesList');
+    if (_issuesEl) {
+      const _iss = data.issues || [];
+      _issuesEl.innerHTML = _iss.length > 0
+        ? _iss.map(i => `<div>・${escapeHtml(i)}</div>`).join('')
+        : '<div style="color:var(--text-muted);font-size:12px;">（取得中...）</div>';
+    }
     // ===== Layer1 =====
     const l1 = data.layer1;
     DOM.briefConclusion.textContent = l1.conclusion || '';
@@ -1109,17 +1119,6 @@ async function showReportModal() {
 
 function buildLayer2HTML(l2, cat) {
   let html = '';
-  // ===== 冒頭会議情報ブロック =====
-  const _topic2 = State.topic || '';
-  const _members2 = (State.members || []).map(m => m.name).join('、');
-  const _cat2 = cat || '';
-  html += `<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px;">`;
-  html += `<div style="font-size:11px;font-weight:700;color:#1B4FD8;margin-bottom:8px;letter-spacing:.5px;">📋 会議情報</div>`;
-  if (_topic2) html += `<div style="font-size:12px;margin-bottom:4px;"><b>議題：</b>${escapeHtml(_topic2)}</div>`;
-  if (_members2) html += `<div style="font-size:12px;margin-bottom:4px;"><b>参加ペルソナ：</b>${escapeHtml(_members2)}</div>`;
-  if (_cat2) html += `<div style="font-size:12px;"><b>カテゴリ：</b>${escapeHtml(_cat2)}</div>`;
-  html += `</div>`;
-  // ===== 冒頭会議情報ブロック ここまで =====
   if (l2.conclusion) {
     html += `<div style="background:var(--bg-base);border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;line-height:1.7;">${l2.conclusion}</div>`;
   }
@@ -1158,17 +1157,6 @@ function buildLayer2HTML(l2, cat) {
 
 function buildLayer3HTML(l3, cat) {
   let html = '';
-  // ===== 冒頭会議情報ブロック =====
-  const _topic3 = State.topic || '';
-  const _members3 = (State.members || []).map(m => m.name).join('、');
-  const _cat3 = cat || '';
-  html += `<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px;">`;
-  html += `<div style="font-size:11px;font-weight:700;color:#1B4FD8;margin-bottom:8px;letter-spacing:.5px;">📋 会議情報</div>`;
-  if (_topic3) html += `<div style="font-size:12px;margin-bottom:4px;"><b>議題：</b>${escapeHtml(_topic3)}</div>`;
-  if (_members3) html += `<div style="font-size:12px;margin-bottom:4px;"><b>参加ペルソナ：</b>${escapeHtml(_members3)}</div>`;
-  if (_cat3) html += `<div style="font-size:12px;"><b>カテゴリ：</b>${escapeHtml(_cat3)}</div>`;
-  html += `</div>`;
-  // ===== 冒頭会議情報ブロック ここまで =====
   if (l3.error) {
     return `<div style="padding:16px;text-align:center;color:var(--text-secondary);font-size:13px;">
       ⚠️ ${l3.error}<br><span style="font-size:12px;margin-top:6px;display:block;">時間をおいて再度「レポートを見る」をお試しください。</span>

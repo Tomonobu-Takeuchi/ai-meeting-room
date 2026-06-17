@@ -1265,6 +1265,26 @@ JSONのみ出力してください。""",
 JSONのみ出力してください。""",
 }
 
+def _extract_issues(client, topic):
+    """議題から解決すべき課題を3点抽出する（claude-haiku使用）"""
+    try:
+        import json as _json
+        res = client.messages.create(
+            model="claude-haiku-4-5",
+            max_tokens=300,
+            messages=[{"role": "user", "content": (
+                f"以下の議題から「解決すべき課題」を3点、"
+                f"JSON形式のみで返してください。\n"
+                f"議題：{topic}\n\n"
+                f"出力形式：{{\"issues\": [\"課題1\", \"課題2\", \"課題3\"]}}\n"
+                f"JSONのみ出力してください。"
+            )}]
+        )
+        text = res.content[0].text.strip().replace("```json","").replace("```","").strip()
+        return _json.loads(text).get("issues", [])
+    except Exception:
+        return []
+
 @app.route("/api/meeting/<session_id>/brief", methods=["POST"])
 @login_required
 def generate_brief(session_id):
@@ -1491,6 +1511,7 @@ JSONのみ出力してください。"""
         return jsonify({
             "plan": plan,
             "topic": summary["topic"],
+            "issues": _extract_issues(client, summary["topic"]),
             "category": category,
             "trial_layer2_used": trial_layer2_used,
             "trial_layer3_used": trial_layer3_used,
@@ -1598,21 +1619,24 @@ JSONのみ出力してください。"""
             return s
 
         story = []
-        # ===== 冒頭会議情報ブロック =====
-        story.append(Paragraph('📋 会議情報', make_style(13, '#1B4FD8')))
+        # ===== 議題・解決すべき課題ブロック =====
+        _l1_issues = _extract_issues(client, summary['topic'])
+        story.append(Paragraph('📋 議題', make_style(13, '#1B4FD8')))
         story.append(Spacer(1, 2*mm))
-        story.append(HRFlowable(width='100%', thickness=1, color=HexColor('#1B4FD8')))
-        story.append(Spacer(1, 2*mm))
-        for _lbl, _val in [
-            ('議題', summary['topic']),
-            ('参加ペルソナ', member_names),
-            ('日時', now.strftime('%Y年%m月%d日 %H:%M')),
-        ]:
-            story.append(Paragraph(f'<b>{_lbl}：</b>{_val}', make_style(10)))
+        story.append(Paragraph(summary['topic'], make_style(11)))
         story.append(Spacer(1, 4*mm))
         story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
         story.append(Spacer(1, 4*mm))
-        # ===== 冒頭会議情報ブロック ここまで =====
+        if _l1_issues:
+            story.append(Paragraph('🎯 解決すべき課題', make_style(13, '#1B4FD8')))
+            story.append(Spacer(1, 2*mm))
+            for _iss in _l1_issues:
+                story.append(Paragraph(f'・{_iss}', make_style(10)))
+                story.append(Spacer(1, 1*mm))
+            story.append(Spacer(1, 4*mm))
+            story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
+            story.append(Spacer(1, 4*mm))
+        # ===== ここまで =====
         story.append(Paragraph('アクション・ブリーフ', make_style(18, '#1a1a2e')))
         story.append(Spacer(1, 2*mm))
         story.append(HRFlowable(width='100%', thickness=1, color=HexColor('#2563EB')))
@@ -1684,28 +1708,25 @@ def generate_brief_pdf_layer2(session_id):
         styles_small = ParagraphStyle('small', fontName='HeiseiMin-W3', fontSize=9, leading=14, textColor=HexColor('#8B949E'))
 
         story = []
-        # ===== 冒頭会議情報ブロック =====
-        try:
-            _l2_sum = meeting_room.get_session_summary(session_id)
-            _l2_members = ', '.join([m['name'] for m in _l2_sum.get('members', [])]) if _l2_sum else '―'
-        except Exception:
-            _l2_members = '―'
-        _l2_category = data.get('category', '―')
-        story.append(Paragraph('📋 会議情報', ParagraphStyle('hdr2', fontName='HeiseiMin-W3', fontSize=13, leading=18, textColor=HexColor('#1B4FD8'))))
+        # ===== 議題・解決すべき課題ブロック =====
+        _l2_client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
+        _l2_issues = _extract_issues(_l2_client, topic)
+        story.append(Paragraph('📋 議題', ParagraphStyle('hdr2t', fontName='HeiseiMin-W3', fontSize=13, leading=18, textColor=HexColor('#1B4FD8'))))
         story.append(Spacer(1, 2*mm))
-        story.append(HRFlowable(width='100%', thickness=1, color=HexColor('#1B4FD8')))
-        story.append(Spacer(1, 2*mm))
-        for _lbl, _val in [
-            ('議題', topic),
-            ('参加ペルソナ', _l2_members),
-            ('日時', datetime.now().strftime('%Y年%m月%d日 %H:%M')),
-            ('カテゴリ', _l2_category),
-        ]:
-            story.append(Paragraph(f'<b>{_lbl}：</b>{_val}', styles_small))
+        story.append(Paragraph(topic, styles_small))
         story.append(Spacer(1, 4*mm))
         story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
         story.append(Spacer(1, 4*mm))
-        # ===== 冒頭会議情報ブロック ここまで =====
+        if _l2_issues:
+            story.append(Paragraph('🎯 解決すべき課題', ParagraphStyle('hdr2i', fontName='HeiseiMin-W3', fontSize=13, leading=18, textColor=HexColor('#1B4FD8'))))
+            story.append(Spacer(1, 2*mm))
+            for _iss in _l2_issues:
+                story.append(Paragraph(f'・{_iss}', styles_small))
+                story.append(Spacer(1, 1*mm))
+            story.append(Spacer(1, 4*mm))
+            story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
+            story.append(Spacer(1, 4*mm))
+        # ===== ここまで =====
         story.append(Paragraph('🔍 議論分析レポート', styles_title))
         story.append(Paragraph(f'議題：{topic}', styles_small))
         story.append(Paragraph(datetime.now().strftime('%Y年%m月%d日'), styles_small))
@@ -1787,27 +1808,25 @@ def generate_brief_pdf_layer3(session_id):
         styles_small = ParagraphStyle('small', fontName='HeiseiMin-W3', fontSize=9, leading=14, textColor=HexColor('#8B949E'))
 
         story = []
-        # ===== 冒頭会議情報ブロック =====
-        try:
-            _l3_sum = meeting_room.get_session_summary(session_id)
-            _l3_members = ', '.join([m['name'] for m in _l3_sum.get('members', [])]) if _l3_sum else '―'
-        except Exception:
-            _l3_members = '―'
-        story.append(Paragraph('📋 会議情報', ParagraphStyle('hdr3', fontName='HeiseiMin-W3', fontSize=13, leading=18, textColor=HexColor('#1B4FD8'))))
+        # ===== 議題・解決すべき課題ブロック =====
+        _l3_client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
+        _l3_issues = _extract_issues(_l3_client, topic)
+        story.append(Paragraph('📋 議題', ParagraphStyle('hdr3t', fontName='HeiseiMin-W3', fontSize=13, leading=18, textColor=HexColor('#1B4FD8'))))
         story.append(Spacer(1, 2*mm))
-        story.append(HRFlowable(width='100%', thickness=1, color=HexColor('#1B4FD8')))
-        story.append(Spacer(1, 2*mm))
-        for _lbl, _val in [
-            ('議題', topic),
-            ('参加ペルソナ', _l3_members),
-            ('日時', datetime.now().strftime('%Y年%m月%d日 %H:%M')),
-            ('カテゴリ', category),
-        ]:
-            story.append(Paragraph(f'<b>{_lbl}：</b>{_val}', styles_small))
+        story.append(Paragraph(topic, styles_small))
         story.append(Spacer(1, 4*mm))
         story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
         story.append(Spacer(1, 4*mm))
-        # ===== 冒頭会議情報ブロック ここまで =====
+        if _l3_issues:
+            story.append(Paragraph('🎯 解決すべき課題', ParagraphStyle('hdr3i', fontName='HeiseiMin-W3', fontSize=13, leading=18, textColor=HexColor('#1B4FD8'))))
+            story.append(Spacer(1, 2*mm))
+            for _iss in _l3_issues:
+                story.append(Paragraph(f'・{_iss}', styles_small))
+                story.append(Spacer(1, 1*mm))
+            story.append(Spacer(1, 4*mm))
+            story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
+            story.append(Spacer(1, 4*mm))
+        # ===== ここまで =====
         story.append(Paragraph('📊 戦略フレームワーク・レポート', styles_title))
         story.append(Paragraph(f'議題：{topic}', styles_small))
         story.append(Paragraph(datetime.now().strftime('%Y年%m月%d日'), styles_small))
