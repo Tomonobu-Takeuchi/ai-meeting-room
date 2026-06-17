@@ -3301,6 +3301,9 @@ async function checkAuthStatus() {
       } else if (params.get('payment') === 'cancel') {
         showToast('お支払いがキャンセルされました。', 'info');
         history.replaceState(null, '', window.location.pathname);
+      } else if (params.get('pricing') === '1') {
+        history.replaceState(null, '', window.location.pathname);
+        openPricingModal();
       }
     } else {
       renderAuthArea();
