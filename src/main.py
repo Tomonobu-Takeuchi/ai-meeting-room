@@ -1598,6 +1598,21 @@ JSONのみ出力してください。"""
             return s
 
         story = []
+        # ===== 冒頭会議情報ブロック =====
+        story.append(Paragraph('📋 会議情報', make_style(13, '#1B4FD8')))
+        story.append(Spacer(1, 2*mm))
+        story.append(HRFlowable(width='100%', thickness=1, color=HexColor('#1B4FD8')))
+        story.append(Spacer(1, 2*mm))
+        for _lbl, _val in [
+            ('議題', summary['topic']),
+            ('参加ペルソナ', member_names),
+            ('日時', now.strftime('%Y年%m月%d日 %H:%M')),
+        ]:
+            story.append(Paragraph(f'<b>{_lbl}：</b>{_val}', make_style(10)))
+        story.append(Spacer(1, 4*mm))
+        story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
+        story.append(Spacer(1, 4*mm))
+        # ===== 冒頭会議情報ブロック ここまで =====
         story.append(Paragraph('アクション・ブリーフ', make_style(18, '#1a1a2e')))
         story.append(Spacer(1, 2*mm))
         story.append(HRFlowable(width='100%', thickness=1, color=HexColor('#2563EB')))
@@ -1669,6 +1684,28 @@ def generate_brief_pdf_layer2(session_id):
         styles_small = ParagraphStyle('small', fontName='HeiseiMin-W3', fontSize=9, leading=14, textColor=HexColor('#8B949E'))
 
         story = []
+        # ===== 冒頭会議情報ブロック =====
+        try:
+            _l2_sum = meeting_room.get_session_summary(session_id)
+            _l2_members = ', '.join([m['name'] for m in _l2_sum.get('members', [])]) if _l2_sum else '―'
+        except Exception:
+            _l2_members = '―'
+        _l2_category = data.get('category', '―')
+        story.append(Paragraph('📋 会議情報', ParagraphStyle('hdr2', fontName='HeiseiMin-W3', fontSize=13, leading=18, textColor=HexColor('#1B4FD8'))))
+        story.append(Spacer(1, 2*mm))
+        story.append(HRFlowable(width='100%', thickness=1, color=HexColor('#1B4FD8')))
+        story.append(Spacer(1, 2*mm))
+        for _lbl, _val in [
+            ('議題', topic),
+            ('参加ペルソナ', _l2_members),
+            ('日時', datetime.now().strftime('%Y年%m月%d日 %H:%M')),
+            ('カテゴリ', _l2_category),
+        ]:
+            story.append(Paragraph(f'<b>{_lbl}：</b>{_val}', styles_small))
+        story.append(Spacer(1, 4*mm))
+        story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
+        story.append(Spacer(1, 4*mm))
+        # ===== 冒頭会議情報ブロック ここまで =====
         story.append(Paragraph('🔍 議論分析レポート', styles_title))
         story.append(Paragraph(f'議題：{topic}', styles_small))
         story.append(Paragraph(datetime.now().strftime('%Y年%m月%d日'), styles_small))
@@ -1750,6 +1787,27 @@ def generate_brief_pdf_layer3(session_id):
         styles_small = ParagraphStyle('small', fontName='HeiseiMin-W3', fontSize=9, leading=14, textColor=HexColor('#8B949E'))
 
         story = []
+        # ===== 冒頭会議情報ブロック =====
+        try:
+            _l3_sum = meeting_room.get_session_summary(session_id)
+            _l3_members = ', '.join([m['name'] for m in _l3_sum.get('members', [])]) if _l3_sum else '―'
+        except Exception:
+            _l3_members = '―'
+        story.append(Paragraph('📋 会議情報', ParagraphStyle('hdr3', fontName='HeiseiMin-W3', fontSize=13, leading=18, textColor=HexColor('#1B4FD8'))))
+        story.append(Spacer(1, 2*mm))
+        story.append(HRFlowable(width='100%', thickness=1, color=HexColor('#1B4FD8')))
+        story.append(Spacer(1, 2*mm))
+        for _lbl, _val in [
+            ('議題', topic),
+            ('参加ペルソナ', _l3_members),
+            ('日時', datetime.now().strftime('%Y年%m月%d日 %H:%M')),
+            ('カテゴリ', category),
+        ]:
+            story.append(Paragraph(f'<b>{_lbl}：</b>{_val}', styles_small))
+        story.append(Spacer(1, 4*mm))
+        story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
+        story.append(Spacer(1, 4*mm))
+        # ===== 冒頭会議情報ブロック ここまで =====
         story.append(Paragraph('📊 戦略フレームワーク・レポート', styles_title))
         story.append(Paragraph(f'議題：{topic}', styles_small))
         story.append(Paragraph(datetime.now().strftime('%Y年%m月%d日'), styles_small))
