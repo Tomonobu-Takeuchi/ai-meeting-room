@@ -3307,6 +3307,11 @@ async function checkAuthStatus() {
       }
     } else {
       renderAuthArea();
+      const params2 = new URLSearchParams(window.location.search);
+      if (params2.get('pricing') === '1') {
+        history.replaceState(null, '', window.location.pathname);
+        openPricingModal();
+      }
     }
   } catch (e) {
     renderAuthArea();
