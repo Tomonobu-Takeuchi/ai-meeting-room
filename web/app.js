@@ -1109,6 +1109,17 @@ async function showReportModal() {
 
 function buildLayer2HTML(l2, cat) {
   let html = '';
+  // ===== 冒頭会議情報ブロック =====
+  const _topic2 = State.topic || '';
+  const _members2 = (State.members || []).map(m => m.name).join('、');
+  const _cat2 = cat || '';
+  html += `<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px;">`;
+  html += `<div style="font-size:11px;font-weight:700;color:#1B4FD8;margin-bottom:8px;letter-spacing:.5px;">📋 会議情報</div>`;
+  if (_topic2) html += `<div style="font-size:12px;margin-bottom:4px;"><b>議題：</b>${escapeHtml(_topic2)}</div>`;
+  if (_members2) html += `<div style="font-size:12px;margin-bottom:4px;"><b>参加ペルソナ：</b>${escapeHtml(_members2)}</div>`;
+  if (_cat2) html += `<div style="font-size:12px;"><b>カテゴリ：</b>${escapeHtml(_cat2)}</div>`;
+  html += `</div>`;
+  // ===== 冒頭会議情報ブロック ここまで =====
   if (l2.conclusion) {
     html += `<div style="background:var(--bg-base);border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;line-height:1.7;">${l2.conclusion}</div>`;
   }
@@ -1147,6 +1158,17 @@ function buildLayer2HTML(l2, cat) {
 
 function buildLayer3HTML(l3, cat) {
   let html = '';
+  // ===== 冒頭会議情報ブロック =====
+  const _topic3 = State.topic || '';
+  const _members3 = (State.members || []).map(m => m.name).join('、');
+  const _cat3 = cat || '';
+  html += `<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px;">`;
+  html += `<div style="font-size:11px;font-weight:700;color:#1B4FD8;margin-bottom:8px;letter-spacing:.5px;">📋 会議情報</div>`;
+  if (_topic3) html += `<div style="font-size:12px;margin-bottom:4px;"><b>議題：</b>${escapeHtml(_topic3)}</div>`;
+  if (_members3) html += `<div style="font-size:12px;margin-bottom:4px;"><b>参加ペルソナ：</b>${escapeHtml(_members3)}</div>`;
+  if (_cat3) html += `<div style="font-size:12px;"><b>カテゴリ：</b>${escapeHtml(_cat3)}</div>`;
+  html += `</div>`;
+  // ===== 冒頭会議情報ブロック ここまで =====
   if (l3.error) {
     return `<div style="padding:16px;text-align:center;color:var(--text-secondary);font-size:13px;">
       ⚠️ ${l3.error}<br><span style="font-size:12px;margin-top:6px;display:block;">時間をおいて再度「レポートを見る」をお試しください。</span>
