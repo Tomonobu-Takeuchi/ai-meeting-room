@@ -334,20 +334,30 @@ def check_and_use_meeting(user_id):
 
         plan, credits, plan_expires_at, monthly_count, monthly_reset_at = rows[0]
         plan = plan or 'free'
-        credits = credits or 0
         monthly_count = monthly_count or 0
 
         now = datetime.now(timezone.utc)
 
-        # monthly_reset_atをtimezone-awareに統一
-        if monthly_reset_at is not None and monthly_reset_at.tzinfo is None:
-            monthly_reset_at = monthly_reset_at.replace(tzinfo=timezone.utc)
-
-        # plan_expires_atもtimezone-awareに統一
         if plan_expires_at is not None and plan_expires_at.tzinfo is None:
             plan_expires_at = plan_expires_at.replace(tzinfo=timezone.utc)
 
-        # 月初リセット判定
+        # スタンダードプラン（月15回・billing_anchor_day基準リセットはWebhook側
+        # reset_monthly_meeting_count が担当。ここではカレンダー月リセットを
+        # 適用しない＝二重リセット防止のため、needs_reset計算より前に分岐する）
+        if plan == 'standard':
+            STANDARD_LIMIT = 15
+            if monthly_count >= STANDARD_LIMIT:
+                conn.close()
+                return False, f"スタンダードプランの月{STANDARD_LIMIT}回の制限に達しました。プロプランへのアップグレードをご検討ください。"
+            conn.run("UPDATE users SET monthly_meeting_count=monthly_meeting_count+1 WHERE id=:id", id=user_id)
+            conn.close()
+            return True, "ok"
+
+        # monthly_reset_atをtimezone-awareに統一（free/pro用）
+        if monthly_reset_at is not None and monthly_reset_at.tzinfo is None:
+            monthly_reset_at = monthly_reset_at.replace(tzinfo=timezone.utc)
+
+        # 月初リセット判定（free・pro共通：カレンダー月変化基準）
         needs_reset = (
             monthly_reset_at is None or
             monthly_reset_at.year < now.year or
@@ -356,7 +366,7 @@ def check_and_use_meeting(user_id):
         if needs_reset:
             monthly_count = 0
 
-        # プロプラン
+        # プロプラン（変更なし）
         if plan == 'pro':
             if plan_expires_at and plan_expires_at < now:
                 # 期限切れ → free に降格
@@ -370,19 +380,8 @@ def check_and_use_meeting(user_id):
                 conn.close()
                 return True, "ok"
 
-        # スタンダードプラン（クレジット消費）
-        if plan == 'standard':
-            if credits <= 0:
-                conn.close()
-                return False, "チケットが不足しています。チケットを購入してください。"
-            conn.run("""UPDATE users SET credits=credits-1,
-                monthly_meeting_count=monthly_meeting_count+1
-                WHERE id=:id""", id=user_id)
-            conn.close()
-            return True, "ok"
-
-        # 無料プラン（月5回）
-        FREE_LIMIT = 5
+        # 無料プラン（月3回）
+        FREE_LIMIT = 3
         if monthly_count >= FREE_LIMIT:
             conn.close()
             return False, f"無料プランの月{FREE_LIMIT}回の制限に達しました。プランをアップグレードしてください。"
@@ -1247,4 +1246,20 @@ def reset_monthly_meeting_count(user_id):
     except Exception as e:
         conn.close()
         raise RuntimeError(f"reset_monthly_meeting_count failed (user={user_id}): {e}") from e
+    conn.close()
+
+
+def set_standard_plan(user_id, stripe_customer_id):
+    """standardプラン契約完了時にplan・stripe_customer_idをセットする"""
+    conn = get_connection()
+    try:
+        conn.run(
+            "UPDATE users SET plan=:plan, stripe_customer_id=:cid WHERE id=:uid",
+            plan='standard', cid=stripe_customer_id, uid=user_id
+        )
+        affected = conn.row_count
+        print(f"[DB][set_standard_plan] UPDATE完了 rows_affected={affected} user_id={user_id} cid={stripe_customer_id!r}")
+    except Exception as e:
+        conn.close()
+        raise RuntimeError(f"set_standard_plan failed (user={user_id}): {e}") from e
     conn.close()
