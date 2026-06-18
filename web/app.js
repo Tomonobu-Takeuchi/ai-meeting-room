@@ -1133,8 +1133,13 @@ async function showReportModal() {
       DOM.layer2Locked.classList.remove('hidden');
       DOM.layer3Locked.classList.remove('hidden');
     } else {
+      const isExtBlock = (e?.message || '').toLowerCase().includes('message port');
       DOM.briefConclusion.textContent = 'レポートの生成に失敗しました。';
-      showToast(translateApiError(e.message, 'レポートの生成'), 'error');
+      if (isExtBlock) {
+        showToast('ブラウザ拡張機能が通信を遮断しました\nシークレットモード（Ctrl+Shift+N）でお試しください', 'warning');
+      } else {
+        showToast(translateApiError(e.message, 'レポートの生成'), 'error');
+      }
     }
   }
 }
@@ -1490,7 +1495,12 @@ async function useTrialLayer2() {
     btn.disabled = false; btn.textContent = '無料で体験する';
     DOM.layer2Trial.querySelector('div').textContent =
       '🎁 議論分析レポートを1回無料で体験できます';
-    showToast('生成に失敗しました', 'error');
+    const isExtBlock = (e?.message || '').toLowerCase().includes('message port');
+    if (isExtBlock) {
+      showToast('ブラウザ拡張機能が通信を遮断しました\nシークレットモード（Ctrl+Shift+N）でお試しください', 'warning');
+    } else {
+      showToast('生成に失敗しました', 'error');
+    }
   }
 }
 
