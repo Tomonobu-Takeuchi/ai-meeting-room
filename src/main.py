@@ -28,6 +28,8 @@ from src.database import (
     add_user_credits, update_user_plan, save_payment, complete_payment,
     get_user_by_stripe_customer, update_user_avatar, encrypt_value,
     get_crisis_keywords,
+    set_earlybird_and_billing_anchor, count_earlybird_users,
+    reset_monthly_meeting_count, set_standard_plan,
 )
 
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
@@ -42,6 +44,13 @@ if STRIPE_SECRET_KEY:
 STANDARD_PRICE_JPY = 480
 PRO_PRICE_JPY = 980
 STANDARD_CREDITS = 50
+
+# 4価格ID（アーリーバード・月回数制対応）
+STRIPE_PRICE_STANDARD_EARLY = os.environ.get('STRIPE_PRICE_STANDARD_EARLY', '')
+STRIPE_PRICE_STANDARD_REGULAR = os.environ.get('STRIPE_PRICE_STANDARD_REGULAR', '')
+STRIPE_PRICE_PRO_EARLY = os.environ.get('STRIPE_PRICE_PRO_EARLY', '')
+STRIPE_PRICE_PRO_REGULAR = os.environ.get('STRIPE_PRICE_PRO_REGULAR', '')
+EARLYBIRD_LIMIT = 100
 
 import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
@@ -2192,64 +2201,46 @@ def payment_checkout():
     if not STRIPE_SECRET_KEY:
         return jsonify({"error": "決済機能が設定されていません"}), 500
 
-    base_url = request.host_url.rstrip('/')
-    meta_to_send = {'user_id': str(user_id), 'payment_type': payment_type}
-    print(f"[checkout] user_id={user_id!r} (type={type(user_id).__name__}) "
-          f"payment_type={payment_type!r} metadata送信={meta_to_send}")
-    try:
-        if payment_type == 'standard':
-            checkout_session = stripe.checkout.Session.create(
-                payment_method_types=['card'],
-                line_items=[{
-                    'price_data': {
-                        'currency': 'jpy',
-                        'product_data': {
-                            'name': 'スタンダードプラン – 50会議チケット',
-                            'description': 'AI-PERSONA会議室 50回分の会議チケット（有効期限なし）',
-                        },
-                        'unit_amount': STANDARD_PRICE_JPY,
-                    },
-                    'quantity': 1,
-                }],
-                mode='payment',
-                success_url=f'{base_url}/app?payment=success&session_id={{CHECKOUT_SESSION_ID}}',
-                cancel_url=f'{base_url}/app?payment=cancel',
-                metadata=meta_to_send,
-            )
-        else:
-            checkout_session = stripe.checkout.Session.create(
-                payment_method_types=['card'],
-                line_items=[{
-                    'price_data': {
-                        'currency': 'jpy',
-                        'product_data': {
-                            'name': 'プロプラン – 月額サブスクリプション',
-                            'description': 'AI-PERSONA会議室 月間会議無制限プラン',
-                        },
-                        'unit_amount': PRO_PRICE_JPY,
-                        'recurring': {'interval': 'month'},
-                    },
-                    'quantity': 1,
-                }],
-                mode='subscription',
-                success_url=f'{base_url}/app?payment=success&session_id={{CHECKOUT_SESSION_ID}}',
-                cancel_url=f'{base_url}/app?payment=cancel',
-                metadata=meta_to_send,
-                subscription_data={'metadata': {'user_id': str(user_id)}},
-            )
+    is_earlybird = count_earlybird_users() < EARLYBIRD_LIMIT
 
+    if payment_type == 'standard':
+        price_id = STRIPE_PRICE_STANDARD_EARLY if is_earlybird else STRIPE_PRICE_STANDARD_REGULAR
+    else:
+        price_id = STRIPE_PRICE_PRO_EARLY if is_earlybird else STRIPE_PRICE_PRO_REGULAR
+
+    if not price_id:
+        return jsonify({"error": "価格IDが未設定です（Railway環境変数を確認してください）"}), 500
+
+    base_url = request.host_url.rstrip('/')
+    meta_to_send = {
+        'user_id': str(user_id),
+        'payment_type': payment_type,
+        'is_earlybird': '1' if is_earlybird else '0',
+    }
+    print(f"[checkout] user_id={user_id!r} payment_type={payment_type!r} "
+          f"is_earlybird={is_earlybird} price_id={price_id} metadata={meta_to_send}")
+
+    try:
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{'price': price_id, 'quantity': 1}],
+            mode='subscription',
+            success_url=f'{base_url}/app?payment=success&session_id={{CHECKOUT_SESSION_ID}}',
+            cancel_url=f'{base_url}/app?payment=cancel',
+            metadata=meta_to_send,
+            subscription_data={'metadata': meta_to_send},
+            allow_promotion_codes=True,
+        )
         checkout_url = checkout_session.url
-        print(f"[checkout] Stripeセッション作成成功 session_id={checkout_session.id} "
-              f"metadata_confirmed={repr(checkout_session.metadata)[:200]}")
+        print(f"[checkout] Stripeセッション作成成功 session_id={checkout_session.id}")
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-    # save_payment は非致命的：失敗してもチェックアウト URL は返す
     try:
         save_payment(
             user_id, checkout_session.id, payment_type,
             STANDARD_PRICE_JPY if payment_type == 'standard' else PRO_PRICE_JPY,
-            STANDARD_CREDITS if payment_type == 'standard' else 0,
+            0,
         )
     except Exception as e:
         print(f"[checkout] save_payment 失敗（無視）: {e}")
@@ -2453,6 +2444,17 @@ def _handle_checkout_completed(event, datetime, timedelta):
         print(f"[webhook][ch2] skip: metadata不足 user_id={user_id} payment_type={payment_type!r}")
         return
 
+    # メタデータからis_earlybird取得（StripeObjectのため.get()使用）
+    try:
+        raw_eb = (meta_raw.get('is_earlybird') or '0') if meta_raw else '0'
+    except Exception:
+        raw_eb = '0'
+    is_earlybird = (raw_eb == '1')
+
+    # billing_anchor_day算出（決済完了日基準・29〜31日は28に丸め）
+    today_day = datetime.utcnow().day
+    billing_anchor_day = 28 if today_day > 28 else today_day
+
     # DB 更新
     try:
         if payment_type == 'standard':
@@ -2466,10 +2468,10 @@ def _handle_checkout_completed(event, datetime, timedelta):
             if _rows and _rows[0][0] == "completed":
                 print(f"[webhook][ch3] skip: 二重付与防止 session={session_id} already completed")
                 return
-            print(f"[webhook][ch3] add_user_credits 開始 user={user_id} amount={STANDARD_CREDITS}")
-            add_user_credits(user_id, STANDARD_CREDITS)
-            app.logger.info(f"[WEBHOOK] credits付与完了 user_id={user_id} plan=standard credits+={STANDARD_CREDITS}")
-            print(f"[webhook][ch3] add_user_credits 完了")
+            print(f"[webhook][ch3] set_standard_plan 開始 user={user_id} customer={customer_id}")
+            set_standard_plan(user_id, customer_id)
+            app.logger.info(f"[WEBHOOK] plan変更完了 user_id={user_id} plan=standard")
+            print(f"[webhook][ch3] set_standard_plan 完了")
         elif payment_type == 'pro':
             expires_at = datetime.utcnow() + timedelta(days=31)
             print(f"[webhook][ch3] update_user_plan 開始 user={user_id} expires={expires_at}")
@@ -2479,6 +2481,10 @@ def _handle_checkout_completed(event, datetime, timedelta):
         else:
             print(f"[webhook][ch3] 未知の payment_type={payment_type!r}")
             return
+
+        set_earlybird_and_billing_anchor(user_id, is_earlybird, billing_anchor_day)
+        print(f"[webhook][ch3] set_earlybird_and_billing_anchor 完了 "
+              f"is_earlybird={is_earlybird} billing_anchor_day={billing_anchor_day}")
     except Exception as e:
         print(f"[webhook][ch3] DB更新エラー: {type(e).__name__}: {e}")
         print(traceback.format_exc())
@@ -2513,12 +2519,28 @@ def _handle_invoice_payment(event, datetime, timedelta):
         return
 
     uid = get_user_by_stripe_customer(customer_id)
-    if uid:
+    if not uid:
+        print(f"[webhook] 未登録の stripe_customer_id={customer_id}")
+        return
+
+    # invoiceの price_id から実際のプラン（standard/pro）を判定
+    try:
+        price_id = invoice.lines.data[0].price.id if invoice.lines.data else None
+    except Exception as e:
+        print(f"[webhook] price_id取得エラー: {type(e).__name__}: {e}")
+        price_id = None
+
+    print(f"[webhook] price_id={price_id!r} user={uid}")
+
+    if price_id in (STRIPE_PRICE_PRO_EARLY, STRIPE_PRICE_PRO_REGULAR):
         expires_at = datetime.utcnow() + timedelta(days=31)
         update_user_plan(uid, 'pro', expires_at)
-        print(f"[webhook] サブスク更新完了 user={uid} expires={expires_at}")
+        print(f"[webhook] proサブスク更新完了 user={uid} expires={expires_at}")
+    elif price_id in (STRIPE_PRICE_STANDARD_EARLY, STRIPE_PRICE_STANDARD_REGULAR):
+        reset_monthly_meeting_count(uid)
+        print(f"[webhook] standard月次リセット完了 user={uid}")
     else:
-        print(f"[webhook] 未登録の stripe_customer_id={customer_id}")
+        print(f"[webhook] 未知のprice_id={price_id!r} → スキップ（plan変更なし）")
 
 
 @app.route("/api/payment/schema-check", methods=["GET"])
