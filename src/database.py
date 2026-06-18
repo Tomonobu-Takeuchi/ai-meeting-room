@@ -1204,3 +1204,47 @@ def get_crisis_keywords():
         conn.close()
 
 get_crisis_keywords._cache = {'data': None, 'ts': 0}
+
+
+def set_earlybird_and_billing_anchor(user_id, is_earlybird, billing_anchor_day):
+    """Checkout完了時にis_earlybird・billing_anchor_dayをセットする（初回登録時のみ呼び出す）"""
+    conn = get_connection()
+    try:
+        conn.run(
+            "UPDATE users SET is_earlybird=:eb, billing_anchor_day=:bad WHERE id=:uid",
+            eb=is_earlybird, bad=billing_anchor_day, uid=user_id
+        )
+        affected = conn.row_count
+        print(f"[DB][set_earlybird] UPDATE完了 rows_affected={affected} user_id={user_id} is_earlybird={is_earlybird} billing_anchor_day={billing_anchor_day}")
+    except Exception as e:
+        conn.close()
+        raise RuntimeError(f"set_earlybird_and_billing_anchor failed (user={user_id}): {e}") from e
+    conn.close()
+
+
+def count_earlybird_users():
+    """先着100名判定用：現在のアーリーバード会員数（standard/pro）をカウント"""
+    conn = get_connection()
+    try:
+        rows = conn.run(
+            "SELECT COUNT(*) FROM users WHERE is_earlybird=TRUE AND plan IN ('standard','pro')"
+        )
+        return rows[0][0] if rows else 0
+    finally:
+        conn.close()
+
+
+def reset_monthly_meeting_count(user_id):
+    """standardプラン：Stripe請求日基準でmonthly_meeting_countを0にリセットする"""
+    conn = get_connection()
+    try:
+        conn.run(
+            "UPDATE users SET monthly_meeting_count=0 WHERE id=:uid",
+            uid=user_id
+        )
+        affected = conn.row_count
+        print(f"[DB][reset_monthly] UPDATE完了 rows_affected={affected} user_id={user_id}")
+    except Exception as e:
+        conn.close()
+        raise RuntimeError(f"reset_monthly_meeting_count failed (user={user_id}): {e}") from e
+    conn.close()
