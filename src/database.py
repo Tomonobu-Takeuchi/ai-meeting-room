@@ -77,7 +77,9 @@ def init_db():
             plan        TEXT DEFAULT 'free',
             trial_layer2_used BOOLEAN DEFAULT FALSE,
             trial_layer3_used BOOLEAN DEFAULT FALSE,
-            created_at  TIMESTAMP DEFAULT NOW()
+            created_at          TIMESTAMP DEFAULT NOW(),
+            is_earlybird        BOOLEAN DEFAULT FALSE NOT NULL,
+            billing_anchor_day  INTEGER
         )
     """)
 
@@ -233,7 +235,8 @@ def get_user_by_email(email):
     rows = conn.run("""
         SELECT id, email, name, plan, password_hash, avatar,
                credits, plan_expires_at, monthly_meeting_count,
-               trial_layer2_used, trial_layer3_used
+               trial_layer2_used, trial_layer3_used,
+               is_earlybird, billing_anchor_day
         FROM users WHERE email=:email
     """, email=email)
     if not rows:
@@ -241,7 +244,8 @@ def get_user_by_email(email):
         return None
     d = row_to_dict(['id','email','name','plan','password_hash','avatar',
                      'credits','plan_expires_at','monthly_meeting_count',
-                     'trial_layer2_used','trial_layer3_used'], rows[0])
+                     'trial_layer2_used','trial_layer3_used',
+                     'is_earlybird','billing_anchor_day'], rows[0])
     d['name'] = decrypt_value(conn, d['name'])
     conn.close()
     return d
@@ -253,7 +257,8 @@ def get_user_by_id(user_id):
             SELECT id, email, name, plan, credits, plan_expires_at,
                    monthly_meeting_count, monthly_reset_at, avatar, password_hash,
                    trial_layer2_used, trial_layer3_used,
-                   layer3_monthly_count, layer3_monthly_reset_at
+                   layer3_monthly_count, layer3_monthly_reset_at,
+                   is_earlybird, billing_anchor_day
             FROM users WHERE id=:id
         """, id=user_id)
         if not rows:
@@ -263,7 +268,8 @@ def get_user_by_id(user_id):
         d = row_to_dict(['id','email','name','plan','credits','plan_expires_at',
                          'monthly_meeting_count','monthly_reset_at','avatar','password_hash',
                          'trial_layer2_used','trial_layer3_used',
-                         'layer3_monthly_count','layer3_monthly_reset_at'], r)
+                         'layer3_monthly_count','layer3_monthly_reset_at',
+                         'is_earlybird','billing_anchor_day'], r)
         d['name'] = decrypt_value(conn, d['name'])
         conn.close()
         d['credits'] = d['credits'] or 0
