@@ -569,7 +569,7 @@ def test6_feedback(client):
 # ─── 機能試験 7: 料金プラン制限 ──────────────────────────────
 
 def test7_plan_limits(client):
-    section("機能試験7: 料金プラン制限（無料5回・スタンダードcredits・プロ無制限）")
+    section("機能試験7: 料金プラン制限（無料3回・スタンダード月15回・プロ無制限）")
 
     uid = state.get('user_id')
     if not uid:
@@ -579,40 +579,42 @@ def test7_plan_limits(client):
     conn = db_conn()
 
     try:
-        # ── 7-1: 無料プラン 月5回制限 ──────────────────────────
+        # ── 7-1: 無料プラン 月3回制限 ──────────────────────────
         info("── 無料プラン制限テスト ──")
-        # monthly_count=4 に設定（次が5回目）
+        # monthly_count=2 に設定（次が3回目）
         conn.run("""
             UPDATE users SET plan='free', credits=0,
-                             monthly_meeting_count=4, monthly_reset_at=NOW()
+                             monthly_meeting_count=2, monthly_reset_at=NOW()
             WHERE id=:id
         """, id=uid)
 
-        r5 = client.post('/api/meeting/start', json={'topic': '無料5回目テスト'})
-        check_code(r5, 200, "無料プラン 5回目 → 200 OK")
+        r5 = client.post('/api/meeting/start', json={'topic': '無料3回目テスト'})
+        check_code(r5, 200, "無料プラン 3回目 → 200 OK")
 
-        r6 = client.post('/api/meeting/start', json={'topic': '無料6回目テスト'})
-        check_code(r6, 403, "無料プラン 6回目 → 403 PLAN_LIMIT")
+        r6 = client.post('/api/meeting/start', json={'topic': '無料4回目テスト'})
+        check_code(r6, 403, "無料プラン 4回目 → 403 PLAN_LIMIT")
         d6 = r6.get_json() or {}
         check(d6.get('code') == 'PLAN_LIMIT', "code='PLAN_LIMIT'が返る")
 
-        # ── 7-2: スタンダードプラン credits 消費 ────────────────
-        info("── スタンダードプラン credits テスト ──")
+        # ── 7-2: スタンダードプラン 月15回制限（monthly_meeting_countベース） ──
+        info("── スタンダードプラン月15回制限テスト ──")
         conn.run("""
-            UPDATE users SET plan='standard', credits=1, monthly_meeting_count=0
+            UPDATE users SET plan='standard', credits=0, monthly_meeting_count=14
             WHERE id=:id
         """, id=uid)
 
-        r_s1 = client.post('/api/meeting/start', json={'topic': 'スタンダード1回目'})
-        check_code(r_s1, 200, "standard credits=1 → 200 OK（credits消費）")
+        r_s1 = client.post('/api/meeting/start', json={'topic': 'スタンダード15回目'})
+        check_code(r_s1, 200, "standard monthly_meeting_count=14 → 15回目 200 OK")
 
-        rows = conn.run("SELECT credits FROM users WHERE id=:id", id=uid)
-        credits_left = rows[0][0] if rows else -1
-        info(f"消費後 credits={credits_left}")
-        check(credits_left == 0, f"credits 1→0 に減っている (got {credits_left})")
+        rows = conn.run("SELECT monthly_meeting_count FROM users WHERE id=:id", id=uid)
+        count_after = rows[0][0] if rows else -1
+        info(f"15回目後 monthly_meeting_count={count_after}")
+        check(count_after == 15, f"monthly_meeting_count 14→15 (got {count_after})")
 
-        r_s2 = client.post('/api/meeting/start', json={'topic': 'スタンダード credits切れ'})
-        check_code(r_s2, 403, "standard credits=0 → 403")
+        r_s2 = client.post('/api/meeting/start', json={'topic': 'スタンダード16回目'})
+        check_code(r_s2, 403, "standard monthly_meeting_count=15 → 16回目 403")
+        d_s2 = r_s2.get_json() or {}
+        check(d_s2.get('code') == 'PLAN_LIMIT', "code='PLAN_LIMIT'が返る")
 
         # ── 7-3: プロプラン 無制限 ──────────────────────────────
         info("── プロプラン（無制限）テスト ──")
@@ -632,15 +634,15 @@ def test7_plan_limits(client):
         from datetime import datetime, timedelta
         expired = datetime.utcnow() - timedelta(days=1)
         conn.run("""
-            UPDATE users SET plan='pro', plan_expires_at=:exp, monthly_meeting_count=4
+            UPDATE users SET plan='pro', plan_expires_at=:exp, monthly_meeting_count=2
             WHERE id=:id
         """, exp=expired, id=uid)
 
-        r_exp5 = client.post('/api/meeting/start', json={'topic': 'pro期限切れ5回目'})
-        check_code(r_exp5, 200, "pro期限切れ→free降格→5回目 200 OK")
+        r_exp5 = client.post('/api/meeting/start', json={'topic': 'pro期限切れ3回目'})
+        check_code(r_exp5, 200, "pro期限切れ→free降格→3回目 200 OK")
 
-        r_exp6 = client.post('/api/meeting/start', json={'topic': 'pro期限切れ6回目'})
-        check_code(r_exp6, 403, "pro期限切れ→free降格→6回目 403")
+        r_exp6 = client.post('/api/meeting/start', json={'topic': 'pro期限切れ4回目'})
+        check_code(r_exp6, 403, "pro期限切れ→free降格→4回目 403")
 
     finally:
         # 後始末: free + 0カウントに戻す
@@ -1035,26 +1037,26 @@ def test_func10_plan_boundary():
             r2 = c.post('/api/meeting/start', json={'topic': '境界値テスト1回目'})
             check_code(r2, 200, "会議1回目が200 OK")
 
-            # 3. monthly_meeting_count=5設定後 → 403かつcode=PLAN_LIMIT
+            # 3. monthly_meeting_count=3設定後 → 403かつcode=PLAN_LIMIT（free上限）
             conn.run(
-                "UPDATE users SET monthly_meeting_count=5, plan='free' WHERE id=:id", id=uid)
-            r3 = c.post('/api/meeting/start', json={'topic': '境界値テスト6回目'})
-            check_code(r3, 403, "monthly_meeting_count=5で会議開始が403")
+                "UPDATE users SET monthly_meeting_count=3, plan='free' WHERE id=:id", id=uid)
+            r3 = c.post('/api/meeting/start', json={'topic': '境界値テスト4回目'})
+            check_code(r3, 403, "monthly_meeting_count=3で会議開始が403")
             check((r3.get_json() or {}).get('code') == 'PLAN_LIMIT', "code=PLAN_LIMITが返る")
 
-            # 4. plan='standard', credits=1 → 200かつcreditsが0になる
+            # 4. plan='standard', monthly_meeting_count=14 → 200かつ15に増える
             conn.run(
-                "UPDATE users SET plan='standard', credits=1, monthly_meeting_count=0 "
+                "UPDATE users SET plan='standard', monthly_meeting_count=14 "
                 "WHERE id=:id", id=uid)
             r4 = c.post('/api/meeting/start', json={'topic': 'スタンダード境界値テスト'})
-            check_code(r4, 200, "plan='standard', credits=1 → 200 OK")
-            rows4 = conn.run("SELECT credits FROM users WHERE id=:id", id=uid)
-            cred4 = rows4[0][0] if rows4 else -1
-            check(cred4 == 0, f"会議後にcreditsが0になる (got {cred4})")
+            check_code(r4, 200, "plan='standard', monthly_meeting_count=14 → 200 OK")
+            rows4 = conn.run("SELECT monthly_meeting_count FROM users WHERE id=:id", id=uid)
+            count4 = rows4[0][0] if rows4 else -1
+            check(count4 == 15, f"会議後にmonthly_meeting_countが15になる (got {count4})")
 
-            # 5. credits=0 → 403
-            r5 = c.post('/api/meeting/start', json={'topic': 'credits=0テスト'})
-            check_code(r5, 403, "credits=0で会議開始が403")
+            # 5. monthly_meeting_count=15 → 403
+            r5 = c.post('/api/meeting/start', json={'topic': 'standard16回目テスト'})
+            check_code(r5, 403, "monthly_meeting_count=15で会議開始が403")
 
             # 6. plan='pro', plan_expires_at=過去日付 → 200かつプランがfreeに降格
             past = datetime.utcnow() - timedelta(days=1)
