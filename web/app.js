@@ -3871,14 +3871,14 @@ async function refreshEarlybirdStatus() {
       if (stdPriceEl) stdPriceEl.innerHTML = '¥980<span>/月</span>';
       if (proPriceEl) proPriceEl.innerHTML = '¥1,980<span>/月</span>';
       if (counterEl) {
-        counterEl.textContent = 'アーリーバード特典（先着100名）は終了しました';
+        counterEl.textContent = 'アーリーバード特典（先着100名）は終了しました。現在は正規価格（スタンダード¥980/月・プロ¥1,980/月）です。';
         counterEl.classList.remove('hidden');
       }
     } else {
       if (stdPriceEl) stdPriceEl.innerHTML = '¥480<span>/月</span>';
       if (proPriceEl) proPriceEl.innerHTML = '¥980<span>/月</span>';
       if (counterEl) {
-        counterEl.textContent = `🎉 アーリーバード特典 残り${data.earlybird_remaining}枠（先着100名限定・終了後は正規価格）`;
+        counterEl.textContent = `🎉 アーリーバード特典 残り${data.earlybird_remaining}枠（先着100名限定・終了後は正規価格 スタンダード¥980/月・プロ¥1,980/月）`;
         counterEl.classList.remove('hidden');
       }
     }
