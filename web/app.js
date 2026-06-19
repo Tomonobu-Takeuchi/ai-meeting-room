@@ -2209,11 +2209,13 @@ async function startMeeting() {
     renderMemberList(); renderMemberTriggers();
     addSystemMessage(`会議を開始しました。議題：${State.topic}`);
     if (State.currentUser?.plan === 'standard') {
-      const remaining = Math.max(0, (State.currentUser.credits || 1) - 1);
-      State.currentUser.credits = remaining;
-      const costEl = $('startMeetingCostText');
-      if (costEl) costEl.textContent = `1チケット消費します（残り${remaining}枚）`;
-      showToast(`会議を開始しました！（残り${remaining}チケット）`, 'success');
+      if (data.monthly_meeting_count !== undefined) {
+        State.currentUser.monthly_meeting_count = data.monthly_meeting_count;
+      } else {
+        State.currentUser.monthly_meeting_count = (State.currentUser.monthly_meeting_count || 0) + 1;
+      }
+      renderAuthArea();
+      showToast('会議を開始しました！', 'success');
     } else if (State.currentUser?.plan === 'free') {
       if (data.monthly_meeting_count !== undefined) {
         State.currentUser.monthly_meeting_count = data.monthly_meeting_count;
@@ -3420,7 +3422,7 @@ async function verifyAndApplyPayment(sessionId) {
         State.currentUser.plan_expires_at = data.status.plan_expires_at;
         State.currentUser.monthly_meeting_count = data.status.monthly_meeting_count;
         renderAuthArea();
-        const planLabels = { standard: 'スタンダード（50チケット）', pro: 'プロ（月間無制限）' };
+        const planLabels = { standard: 'スタンダード（月15回）', pro: 'プロ（月間無制限）' };
         const label = planLabels[data.status.plan] || data.status.plan;
         showToast(`お支払い完了！${label}に更新されました。`, 'success');
         return;
@@ -3451,10 +3453,11 @@ function renderAuthArea() {
     const planLabel = planLabels[plan] || plan;
     let remainingLabel = '';
     if (plan === 'free') {
-      const remaining = Math.max(0, 5 - (u.monthly_meeting_count || 0));
+      const remaining = Math.max(0, 3 - (u.monthly_meeting_count || 0));
       remainingLabel = `残り${remaining}回`;
     } else if (plan === 'standard') {
-      remainingLabel = `残り${u.credits || 0}枚`;
+      const remaining = Math.max(0, 15 - (u.monthly_meeting_count || 0));
+      remainingLabel = `残り${remaining}回`;
     } else if (plan === 'pro') {
       if (u.plan_expires_at) {
         const days = Math.ceil((new Date(u.plan_expires_at) - new Date()) / (1000 * 60 * 60 * 24));
@@ -3506,12 +3509,13 @@ function renderAuthArea() {
   } else {
     area.innerHTML = `<button class="btn btn-green" id="freeStartBtn" onclick="startFree()">🚀 <span class="btn-full-text">無料で始める</span><span class="btn-short-text">無料</span></button><button class="btn" id="loginBtnHeader" onclick="openAuthModal()">🔑<span class="btn-login-text"> ログイン</span></button>`;
   }
-  // 案A：standardプランのチケット消費テキスト更新
+  // Step4-2：standardプランの月回数表示に変更（チケット制廃止）
   const costInfo = $('startMeetingCostInfo');
   const costText = $('startMeetingCostText');
   if (costInfo && costText && State.currentUser) {
     if (State.currentUser.plan === 'standard') {
-      costText.textContent = `1チケット消費します（残り${State.currentUser.credits || 0}枚）`;
+      const remaining = Math.max(0, 15 - (State.currentUser.monthly_meeting_count || 0));
+      costText.textContent = `今月の残り会議回数：${remaining} / 15回`;
       costInfo.style.display = 'inline';
     } else {
       costInfo.style.display = 'none';
@@ -3856,20 +3860,47 @@ function agreeProhibitedNotice() {
 
 // ===== 料金プランモーダル =====
 
+// Step4-2：アーリーバード残り枠数を取得し、料金モーダルの表示を更新（未ログインでも呼べる）
+async function refreshEarlybirdStatus() {
+  try {
+    const data = await API.get('/api/payment/earlybird-status');
+    const stdPriceEl = $('standardPriceDisplay');
+    const proPriceEl = $('proPriceDisplay');
+    const counterEl = $('earlybirdCounter');
+    if (data.is_full) {
+      if (stdPriceEl) stdPriceEl.innerHTML = '¥980<span>/月</span>';
+      if (proPriceEl) proPriceEl.innerHTML = '¥1,980<span>/月</span>';
+      if (counterEl) {
+        counterEl.textContent = 'アーリーバード特典（先着100名）は終了しました';
+        counterEl.classList.remove('hidden');
+      }
+    } else {
+      if (stdPriceEl) stdPriceEl.innerHTML = '¥480<span>/月</span>';
+      if (proPriceEl) proPriceEl.innerHTML = '¥980<span>/月</span>';
+      if (counterEl) {
+        counterEl.textContent = `🎉 アーリーバード特典 残り${data.earlybird_remaining}枠（先着100名限定・終了後は正規価格）`;
+        counterEl.classList.remove('hidden');
+      }
+    }
+  } catch (e) {
+    // 取得失敗時はHTMLのデフォルト表示（アーリーバード価格）のまま
+  }
+}
+
 function openPricingModal(reason) {
   const overlay = $('pricingModalOverlay');
   if (!overlay) return;
+  refreshEarlybirdStatus();
   const planEl = $('pricingCurrentPlan');
   if (planEl && State.currentUser) {
     const plan = State.currentUser.plan || 'free';
-    const credits = State.currentUser.credits || 0;
     const monthly = State.currentUser.monthly_meeting_count || 0;
     let msg = '';
     if (reason) msg = `<div style="color:#FCA5A5;margin-bottom:6px;font-size:12px;">⚠️ ${escapeHtml(reason)}</div>`;
     if (plan === 'free') {
-      msg += `現在のプラン: <b>無料</b> · 今月 ${monthly}/5 回使用済み`;
+      msg += `現在のプラン: <b>無料</b> · 今月 ${monthly}/3 回使用済み`;
     } else if (plan === 'standard') {
-      msg += `現在のプラン: <b>スタンダード</b> · 残り ${credits} チケット`;
+      msg += `現在のプラン: <b>スタンダード</b> · 今月 ${monthly}/15 回使用済み`;
     } else if (plan === 'pro') {
       const exp = State.currentUser.plan_expires_at
         ? new Date(State.currentUser.plan_expires_at).toLocaleDateString('ja-JP')
@@ -3903,11 +3934,11 @@ function showPurchaseConfirm(type) {
   closePricingModal();
   const isStandard = type === 'standard';
   $('purchaseConfirmTitle').textContent = isStandard
-    ? 'スタンダードプラン ¥480 を購入'
-    : 'プロプラン ¥980/月 に登録';
+    ? 'スタンダードプランに登録'
+    : 'プロプランに登録';
   $('purchaseConfirmDesc').textContent = isStandard
-    ? '50回分の会議チケットを購入します。有効期限はありません。'
-    : '月間会議回数無制限のプロプランに登録します。';
+    ? '月15回まで会議できるサブスクリプションに登録します（毎月自動更新・いつでも解約可）。'
+    : '月間会議回数無制限のプロプランに登録します（毎月自動更新・いつでも解約可）。';
   $('purchaseConfirmOverlay').classList.remove('hidden');
   $('purchaseConfirmOk').dataset.planType = type;
 }
@@ -3935,7 +3966,7 @@ async function purchasePlan(type, newWindow = null) {
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.textContent = type === 'standard' ? 'チケットを購入' : 'プロプランに登録';
+      btn.textContent = type === 'standard' ? 'スタンダードプランに登録' : 'プロプランに登録';
     }
   }
 }

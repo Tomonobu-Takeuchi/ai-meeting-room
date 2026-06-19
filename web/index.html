@@ -1345,21 +1345,21 @@
         <h3 class="howto-h3">💳 プラン比較</h3>
         <table class="howto-table">
           <tr><th>プラン</th><th>価格</th><th>会議回数</th><th>ペルソナ作成</th></tr>
-          <tr><td>無料</td><td>¥0</td><td>月5回</td><td>3体まで</td></tr>
-          <tr><td>スタンダード</td><td>¥480 / 50チケット</td><td>50回分（有効期限なし）</td><td>無制限</td></tr>
+          <tr><td>無料</td><td>¥0</td><td>月3回</td><td>3体まで</td></tr>
+          <tr><td>スタンダード</td><td>¥480 / 月</td><td>月15回（継続課金・先着100名アーリーバード価格）</td><td>無制限</td></tr>
           <tr><td>プロ</td><td>¥980 / 月</td><td>無制限</td><td>無制限</td></tr>
         </table>
         <p class="howto-p" style="font-weight:600;margin-top:12px">📄 レポート機能（プラン別）</p>
         <table class="howto-table">
           <tr><th>レポート種別</th><th>無料</th><th>スタンダード</th><th>プロ</th></tr>
           <tr><td>Layer1：アクション・ブリーフPDF（会議サマリー）</td><td>✓ 無制限</td><td>✓ 無制限</td><td>✓ 無制限</td></tr>
-          <tr><td>Layer2：詳細分析PDF（意見・論点整理）</td><td>試用1回のみ</td><td>✓ 利用可（1チケット追加消費）</td><td>✓ 無制限</td></tr>
+          <tr><td>Layer2：詳細分析PDF（意見・論点整理）</td><td>試用1回のみ</td><td>✓ 利用可（追加消費なし）</td><td>✓ 無制限</td></tr>
           <tr><td>Layer3：戦略レポートPDF（アクションプラン・リスク分析）</td><td>試用1回のみ</td><td>試用1回のみ</td><td>✓ 月30回まで</td></tr>
         </table>
         <div class="howto-tip">
           <p>💡 <strong>ゲスト（未ログイン）は会議回数カウントなし</strong>で利用できます。ただしペルソナ・学習データはブラウザを閉じると消えます。</p>
         </div>
-        <h3 class="howto-h3">🛒 チケット・プランの購入方法</h3>
+        <h3 class="howto-h3">🛒 プランの購入方法</h3>
         <div class="howto-step">
           <div class="howto-step-num">1</div>
           <div class="howto-step-body">
@@ -1378,7 +1378,7 @@
           <div class="howto-step-num">3</div>
           <div class="howto-step-body">
             <h4>Stripeで決済</h4>
-            <p>「チケットを購入」または「プロプランに登録」をクリックするとStripeの安全な決済画面に進みます。</p>
+            <p>「スタンダードプランに登録」または「プロプランに登録」をクリックするとStripeの安全な決済画面に進みます。</p>
           </div>
         </div>
         <div class="howto-warn">
@@ -1395,7 +1395,7 @@
         </div>
         <div class="howto-faq">
           <p class="howto-faq-q">会議が始まりません。</p>
-          <p class="howto-faq-a">議題の入力とペルソナの選択が必要です。左パネルに参加ペルソナが1名以上選択（青枠）されているか確認してください。無料プランの月5回上限に達した場合は「料金プラン」からアップグレードしてください。</p>
+          <p class="howto-faq-a">議題の入力とペルソナの選択が必要です。左パネルに参加ペルソナが1名以上選択（青枠）されているか確認してください。無料プランの月3回上限に達した場合は「料金プラン」からアップグレードしてください。</p>
         </div>
         <div class="howto-faq">
           <p class="howto-faq-q">YouTube動画の内容を学習させようとしたら失敗します。</p>
@@ -1477,6 +1477,7 @@
     <h2>プランを選択</h2>
     <p class="pricing-subtitle">会議の使用頻度に合わせてプランをお選びください</p>
     <div id="pricingCurrentPlan" class="pricing-current hidden"></div>
+    <div id="earlybirdCounter" class="earlybird-counter hidden"></div>
     <div class="pricing-cards">
       <!-- 無料 -->
       <div class="pricing-card">
@@ -1484,7 +1485,7 @@
         <div class="pricing-card-price">¥0<span>/月</span></div>
         <div class="pricing-card-desc">はじめての方に</div>
         <ul class="pricing-card-features">
-          <li>月5回まで会議</li>
+          <li>月3回まで会議</li>
           <li>ペルソナ作成3体まで</li>
           <li>学習データ登録</li>
           <li>Layer1レポート（無制限）</li>
@@ -1495,22 +1496,22 @@
       <!-- スタンダード -->
       <div class="pricing-card">
         <div class="pricing-card-label">スタンダード</div>
-        <div class="pricing-card-price">¥480<span>/50チケット</span></div>
-        <div class="pricing-card-desc">単発購入・有効期限なし</div>
+        <div class="pricing-card-price" id="standardPriceDisplay">¥480<span>/月</span></div>
+        <div class="pricing-card-desc">継続課金（毎月更新・いつでも解約可）</div>
         <ul class="pricing-card-features">
-          <li>50回分の会議チケット</li>
+          <li>月15回まで会議</li>
           <li>全ペルソナ利用可（無制限作成）</li>
           <li>学習データ登録</li>
-          <li>Layer1・Layer2レポート利用可</li>
+          <li>Layer1・Layer2レポート利用可（追加消費なし）</li>
           <li class="dim">Layer3は試用1回のみ</li>
         </ul>
-        <button class="btn btn-primary" id="buyStandardBtn" onclick="showPurchaseConfirm('standard')">チケットを購入</button>
+        <button class="btn btn-primary" id="buyStandardBtn" onclick="showPurchaseConfirm('standard')">スタンダードプランに登録</button>
       </div>
       <!-- プロ -->
       <div class="pricing-card recommended">
         <div class="badge-recommended">おすすめ</div>
         <div class="pricing-card-label">プロ</div>
-        <div class="pricing-card-price">¥980<span>/月</span></div>
+        <div class="pricing-card-price" id="proPriceDisplay">¥980<span>/月</span></div>
         <div class="pricing-card-desc">ヘビーユーザーに</div>
         <ul class="pricing-card-features">
           <li>月間会議回数無制限</li>
