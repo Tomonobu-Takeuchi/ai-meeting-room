@@ -2251,7 +2251,8 @@ def payment_checkout():
 @app.route("/api/payment/verify-session", methods=["POST"])
 @login_required
 def verify_payment_session():
-    """Stripe セッションを直接検証してプランを即時反映（webhook 非依存）"""
+    """Stripeセッションの状態確認のみを行う。DB更新は一切行わない（業務設計書v29 197行目の原則：
+    決済完了の確認はWebhook経由で行う。プラン確定処理は _handle_checkout_completed のみが担当する）"""
     user_id = get_current_user_id()
     data = request.json or {}
     session_id = data.get("session_id", "").strip()
@@ -2267,62 +2268,38 @@ def verify_payment_session():
         return jsonify({"error": str(e)}), 500
 
     # セッションのユーザーIDと照合（なりすまし防止）
-    # metadata は StripeObject のためドット記法（getattr）で統一
     meta = s.metadata
     meta_user_id = int(getattr(meta, 'user_id', None) or 0)
     if meta_user_id != user_id:
         return jsonify({"error": "セッションが一致しません"}), 403
 
-    payment_type = getattr(meta, 'payment_type', None)
     payment_status = s.payment_status  # 'paid' / 'no_payment_required' / 'unpaid'
     status = s.status                  # 'complete' / 'open' / 'expired'
 
-    print(f"[verify-session] session={session_id} status={status} payment_status={payment_status} type={payment_type}")
+    print(f"[verify-session] session={session_id} status={status} payment_status={payment_status}")
 
     if status != "complete":
         return jsonify({"verified": False, "reason": f"status={status}"}), 200
 
-    # 支払い済み or サブスク（no_payment_required は初回請求書で処理済み）
     if payment_status not in ("paid", "no_payment_required"):
         return jsonify({"verified": False, "reason": f"payment_status={payment_status}"}), 200
 
-    from datetime import datetime, timedelta
-    try:
-        if payment_type == "standard":
-            # 二重付与防止: payments テーブルで未完了か確認
-            from src.database import get_connection
-            conn = get_connection()
-            rows = conn.run(
-                "SELECT status FROM payments WHERE stripe_session_id=:sid",
-                sid=session_id
-            )
-            conn.close()
-            already_done = rows and rows[0][0] == "completed"
-            if not already_done:
-                add_user_credits(user_id, STANDARD_CREDITS)
-                complete_payment(session_id)
-        elif payment_type == "pro":
-            from src.database import get_connection
-            conn = get_connection()
-            rows = conn.run(
-                "SELECT status FROM payments WHERE stripe_session_id=:sid",
-                sid=session_id
-            )
-            conn.close()
-            already_done = rows and rows[0][0] == "completed"
-            if not already_done:
-                expires_at = datetime.utcnow() + timedelta(days=31)
-                customer_id = s.customer
-                update_user_plan(user_id, "pro", expires_at, stripe_customer_id=customer_id)
-                complete_payment(session_id)
-        else:
-            return jsonify({"verified": False, "reason": "unknown payment_type"}), 200
-    except Exception as e:
-        print(f"[verify-session] DB更新エラー: {e}")
-        return jsonify({"error": str(e)}), 500
+    # Stripe側は決済完了。Webhookによるplan確定処理が完了済みかをDBから読み取るだけ（書き込みは行わない）
+    from src.database import get_connection
+    conn = get_connection()
+    rows = conn.run(
+        "SELECT status FROM payments WHERE stripe_session_id=:sid",
+        sid=session_id
+    )
+    conn.close()
+    webhook_done = bool(rows and rows[0][0] == "completed")
+
+    if not webhook_done:
+        print(f"[verify-session] Stripe決済完了済み・Webhook未処理 session={session_id}（フロントが再試行する）")
+        return jsonify({"verified": False, "reason": "webhook_pending"}), 200
 
     status_data = get_user_payment_status(user_id)
-    print(f"[verify-session] 完了 user={user_id} plan={status_data.get('plan')} credits={status_data.get('credits')}")
+    print(f"[verify-session] Webhook処理済み確認 user={user_id} plan={status_data.get('plan')}")
     return jsonify({"verified": True, "status": status_data})
 
 
