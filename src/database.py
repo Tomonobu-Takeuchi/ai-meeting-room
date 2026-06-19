@@ -303,19 +303,20 @@ def update_user_avatar(user_id, avatar):
 def get_user_payment_status(user_id):
     conn = get_connection()
     rows = conn.run("""
-        SELECT plan, credits, plan_expires_at, monthly_meeting_count, monthly_reset_at
+        SELECT plan, credits, plan_expires_at, monthly_meeting_count, monthly_reset_at, is_earlybird
         FROM users WHERE id=:id
     """, id=user_id)
     conn.close()
     if not rows:
         return None
-    plan, credits, expires_at, monthly_count, reset_at = rows[0]
+    plan, credits, expires_at, monthly_count, reset_at, is_earlybird = rows[0]
     return {
         'plan': plan or 'free',
         'credits': credits or 0,
         'plan_expires_at': expires_at.isoformat() if expires_at else None,
         'monthly_meeting_count': monthly_count or 0,
         'monthly_reset_at': reset_at.isoformat() if reset_at else None,
+        'is_earlybird': bool(is_earlybird),
     }
 
 
