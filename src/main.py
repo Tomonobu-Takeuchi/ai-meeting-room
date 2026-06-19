@@ -2565,6 +2565,20 @@ def payment_status():
     return jsonify(status)
 
 
+@app.route("/api/payment/earlybird-status", methods=["GET"])
+def earlybird_status():
+    """アーリーバード残り枠数を返却。ログイン不要（料金モーダルはゲストにも表示するため、
+    機能試験仕様書v44 FT-15-D-06の通り未ログインでもアクセス可能であること）"""
+    used = count_earlybird_users()
+    remaining = max(0, EARLYBIRD_LIMIT - used)
+    return jsonify({
+        "earlybird_limit": EARLYBIRD_LIMIT,
+        "earlybird_used": used,
+        "earlybird_remaining": remaining,
+        "is_full": remaining <= 0,
+    })
+
+
 @app.route("/")
 def lp_top():
     return send_from_directory(os.path.join(app.static_folder, "lp"), "index.html")
