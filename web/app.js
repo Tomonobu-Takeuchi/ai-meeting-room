@@ -947,7 +947,22 @@ async function summarizeMeeting() {
   const typingEl = addTypingIndicator(State.facilitator, true);
   const evtSource = new EventSource(`/api/stream/facilitator/${State.sessionId}?mode=summarize`);
   let streamEl = null, fullText = '';
+  let watchdog = null;
+  function armWatchdog() {
+    if (watchdog) clearTimeout(watchdog);
+    watchdog = setTimeout(() => {
+      if (State.isStreaming) {
+        evtSource.close();
+        typingEl?.remove();
+        State.isStreaming = false; setStreamingButtons(false);
+        DOM.summarizeBtn.disabled = false;
+        showToast('議論のまとめがタイムアウトしました。もう一度お試しください。', 'warning');
+      }
+    }, 30000);
+  }
+  armWatchdog();
   evtSource.onmessage = (e) => {
+    armWatchdog();
     const data = JSON.parse(e.data);
     if (data.type === 'chunk') {
       typingEl?.remove();
@@ -955,12 +970,14 @@ async function summarizeMeeting() {
       appendToFacilitatorBanner(streamEl, data.text);
       fullText += data.text;
     } else if (data.type === 'done') {
+      clearTimeout(watchdog);
       evtSource.close(); State.isStreaming = false; setStreamingButtons(false);
       _briefSessionId = State.sessionId;
       DOM.minutesBar.classList.remove('hidden');
       scrollToBottom();
       if (State.voiceMode && fullText) speakText(fullText, 'facilitator', streamEl?.querySelector('.facilitator-banner'));
     } else if (data.type === 'error') {
+      clearTimeout(watchdog);
       typingEl?.remove(); streamEl?.remove(); evtSource.close();
       State.isStreaming = false; setStreamingButtons(false);
       DOM.summarizeBtn.disabled = false;
@@ -968,6 +985,7 @@ async function summarizeMeeting() {
     }
   };
   evtSource.onerror = () => {
+    clearTimeout(watchdog);
     typingEl?.remove(); evtSource.close(); State.isStreaming = false; setStreamingButtons(false); DOM.summarizeBtn.disabled = false;
     if (streamEl && DOM.minutesBar.classList.contains('hidden')) {
       _briefSessionId = State.sessionId;
@@ -2473,7 +2491,21 @@ async function invokeFacilitator() {
   const typingEl = addTypingIndicator(State.facilitator, true);
   const evtSource = new EventSource(`/api/stream/facilitator/${State.sessionId}?mode=guide`);
   let streamEl = null, fullText = '';
+  let watchdog = null;
+  function armWatchdog() {
+    if (watchdog) clearTimeout(watchdog);
+    watchdog = setTimeout(() => {
+      if (State.isStreaming) {
+        evtSource.close();
+        typingEl?.remove();
+        State.isStreaming = false; setStreamingButtons(false);
+        showToast('ファシリテーターの応答がタイムアウトしました。もう一度お試しください。', 'warning');
+      }
+    }, 30000);
+  }
+  armWatchdog();
   evtSource.onmessage = (e) => {
+    armWatchdog();
     const data = JSON.parse(e.data);
     if (data.type === 'chunk') {
       typingEl?.remove();
@@ -2481,6 +2513,7 @@ async function invokeFacilitator() {
       appendToFacilitatorBanner(streamEl, data.text);
       fullText += data.text;
     } else if (data.type === 'done') {
+      clearTimeout(watchdog);
       evtSource.close(); State.isStreaming = false; setStreamingButtons(false); scrollToBottom();
       if (fullText.includes('【質問】')) {
         showQuestionBadge();
@@ -2488,12 +2521,16 @@ async function invokeFacilitator() {
       }
       if (State.voiceMode && fullText) speakText(fullText.replace(/【質問】/g, '').trim(), 'facilitator', streamEl?.querySelector('.facilitator-banner'));
     } else if (data.type === 'error') {
+      clearTimeout(watchdog);
       typingEl?.remove(); streamEl?.remove(); evtSource.close();
       State.isStreaming = false; setStreamingButtons(false);
       showToast(translateApiError(data.message, 'ファシリテーターの応答'), 'error');
     }
   };
-  evtSource.onerror = () => { typingEl?.remove(); evtSource.close(); State.isStreaming = false; setStreamingButtons(false); showToast('AIとの接続が切断されました。再試行してください。', 'error'); };
+  evtSource.onerror = () => {
+    clearTimeout(watchdog);
+    typingEl?.remove(); evtSource.close(); State.isStreaming = false; setStreamingButtons(false); showToast('AIとの接続が切断されました。再試行してください。', 'error');
+  };
 }
 
 async function allRespond() {
@@ -2783,9 +2820,25 @@ async function invokeFacilitatorNominate() {
   const typingEl = addTypingIndicator(facilitator);
   const evtSource = new EventSource(`/api/stream/facilitator/${State.sessionId}?mode=nominate`);
   let streamEl = null, fullText = '';
+  let watchdog = null;
 
   return new Promise((resolve) => {
+    function armWatchdog() {
+      if (watchdog) clearTimeout(watchdog);
+      watchdog = setTimeout(() => {
+        if (State.isStreaming) {
+          evtSource.close();
+          typingEl?.remove();
+          State.isStreaming = false; setStreamingButtons(false);
+          showToast('次の発言者の指名がタイムアウトしました。もう一度お試しください。', 'warning');
+          resolve();
+        }
+      }, 30000);
+    }
+    armWatchdog();
+
     evtSource.onmessage = async (e) => {
+      armWatchdog();
       const data = JSON.parse(e.data);
       if (data.type === 'chunk') {
         typingEl?.remove();
@@ -2793,6 +2846,7 @@ async function invokeFacilitatorNominate() {
         appendToFacilitatorBanner(streamEl, data.text);
         fullText += data.text;
       } else if (data.type === 'done') {
+        clearTimeout(watchdog);
         evtSource.close(); State.isStreaming = false; setStreamingButtons(false);
         scrollToBottom();
         // 【指名:id】タグを検出してタグ除去
@@ -2809,12 +2863,14 @@ async function invokeFacilitatorNominate() {
         }
         resolve();
       } else if (data.type === 'error') {
+        clearTimeout(watchdog);
         typingEl?.remove(); streamEl?.remove(); evtSource.close();
         State.isStreaming = false; setStreamingButtons(false);
         resolve();
       }
     };
     evtSource.onerror = () => {
+      clearTimeout(watchdog);
       typingEl?.remove(); evtSource.close();
       State.isStreaming = false; setStreamingButtons(false);
       resolve();
