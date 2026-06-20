@@ -978,7 +978,72 @@ async function summarizeMeeting() {
 
 let _briefData = null;
 let _briefSessionId = null;
+let _briefIssues = null;
 let _feedbackFlowStarted = false;  // BUG-42：フィードバック重複発火防止フラグ
+
+async function loadLayer2(sid, category) {
+  try {
+    const data = await API.post(`/api/meeting/${sid}/brief_layer2`, { category }, 120000);
+    if (data.layer2) {
+      DOM.layer2Content.innerHTML = buildLayer2HTML(data.layer2, category, _briefData?.topic || '', _briefIssues || []);
+      DOM.downloadLayer2Btn.style.display = 'inline-block';
+      const layer2CostInfo = $('layer2CostInfo');
+      if (layer2CostInfo) layer2CostInfo.style.display = 'none';
+      _briefData = { ..._briefData, layer2: data.layer2 };
+    } else if (State.currentUser?.plan === 'free' && !_briefData?.trial_layer2_used) {
+      DOM.layer2Trial.classList.remove('hidden');
+    } else {
+      DOM.downloadLayer2Btn.style.display = 'none';
+      const layer2CostInfo = $('layer2CostInfo');
+      if (layer2CostInfo) layer2CostInfo.style.display = 'none';
+      DOM.layer2Locked.classList.remove('hidden');
+    }
+  } catch (e) {
+    DOM.layer2Content.innerHTML = `<div style="padding:16px;text-align:center;color:var(--text-secondary);font-size:13px;">⚠️ 議論分析レポートの生成に失敗しました。</div>`;
+  }
+}
+
+async function loadLayer3(sid, category) {
+  try {
+    const data = await API.post(`/api/meeting/${sid}/brief_layer3`, { category }, 120000);
+    _briefData = { ..._briefData, layer3: data.layer3, layer3_remaining: data.layer3_remaining };
+    if (data.layer3) {
+      if (State.currentUser?.plan === 'standard' && _briefData?.trial_layer3_used) {
+        DOM.downloadLayer3Btn.style.display = 'none';
+        DOM.layer3Locked.classList.remove('hidden');
+      } else {
+        DOM.layer3Content.innerHTML = buildLayer3HTML(data.layer3, category, _briefData?.topic || '', _briefIssues || []);
+        DOM.downloadLayer3Btn.style.display = 'inline-block';
+        const layer3CostInfo = $('layer3CostInfo');
+        if (layer3CostInfo) layer3CostInfo.style.display = (State.currentUser?.plan === 'pro') ? 'inline' : 'none';
+        const remainingEl = $('layer3RemainingInfo');
+        if (remainingEl && data.layer3_remaining !== null && data.layer3_remaining !== undefined) {
+          remainingEl.textContent = `🔄 今月の残り生成回数：${data.layer3_remaining} / 30回`;
+          remainingEl.style.cssText = 'display:inline;font-size:11px;opacity:0.8;';
+        }
+      }
+    } else if (State.currentUser?.plan === 'pro' && data.layer3_remaining === 0) {
+      DOM.downloadLayer3Btn.style.display = 'none';
+      const proLockedEl = $('layer3ProLocked');
+      if (proLockedEl) proLockedEl.classList.remove('hidden');
+    } else if ((State.currentUser?.plan === 'free' || State.currentUser?.plan === 'standard') && !_briefData?.trial_layer3_used) {
+      DOM.layer3Trial.classList.remove('hidden');
+    } else {
+      DOM.downloadLayer3Btn.style.display = 'none';
+      DOM.layer3Locked.classList.remove('hidden');
+    }
+  } catch (e) {
+    const isExtBlock = (e?.message || '').toLowerCase().includes('message port');
+    const msg = isExtBlock
+      ? 'ブラウザ拡張機能が通信を遮断しました。シークレットモードでお試しください。'
+      : '戦略フレームワークレポートの生成に時間がかかり失敗しました。';
+    DOM.layer3Content.innerHTML = `
+      <div style="padding:16px;text-align:center;color:var(--text-secondary);font-size:13px;">
+        ⚠️ ${msg}<br>
+        <button onclick="loadLayer3('${sid}', '${category}')" style="margin-top:10px;padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text-primary);font-size:13px;cursor:pointer;">🔄 もう一度生成</button>
+      </div>`;
+  }
+}
 
 async function showReportModal() {
   const sid = State.sessionId || _briefSessionId;
@@ -1014,6 +1079,7 @@ async function showReportModal() {
       category: State.meetingCategory || 'chat'
     }, 120000);
     _briefData = data;
+    _briefIssues = null;
 
     // ===== 議題・解決すべき課題ブロック =====
     const _topicEl = document.getElementById('briefTopicText');
@@ -1021,13 +1087,13 @@ async function showReportModal() {
     const _issuesEl = document.getElementById('briefIssuesList');
     if (_issuesEl) {
       _issuesEl.innerHTML = '<div style="color:var(--text-muted);font-size:12px;">⏳ 分析中...</div>';
-      // issuesは非同期で別途取得
-      const _sid = sid;
-      fetch(`/api/meeting/${_sid}/issues`, { method: 'POST',
+      // issuesは非同期で別途取得（Layer2/3完成後に再描画）
+      fetch(`/api/meeting/${sid}/issues`, { method: 'POST',
         headers: {'Content-Type': 'application/json'} })
         .then(r => r.json())
         .then(d => {
           const _iss = d.issues || [];
+          _briefIssues = _iss;
           if (_issuesEl) _issuesEl.innerHTML = _iss.length > 0
             ? _iss.map(i => `<div>・${escapeHtml(i)}</div>`).join('')
             : '<div style="color:var(--text-muted);font-size:12px;">（取得できませんでした）</div>';
@@ -1047,28 +1113,24 @@ async function showReportModal() {
             '<div style="color:var(--text-muted);font-size:12px;">（取得できませんでした）</div>';
         });
     }
+
     // ===== Layer1 =====
     const l1 = data.layer1;
     DOM.briefConclusion.textContent = l1.conclusion || '';
     DOM.briefActions.innerHTML = (l1.actions || []).map(a => `<div>・${a}</div>`).join('');
     DOM.briefUserBasis.textContent = l1.user_basis || '';
 
-    // ===== Layer2 =====
+    // ===== Layer2・Layer3を並行起動 =====
+    const plan = data.plan;
     const isLoggedIn = !!State.currentUser;
-    if (data.layer2) {
-      DOM.layer2Content.innerHTML = buildLayer2HTML(data.layer2, data.category || 'chat', data.topic || '', []);
-      DOM.downloadLayer2Btn.style.display = 'inline-block';
-      // 案A：standardプランのみクレジット消費テキスト表示
-      const layer2CostInfo = $('layer2CostInfo');
-      if (layer2CostInfo) {
-        layer2CostInfo.style.display = 'none';
-      }
+    if (plan === 'standard' || plan === 'pro') {
+      loadLayer2(sid, data.category || 'chat');
     } else if (!isLoggedIn) {
       DOM.downloadLayer2Btn.style.display = 'none';
       const layer2CostInfo = $('layer2CostInfo');
       if (layer2CostInfo) layer2CostInfo.style.display = 'none';
       DOM.layer2Locked.classList.remove('hidden');
-    } else if (data.plan === 'free' && !data.trial_layer2_used) {
+    } else if (plan === 'free' && !data.trial_layer2_used) {
       DOM.layer2Trial.classList.remove('hidden');
     } else {
       DOM.downloadLayer2Btn.style.display = 'none';
@@ -1077,49 +1139,19 @@ async function showReportModal() {
       DOM.layer2Locked.classList.remove('hidden');
     }
 
-    // ===== Layer3 =====
     if (data.layer3_available === false) {
       DOM.layer3Section.style.display = 'none';
     } else {
       DOM.layer3Section.style.display = '';
-      if (data.layer3) {
-        if (State.currentUser?.plan === 'standard' && data.trial_layer3_used) {
-          DOM.downloadLayer3Btn.style.display = 'none';
-          DOM.layer3Locked.classList.remove('hidden');
-        } else {
-          DOM.layer3Content.innerHTML = buildLayer3HTML(data.layer3, data.category || 'strategy', data.topic || '', []);
-          DOM.downloadLayer3Btn.style.display = 'inline-block';
-          const layer3CostInfo = $('layer3CostInfo');
-          if (layer3CostInfo) {
-            layer3CostInfo.style.display = (State.currentUser?.plan === 'pro') ? 'inline' : 'none';
-          }
-          const remainingEl = $('layer3RemainingInfo');
-          if (remainingEl) {
-            if (data.layer3_remaining !== null && data.layer3_remaining !== undefined) {
-              remainingEl.textContent = `🔄 今月の残り生成回数：${data.layer3_remaining} / 30回`;
-              remainingEl.style.cssText = 'display:inline;font-size:11px;opacity:0.8;';
-            } else {
-              remainingEl.style.display = 'none';
-            }
-          }
-        }
-      } else if (data.plan === 'pro' && data.layer3_remaining === 0) {
-        DOM.downloadLayer3Btn.style.display = 'none';
+      if (plan === 'pro' && data.layer3_remaining > 0) {
+        loadLayer3(sid, data.category || 'strategy');
+      } else if (plan === 'pro' && data.layer3_remaining === 0) {
         const proLockedEl = $('layer3ProLocked');
         if (proLockedEl) proLockedEl.classList.remove('hidden');
       } else if (!isLoggedIn) {
         DOM.downloadLayer3Btn.style.display = 'none';
         DOM.layer3Locked.classList.remove('hidden');
-      } else if (data.plan === 'pro') {
-        DOM.downloadLayer3Btn.style.display = 'inline-block';
-        const layer3CostInfo = $('layer3CostInfo');
-        if (layer3CostInfo) layer3CostInfo.style.display = 'inline';
-        const remainingEl = $('layer3RemainingInfo');
-        if (remainingEl && data.layer3_remaining !== null && data.layer3_remaining !== undefined) {
-          remainingEl.textContent = `🔄 今月の残り生成回数：${data.layer3_remaining} / 30回`;
-          remainingEl.style.cssText = 'display:inline;font-size:11px;opacity:0.8;';
-        }
-      } else if ((data.plan === 'free' || data.plan === 'standard') && !data.trial_layer3_used) {
+      } else if ((plan === 'free' || plan === 'standard') && !data.trial_layer3_used) {
         DOM.layer3Trial.classList.remove('hidden');
       } else {
         DOM.downloadLayer3Btn.style.display = 'none';
@@ -1470,19 +1502,16 @@ async function useTrialLayer2() {
   btn.disabled = true; btn.textContent = '⏳ 生成中...';
   DOM.layer2Trial.querySelector('div').textContent = '⏳ 生成中...';
   try {
-    const data = await API.post(`/api/meeting/${sid}/brief`, {
+    const data = await API.post(`/api/meeting/${sid}/brief_layer2`, {
       category: State.meetingCategory || 'chat',
       trial_layer: 'layer2'
     }, 120000);
-    _briefData = { ..._briefData, ...data };
+    _briefData = { ..._briefData, layer2: data.layer2 };
     if (data.layer2) {
-      DOM.layer2Content.innerHTML = buildLayer2HTML(data.layer2, data.category || 'chat', data.topic || '', []);
+      DOM.layer2Content.innerHTML = buildLayer2HTML(data.layer2, State.meetingCategory || 'chat', _briefData?.topic || '', _briefIssues || []);
       DOM.downloadLayer2Btn.style.display = 'inline-block';
-      // 案A：standardプランのみクレジット消費テキスト表示
       const layer2CostInfo = $('layer2CostInfo');
-      if (layer2CostInfo) {
-        layer2CostInfo.style.display = 'none';
-      }
+      if (layer2CostInfo) layer2CostInfo.style.display = 'none';
       DOM.layer2Trial.classList.add('hidden');
     } else {
       DOM.layer2Trial.classList.add('hidden');
@@ -1512,18 +1541,16 @@ async function useTrialLayer3() {
   btn.disabled = true; btn.textContent = '⏳ 生成中...';
   DOM.layer3Trial.querySelector('div').textContent = '⏳ 生成中...';
   try {
-    const data = await API.post(`/api/meeting/${sid}/brief`, {
+    const data = await API.post(`/api/meeting/${sid}/brief_layer3`, {
       category: State.meetingCategory || 'chat',
       trial_layer: 'layer3'
     }, 120000);
-    _briefData = { ..._briefData, ...data };
+    _briefData = { ..._briefData, layer3: data.layer3, layer3_remaining: data.layer3_remaining };
     if (data.layer3) {
-      DOM.layer3Content.innerHTML = buildLayer3HTML(data.layer3, data.category || 'strategy', data.topic || '', []);
+      DOM.layer3Content.innerHTML = buildLayer3HTML(data.layer3, State.meetingCategory || 'strategy', _briefData?.topic || '', _briefIssues || []);
       DOM.downloadLayer3Btn.style.display = 'inline-block';
       const layer3CostInfo = $('layer3CostInfo');
-      if (layer3CostInfo) {
-        layer3CostInfo.style.display = (State.currentUser?.plan === 'pro') ? 'inline' : 'none';
-      }
+      if (layer3CostInfo) layer3CostInfo.style.display = (State.currentUser?.plan === 'pro') ? 'inline' : 'none';
       DOM.layer3Trial.classList.add('hidden');
     } else {
       DOM.layer3Trial.classList.add('hidden');
