@@ -1113,29 +1113,41 @@ LAYER1_TEMPLATES = {
 
 LAYER2_TEMPLATES = {
     'common': """以下の会議から「議論分析レポート」を作成してください。
+カテゴリに関わらず、必ず以下の6ブロック構成で出力してください（カテゴリ別テンプレートは設けません）。
 
 以下のJSON形式のみで出力してください：
 {
-  "conclusion": "議論全体の結論を2〜3文で",
-  "persona_views": [
+  "summary": "議論全体のサマリを2〜3文で（一目で何を議論したか分かるように）",
+  "discussion_points": [
     {
-      "name": "ペルソナ名",
-      "stance": "推進派または慎重派またはリスク指摘または補足",
-      "opinion": "主な意見を1〜2文で（ペルソナの口調で）"
-    }
-  ],
-  "risks": [
-    {
-      "level": "高または中",
-      "title": "リスク名",
-      "detail": "具体的な理由・影響を2文で"
+      "issue": "論点のタイトルを短く（10〜20文字程度）",
+      "positions": [
+        {"name": "ペルソナ名", "stance": "支持または反対または懸念", "opinion": "立場の要約を1文で（ペルソナの口調で）"}
+      ]
     }
   ],
   "next_actions": [
-    "具体的なアクション1",
-    "具体的なアクション2"
+    {"action": "直近で実行すべき具体的なアクション", "related_issue": 1}
+  ],
+  "unresolved_points": [
+    {
+      "level": "高または中",
+      "title": "未解決論点名（結論が出なかった問い）",
+      "detail": "なぜ未解決か・今後どう影響するかを2文で"
+    }
+  ],
+  "future_directions": [
+    {"direction": "未解決論点を受けて、今後どちらに進むべきかの方向性提案", "related_unresolved": [1]}
   ]
 }
+
+制約：
+- discussion_pointsは実際に意見が分かれた論点のみを2〜4件抽出すること。意見が一致した点は含めない
+- 各discussion_pointのpositionsは最大2件（最も代表的な支持側と反対側／懸念側）に絞ること。3名以上が同じ論点に言及した場合も、最も代表的な2件を選ぶこと
+- next_actionsのrelated_issueは、対応するdiscussion_pointsの番号（1始まり）。複数の論点をまたぐ・どの論点にも紐づかない場合は0
+- unresolved_pointsは結論が出なかった問いを2〜3件抽出すること（リスクに限らず、検討が浅かった点も含めてよい）
+- future_directionsのrelated_unresolvedは、対応するunresolved_pointsの番号（1始まり）の配列（複数可）
+- future_directionsは「今すぐの実行項目」ではなく「この先どちらに進むかの分岐点」を示すこと（next_actionsとの重複を避ける）
 JSONのみ出力してください。"""
 }
 
@@ -1473,7 +1485,7 @@ def generate_brief_layer2(session_id):
             layer2_parse_ok = True
         except (json.JSONDecodeError, ValueError):
             app.logger.error(f"[LAYER2_PARSE_ERROR] session={session_id} raw={layer2_text[:200]}")
-            layer2_data = {"conclusion": "レポートの生成に失敗しました。もう一度お試しください。", "persona_views": [], "risks": [], "next_actions": []}
+            layer2_data = {"summary": "レポートの生成に失敗しました。もう一度お試しください。", "discussion_points": [], "next_actions": [], "unresolved_points": [], "future_directions": []}
             layer2_parse_ok = False
 
         # freeプランのお試し使用済みフラグを更新（parse成功時のみ）
@@ -1798,35 +1810,79 @@ def generate_brief_pdf_layer2(session_id):
             story.append(Spacer(1, 4*mm))
         # ===== ここまで =====
 
-        if l2.get('conclusion'):
-            story.append(Paragraph('■ 結論', styles_h2))
-            story.append(Paragraph(l2['conclusion'], styles_base))
+        CIRCLED = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩']
+        stance_colors = {'支持': ('#15803D', '#EAF7EF'), '反対': ('#B91C1C', '#FCEAEA'), '懸念': ('#B45309', '#FBF2DF')}
+
+        def action_tag(related_issue):
+            ri = related_issue or 0
+            if not ri:
+                return "全体"
+            if ri <= len(CIRCLED):
+                return f"論点{CIRCLED[ri-1]}"
+            return f"論点{ri}"
+
+        def direction_tag(related_unresolved):
+            refs = related_unresolved or []
+            if not refs:
+                return ""
+            return "未解決" + "".join(CIRCLED[r-1] if r <= len(CIRCLED) else str(r) for r in refs)
+
+        if l2.get('summary'):
+            story.append(Paragraph('📝 全体サマリ', styles_h2))
+            story.append(Paragraph(l2['summary'], styles_base))
             story.append(Spacer(1, 4*mm))
 
-        if l2.get('persona_views'):
-            story.append(Paragraph('■ ペルソナ別意見', styles_h2))
-            for pv in l2['persona_views']:
-                styles_persona_name = ParagraphStyle('pname', fontName='HeiseiMin-W3', fontSize=11, leading=16, textColor=HexColor('#60A5FA'))
-                story.append(Paragraph(f"◆ {pv.get('name','')}　【{pv.get('stance','')}】", styles_persona_name))
-                story.append(Paragraph(pv.get('opinion',''), styles_base))
-                story.append(Spacer(1, 3*mm))
+        if l2.get('discussion_points'):
+            story.append(Paragraph('💬 論点と対立構造', styles_h2))
             story.append(Spacer(1, 2*mm))
-
-        if l2.get('risks'):
-            story.append(Paragraph('■ リスク・懸念点', styles_h2))
-            for r in l2['risks']:
-                level = r.get('level','')
-                color = '#DC2626' if level == '高' else '#D97706'
-                styles_risk_level = ParagraphStyle('rlevel', fontName='HeiseiMin-W3', fontSize=10, leading=16, textColor=HexColor(color))
-                story.append(Paragraph(f"[{level}] {r.get('title','')}", styles_risk_level))
-                story.append(Paragraph(r.get('detail',''), styles_base))
-                story.append(Spacer(1, 3*mm))
-            story.append(Spacer(1, 2*mm))
+            issue_title_style = ParagraphStyle('issuet', fontName='HeiseiMin-W3', fontSize=11, leading=15, textColor=HexColor('#6D28D9'))
+            pos_text_style = ParagraphStyle('postxt', fontName='HeiseiMin-W3', fontSize=9.5, leading=14)
+            for idx, dp in enumerate(l2['discussion_points'], start=1):
+                num = CIRCLED[idx-1] if idx <= len(CIRCLED) else str(idx)
+                story.append(Paragraph(f"論点{num}　{dp.get('issue','')}", issue_title_style))
+                story.append(Spacer(1, 1.5*mm))
+                positions = dp.get('positions', [])[:2]
+                cells, bgs = [], []
+                for p in positions:
+                    color, bg = stance_colors.get(p.get('stance',''), ('#6B7280', '#F3F4F6'))
+                    cells.append(Paragraph(f"<font color='{color}'><b>{p.get('stance','')}</b></font><br/>{p.get('name','')}：{p.get('opinion','')}", pos_text_style))
+                    bgs.append(bg)
+                while len(cells) < 2:
+                    cells.append(Paragraph('', pos_text_style))
+                    bgs.append('#FFFFFF')
+                t = Table([cells], colWidths=[83*mm, 83*mm], style=TableStyle([
+                    ('BACKGROUND', (0,0), (0,0), HexColor(bgs[0])),
+                    ('BACKGROUND', (1,0), (1,0), HexColor(bgs[1])),
+                    ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                    ('TOPPADDING', (0,0), (-1,-1), 6), ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+                    ('LEFTPADDING', (0,0), (-1,-1), 8), ('RIGHTPADDING', (0,0), (-1,-1), 8),
+                ]))
+                story.append(t)
+                story.append(Spacer(1, 4*mm))
 
         if l2.get('next_actions'):
-            story.append(Paragraph('■ 今後のアクション', styles_h2))
+            story.append(Paragraph('🚀 直近のアクションプラン', styles_h2))
             for a in l2['next_actions']:
-                story.append(Paragraph(f'・{a}', styles_base))
+                tag = action_tag(a.get('related_issue'))
+                story.append(Paragraph(f"・<font color='#6D28D9' size='8'>[{tag}]</font> {a.get('action','')}", styles_base))
+            story.append(Spacer(1, 4*mm))
+
+        if l2.get('unresolved_points'):
+            story.append(Paragraph('⚠️ 未解決論点', styles_h2))
+            udetail_style = ParagraphStyle('udetail', fontName='HeiseiMin-W3', fontSize=9, leading=13, textColor=HexColor('#6B7280'))
+            for idx, u in enumerate(l2['unresolved_points'], start=1):
+                num = CIRCLED[idx-1] if idx <= len(CIRCLED) else str(idx)
+                story.append(Paragraph(f"未解決{num}　{u.get('title','')}", styles_base))
+                story.append(Paragraph(u.get('detail',''), udetail_style))
+                story.append(Spacer(1, 2*mm))
+            story.append(Spacer(1, 2*mm))
+
+        if l2.get('future_directions'):
+            story.append(Paragraph('🧭 今後の検討の方向性', styles_h2))
+            for fd in l2['future_directions']:
+                tag = direction_tag(fd.get('related_unresolved'))
+                story.append(Paragraph(f"<font color='#B91C1C' size='8'>[{tag}]</font> {fd.get('direction','')}", styles_base))
+                story.append(Spacer(1, 2*mm))
 
         doc.build(story)
         buf.seek(0)

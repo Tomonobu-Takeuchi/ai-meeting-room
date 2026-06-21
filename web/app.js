@@ -1210,37 +1210,53 @@ function buildLayer2HTML(l2, cat, topic, issues) {
     html += `</div>`;
   }
   // ===== ここまで =====
-  if (l2.conclusion) {
-    html += `<div style="background:var(--bg-base);border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;line-height:1.7;">${l2.conclusion}</div>`;
+  const CIRCLED = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩'];
+  if (l2.summary) {
+    html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">📝 全体サマリ</div>`;
+    html += `<div style="background:var(--bg-base);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;line-height:1.7;">${escapeHtml(l2.summary)}</div>`;
   }
-  if (l2.persona_views && l2.persona_views.length > 0) {
-    html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">👥 参加者の主な意見</div>`;
-    l2.persona_views.forEach(p => {
-      const stanceColors = {'推進派':'#16A34A','慎重派':'#D97706','リスク指摘':'#DC2626','補足':'#2563EB'};
-      const c = stanceColors[p.stance] || '#8B949E';
-      html += `<div style="margin-bottom:8px;padding:10px 12px;background:var(--bg-base);border-radius:8px;border-left:3px solid ${c};">`;
-      html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">`;
-      html += `<span style="font-size:13px;font-weight:600;">${p.name || ''}</span>`;
-      html += `<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:${c}22;color:${c};">${p.stance || ''}</span>`;
-      html += `</div><div style="font-size:12px;line-height:1.6;color:var(--text-secondary);">${p.opinion || ''}</div></div>`;
-    });
-  }
-  if (l2.risks && l2.risks.length > 0) {
-    html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">⚠️ リスク・懸念点</div>`;
-    l2.risks.forEach(r => {
-      const lvlColor = r.level === '高' ? '#DC2626' : '#D97706';
-      html += `<div style="margin-bottom:8px;padding:10px 12px;background:var(--bg-base);border-radius:8px;">`;
-      html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">`;
-      html += `<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:${lvlColor}22;color:${lvlColor};font-weight:600;">${r.level || ''}</span>`;
-      html += `<span style="font-size:13px;font-weight:600;">${r.title || ''}</span></div>`;
-      html += `<div style="font-size:12px;line-height:1.6;color:var(--text-secondary);">${r.detail || ''}</div></div>`;
+  if (l2.discussion_points && l2.discussion_points.length > 0) {
+    html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">💬 論点と対立構造</div>`;
+    const stanceStyle = {'支持':{c:'#4ADE80',bg:'#16A34A14'},'反対':{c:'#F87171',bg:'#DC262614'},'懸念':{c:'#FBBF24',bg:'#D9770614'}};
+    l2.discussion_points.forEach((dp, i) => {
+      const num = CIRCLED[i] || (i+1);
+      html += `<div style="background:var(--bg-elevated);border:1px solid var(--border);border-left:3px solid #7C3AED;border-radius:8px;padding:10px 12px;margin-bottom:10px;">`;
+      html += `<div style="font-size:12px;font-weight:700;color:#A78BFA;margin-bottom:8px;">論点${num} ${escapeHtml(dp.issue || '')}</div>`;
+      html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">`;
+      (dp.positions || []).slice(0, 2).forEach(p => {
+        const st = stanceStyle[p.stance] || {c:'var(--text-secondary)', bg:'var(--bg-base)'};
+        html += `<div style="background:${st.bg};border-radius:6px;padding:8px;">`;
+        html += `<div style="font-size:10px;font-weight:700;color:${st.c};margin-bottom:4px;">${escapeHtml(p.stance || '')}</div>`;
+        html += `<div style="font-size:12px;">${escapeHtml(p.name || '')}：${escapeHtml(p.opinion || '')}</div></div>`;
+      });
+      html += `</div></div>`;
     });
   }
   if (l2.next_actions && l2.next_actions.length > 0) {
-    html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">🚀 今後のアクション（案）</div>`;
+    html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">🚀 直近のアクションプラン</div>`;
     l2.next_actions.forEach(a => {
-      html += `<div style="font-size:13px;padding:5px 0;border-bottom:1px solid var(--border-subtle);display:flex;gap:8px;align-items:flex-start;">`;
-      html += `<span style="color:var(--accent-blue);flex-shrink:0;">•</span>${a}</div>`;
+      const ri = a.related_issue || 0;
+      const tag = ri ? `論点${CIRCLED[ri-1] || ri}` : '全体';
+      html += `<div style="font-size:13px;padding:7px 0;border-bottom:1px solid var(--border-subtle);display:flex;gap:8px;align-items:flex-start;">`;
+      html += `<span style="flex-shrink:0;font-size:10px;padding:2px 6px;border-radius:4px;background:#7C3AED22;color:#A78BFA;margin-top:1px;">${tag}</span><span>${escapeHtml(a.action || '')}</span></div>`;
+    });
+  }
+  if (l2.unresolved_points && l2.unresolved_points.length > 0) {
+    html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">⚠️ 未解決論点</div>`;
+    l2.unresolved_points.forEach((u, i) => {
+      const num = CIRCLED[i] || (i+1);
+      html += `<div style="margin-bottom:8px;padding:8px 12px;background:var(--bg-base);border-radius:8px;">`;
+      html += `<div style="font-size:12px;font-weight:600;">未解決${num} ${escapeHtml(u.title || '')}</div>`;
+      html += `<div style="font-size:11px;line-height:1.5;color:var(--text-secondary);margin-top:2px;">${escapeHtml(u.detail || '')}</div></div>`;
+    });
+  }
+  if (l2.future_directions && l2.future_directions.length > 0) {
+    html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">🧭 今後の検討の方向性</div>`;
+    l2.future_directions.forEach(fd => {
+      const refs = (fd.related_unresolved || []).map(r => CIRCLED[r-1] || r).join('');
+      html += `<div style="margin-bottom:8px;padding:10px 12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;">`;
+      html += `<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#DC262622;color:#F87171;margin-right:6px;">未解決${refs}</span>`;
+      html += `<span style="font-size:12px;">${escapeHtml(fd.direction || '')}</span></div>`;
     });
   }
   return html;
