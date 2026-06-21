@@ -1768,7 +1768,7 @@ def generate_brief_pdf_layer2(session_id):
         from reportlab.lib.styles import ParagraphStyle
         from reportlab.lib.units import mm
         from reportlab.lib.colors import HexColor
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Table, TableStyle
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 
