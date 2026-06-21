@@ -2463,11 +2463,16 @@ def _handle_checkout_completed(event, datetime, timedelta):
         print(f"[webhook][ch2] skip: metadata不足 user_id={user_id} payment_type={payment_type!r}")
         return
 
-    # メタデータからis_earlybird取得（StripeObjectのため.get()使用）
+    # メタデータからis_earlybird取得（StripeObjectのため.get()使用、失敗時は[]記法でフォールバック）
     try:
         raw_eb = (meta_raw.get('is_earlybird') or '0') if meta_raw else '0'
-    except Exception:
-        raw_eb = '0'
+    except Exception as e1:
+        print(f"[webhook][ch1] is_earlybird meta.get失敗({e1}) → meta['is_earlybird']を試行")
+        try:
+            raw_eb = str(meta_raw['is_earlybird']) if meta_raw else '0'
+        except Exception as e2:
+            print(f"[webhook][ch1] meta['is_earlybird']も失敗: {e2}")
+            raw_eb = '0'
     is_earlybird = (raw_eb == '1')
 
     # billing_anchor_day算出（決済完了日基準・29〜31日は28に丸め）
