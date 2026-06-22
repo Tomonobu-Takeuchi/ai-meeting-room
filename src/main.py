@@ -1534,7 +1534,7 @@ def generate_brief_layer3(session_id):
 
         is_blur_request = req_data.get('blur_preview', False)
         can_use_layer3 = (
-            category in LAYER3_TEMPLATES and (
+            (category in LAYER3_TEMPLATES or is_blur_request) and (
                 (plan == 'pro' and layer3_remaining > 0) or
                 (plan in ('free', 'standard') and not trial_layer3_used and is_trial_request == 'layer3') or
                 (plan in ('free', 'standard') and trial_layer3_used and is_blur_request)
