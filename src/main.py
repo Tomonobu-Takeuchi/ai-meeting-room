@@ -1452,12 +1452,14 @@ def generate_brief_layer2(session_id):
         req_data = request.json or {}
         category = req_data.get('category', 'chat')
         is_trial_request = req_data.get('trial_layer', '')
+        is_blur_request = req_data.get('blur_preview', False)
         user_id = get_current_user_id()
         plan, trial_layer2_used, trial_layer3_used, _, _ = _get_brief_billing_info(user_id)
 
         can_use_layer2 = (
             plan in ('standard', 'pro') or
-            (plan == 'free' and not trial_layer2_used and is_trial_request == 'layer2')
+            (plan == 'free' and not trial_layer2_used and is_trial_request == 'layer2') or
+            (plan == 'free' and trial_layer2_used and is_blur_request)
         )
         if not can_use_layer2:
             return jsonify({"layer2": None})
@@ -1530,10 +1532,12 @@ def generate_brief_layer3(session_id):
             current_count = 0 if needs_reset else layer3_monthly_count
             layer3_remaining = max(0, 30 - current_count)
 
+        is_blur_request = req_data.get('blur_preview', False)
         can_use_layer3 = (
             category in LAYER3_TEMPLATES and (
                 (plan == 'pro' and layer3_remaining > 0) or
-                (plan in ('free', 'standard') and not trial_layer3_used and is_trial_request == 'layer3')
+                (plan in ('free', 'standard') and not trial_layer3_used and is_trial_request == 'layer3') or
+                (plan in ('free', 'standard') and trial_layer3_used and is_blur_request)
             )
         )
         if not can_use_layer3 and plan in ('free', 'standard') and trial_layer3_used and is_trial_request == 'layer3':

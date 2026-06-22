@@ -1001,7 +1001,7 @@ let _feedbackFlowStarted = false;  // BUG-42：フィードバック重複発火
 
 async function loadLayer2(sid, category) {
   try {
-    const data = await API.post(`/api/meeting/${sid}/brief_layer2`, { category }, 120000);
+    const data = await API.post(`/api/meeting/${sid}/brief_layer2`, { category, blur_preview: true }, 120000);
     if (data.layer2) {
       DOM.layer2Content.innerHTML = buildLayer2HTML(data.layer2, category, _briefData?.topic || '', _briefIssues || []);
       DOM.downloadLayer2Btn.style.display = 'inline-block';
@@ -1023,7 +1023,7 @@ async function loadLayer2(sid, category) {
 
 async function loadLayer3(sid, category) {
   try {
-    const data = await API.post(`/api/meeting/${sid}/brief_layer3`, { category }, 120000);
+    const data = await API.post(`/api/meeting/${sid}/brief_layer3`, { category, blur_preview: true }, 120000);
     _briefData = { ..._briefData, layer3: data.layer3, layer3_remaining: data.layer3_remaining };
     if (data.layer3) {
       if (State.currentUser?.plan === 'standard' && _briefData?.trial_layer3_used) {
