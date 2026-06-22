@@ -9,3 +9,4 @@ data/meetings/
 *.log
 *.tmp
 .env.local
+web/lp/old/

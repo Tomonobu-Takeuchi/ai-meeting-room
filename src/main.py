@@ -2699,6 +2699,11 @@ def lp_ai_task():
     return send_from_directory(os.path.join(app.static_folder, "lp"), "ai-task.html")
 
 
+@app.route("/lp/<path:filename>")
+def lp_static(filename):
+    return send_from_directory(os.path.join(app.static_folder, "lp"), filename)
+
+
 @app.route("/terms")
 def terms():
     return send_from_directory(app.static_folder, "terms.html")

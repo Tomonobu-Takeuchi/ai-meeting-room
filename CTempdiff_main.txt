@@ -1,0 +1,410 @@
+diff --git a/src/main.py b/src/main.py
+index 5d9b778..facf392 100644
+--- a/src/main.py
++++ b/src/main.py
+@@ -1308,10 +1308,53 @@ def get_meeting_issues(session_id):
+     except Exception:
+         return jsonify({"issues": []})
+ 
++def _get_brief_billing_info(user_id):
++    """plan・trial使用状況・Layer3月次カウントを取得（3つのbriefエンドポイント共通）"""
++    plan = 'free'
++    trial_layer2_used = False
++    trial_layer3_used = False
++    layer3_monthly_count = 0
++    layer3_monthly_reset_at = None
++    if user_id:
++        from src.database import get_connection
++        conn = get_connection()
++        try:
++            row = conn.run(
++                "SELECT plan, trial_layer2_used, trial_layer3_used, layer3_monthly_count, layer3_monthly_reset_at FROM users WHERE id = :uid",
++                uid=user_id
++            )
++            if row:
++                plan = row[0][0] or 'free'
++                trial_layer2_used = bool(row[0][1])
++                trial_layer3_used = bool(row[0][2])
++                layer3_monthly_count = row[0][3] or 0
++                layer3_monthly_reset_at = row[0][4]
++        finally:
++            conn.close()
++    return plan, trial_layer2_used, trial_layer3_used, layer3_monthly_count, layer3_monthly_reset_at
++
++
++def _build_discussion_text(summary):
++    """会議の全発言からdiscussion文字列とuser_messagesを組み立てる"""
++    discussion = ""
++    user_messages = []
++    for msg in summary.get("messages", []):
++        if msg["persona_id"] == "user":
++            name = "ユーザー"
++            user_messages.append(msg["content"])
++        elif msg["persona_id"] == "facilitator":
++            name = "ファシリテータ"
++        else:
++            persona = next((m for m in summary["members"] if m["id"] == msg["persona_id"]), None)
++            name = persona["name"] if persona else msg["persona_id"]
++        discussion += f"{name}: {msg['content']}\n\n"
++    return discussion, user_messages
++
++
+ @app.route("/api/meeting/<session_id>/brief", methods=["POST"])
+ @login_required
+ def generate_brief(session_id):
+-    """Layer1・Layer2・Layer3をJSON返却"""
++    """Layer1のみ生成・Layer2/3判定メタ情報を返す（Layer2/3は個別エンドポイントで並行生成）"""
+     summary = meeting_room.get_session_summary(session_id)
+     if not summary:
+         return jsonify({"error": "セッションが見つかりません"}), 404
+@@ -1320,43 +1363,10 @@ def generate_brief(session_id):
+         category = req_data.get('category', 'chat')
+ 
+         user_id = get_current_user_id()
+-        plan = 'free'
+-        trial_layer2_used = False
+-        trial_layer3_used = False
+-        layer3_monthly_count = 0
+-        layer3_monthly_reset_at = None
+-        if user_id:
+-            from src.database import get_connection
+-            conn = get_connection()
+-            try:
+-                row = conn.run(
+-                    "SELECT plan, trial_layer2_used, trial_layer3_used, layer3_monthly_count, layer3_monthly_reset_at FROM users WHERE id = :uid",
+-                    uid=user_id
+-                )
+-                if row:
+-                    plan = row[0][0] or 'free'
+-                    trial_layer2_used = bool(row[0][1])
+-                    trial_layer3_used = bool(row[0][2])
+-                    layer3_monthly_count = row[0][3] or 0
+-                    layer3_monthly_reset_at = row[0][4]
+-            finally:
+-                conn.close()
+-
+-        discussion = ""
+-        user_messages = []
+-        for msg in summary.get("messages", []):
+-            if msg["persona_id"] == "user":
+-                name = "ユーザー"
+-                user_messages.append(msg["content"])
+-            elif msg["persona_id"] == "facilitator":
+-                name = "ファシリテータ"
+-            else:
+-                persona = next(
+-                    (m for m in summary["members"] if m["id"] == msg["persona_id"]), None
+-                )
+-                name = persona["name"] if persona else msg["persona_id"]
+-            discussion += f"{name}: {msg['content']}\n\n"
++        plan, trial_layer2_used, trial_layer3_used, layer3_monthly_count, layer3_monthly_reset_at = _get_brief_billing_info(user_id)
++        app.logger.info(f"[BRIEF] user_id={user_id} plan={plan} trial_layer2={trial_layer2_used} trial_layer3={trial_layer3_used}")
+ 
++        discussion, user_messages = _build_discussion_text(summary)
+         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+         member_names = ", ".join([m["name"] for m in summary["members"]])
+         user_context = "\n".join([f"・{m}" for m in user_messages]) if user_messages else "（なし）"
+@@ -1383,63 +1393,117 @@ JSONのみ出力してください。"""
+         if layer1_res.stop_reason == "max_tokens":
+             app.logger.warning(f"[LAYER1_TRUNCATED] session={session_id} category={category} stop_reason=max_tokens")
+         layer1_text = layer1_res.content[0].text.strip().replace("```json", "").replace("```", "").strip()
+-        layer1_parse_ok = False
+         try:
+             layer1_data = json.loads(layer1_text)
+-            layer1_parse_ok = True
+         except (json.JSONDecodeError, ValueError):
+             app.logger.error(f"[LAYER1_PARSE_ERROR] session={session_id} category={category} raw={layer1_text[:200]}")
+             layer1_data = {"conclusion": "レポートの生成に失敗しました。もう一度お試しください。", "actions": [], "user_basis": ""}
+ 
+-        # ===== Layer2（standard/pro は常時、free は未使用時のみ、chatカテゴリは除外） =====
+-        layer2_data = None
++        # proプランの残り回数計算（フロント初期表示用・参照のみ・加算しない）
++        layer3_remaining = None
++        if plan == 'pro':
++            from datetime import datetime, timezone
++            now = datetime.now(timezone.utc)
++            reset_at = layer3_monthly_reset_at
++            if reset_at and reset_at.tzinfo is None:
++                reset_at = reset_at.replace(tzinfo=timezone.utc)
++            needs_reset = (
++                reset_at is None or
++                reset_at.year < now.year or
++                (reset_at.year == now.year and reset_at.month < now.month)
++            )
++            current_count = 0 if needs_reset else layer3_monthly_count
++            layer3_remaining = max(0, 30 - current_count)
++
++        return jsonify({
++            "plan": plan,
++            "topic": summary["topic"],
++            "category": category,
++            "trial_layer2_used": trial_layer2_used,
++            "trial_layer3_used": trial_layer3_used,
++            "layer1": layer1_data,
++            "layer3_available": category in LAYER3_TEMPLATES,
++            "layer3_remaining": layer3_remaining
++        })
++    except Exception as e:
++        return jsonify({"error": str(e)}), 500
++
++
++@app.route("/api/meeting/<session_id>/brief_layer2", methods=["POST"])
++@login_required
++def generate_brief_layer2(session_id):
++    """Layer2（議論分析レポート）のみを生成"""
++    summary = meeting_room.get_session_summary(session_id)
++    if not summary:
++        return jsonify({"error": "セッションが見つかりません"}), 404
++    try:
++        req_data = request.json or {}
++        category = req_data.get('category', 'chat')
+         is_trial_request = req_data.get('trial_layer', '')
+-        app.logger.info(f"[BRIEF] user_id={user_id} plan={plan} trial_layer2={trial_layer2_used} trial_layer3={trial_layer3_used} is_trial_request={is_trial_request!r}")
++        user_id = get_current_user_id()
++        plan, trial_layer2_used, trial_layer3_used, _, _ = _get_brief_billing_info(user_id)
++
+         can_use_layer2 = (
+             plan in ('standard', 'pro') or
+             (plan == 'free' and not trial_layer2_used and is_trial_request == 'layer2')
+         )
+-        if can_use_layer2:
+-            l2_prompt = f"""{LAYER2_TEMPLATES['common']}
++        if not can_use_layer2:
++            return jsonify({"layer2": None})
++
++        discussion, _ = _build_discussion_text(summary)
++        member_names = ", ".join([m["name"] for m in summary["members"]])
++        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
++
++        l2_prompt = f"""{LAYER2_TEMPLATES['common']}
+ 議題：{summary['topic']}
+ カテゴリ：{category}
+ 参加者：{member_names}
+ 議論内容：
+ {discussion if discussion else "（議論なし）"}"""
+ 
+-            layer2_res = client.messages.create(
+-                model="claude-sonnet-4-6",
+-                max_tokens=3000,
+-                messages=[{"role": "user", "content": l2_prompt}]
+-            )
+-            if layer2_res.stop_reason == "max_tokens":
+-                app.logger.warning(f"[LAYER2_TRUNCATED] session={session_id} category={category} stop_reason=max_tokens")
+-            layer2_text = layer2_res.content[0].text.strip().replace("```json", "").replace("```", "").strip()
++        layer2_res = client.messages.create(
++            model="claude-sonnet-4-6", max_tokens=3000,
++            messages=[{"role": "user", "content": l2_prompt}]
++        )
++        if layer2_res.stop_reason == "max_tokens":
++            app.logger.warning(f"[LAYER2_TRUNCATED] session={session_id} category={category} stop_reason=max_tokens")
++        layer2_text = layer2_res.content[0].text.strip().replace("```json", "").replace("```", "").strip()
++        try:
++            layer2_data = json.loads(layer2_text)
++            layer2_parse_ok = True
++        except (json.JSONDecodeError, ValueError):
++            app.logger.error(f"[LAYER2_PARSE_ERROR] session={session_id} raw={layer2_text[:200]}")
++            layer2_data = {"conclusion": "レポートの生成に失敗しました。もう一度お試しください。", "persona_views": [], "risks": [], "next_actions": []}
+             layer2_parse_ok = False
++
++        # freeプランのお試し使用済みフラグを更新（parse成功時のみ）
++        if layer2_parse_ok and plan == 'free' and not trial_layer2_used and user_id:
++            from src.database import get_connection
++            conn2 = get_connection()
+             try:
+-                layer2_data = json.loads(layer2_text)
+-                layer2_parse_ok = True
+-            except (json.JSONDecodeError, ValueError):
+-                app.logger.error(f"[LAYER2_PARSE_ERROR] session={session_id} raw={layer2_text[:200]}")
+-                layer2_data = {"conclusion": "レポートの生成に失敗しました。もう一度お試しください。", "persona_views": [], "risks": [], "next_actions": []}
+-
+-            # freeプランのお試し使用済みフラグを更新（parse成功時のみ）
+-            if layer2_parse_ok and plan == 'free' and not trial_layer2_used and user_id:
+-                from src.database import get_connection
+-                conn2 = get_connection()
+-                try:
+-                    conn2.run(
+-                        "UPDATE users SET trial_layer2_used = TRUE WHERE id = :uid",
+-                        uid=user_id
+-                    )
+-                finally:
+-                    conn2.close()
+-                trial_layer2_used = True
++                conn2.run("UPDATE users SET trial_layer2_used = TRUE WHERE id = :uid", uid=user_id)
++            finally:
++                conn2.close()
++
++        return jsonify({"layer2": layer2_data})
++    except Exception as e:
++        return jsonify({"error": str(e)}), 500
+ 
+-        # ===== Layer3（proは月30回まで・free/standardは未使用時のみ） =====
+-        layer3_data = None
+ 
+-        # proプランの残り回数計算（生成判定の前に実施）
++@app.route("/api/meeting/<session_id>/brief_layer3", methods=["POST"])
++@login_required
++def generate_brief_layer3(session_id):
++    """Layer3（戦略フレームワークレポート）のみを生成"""
++    summary = meeting_room.get_session_summary(session_id)
++    if not summary:
++        return jsonify({"error": "セッションが見つかりません"}), 404
++    try:
++        req_data = request.json or {}
++        category = req_data.get('category', 'chat')
++        is_trial_request = req_data.get('trial_layer', '')
++        user_id = get_current_user_id()
++        plan, _, trial_layer3_used, layer3_monthly_count, layer3_monthly_reset_at = _get_brief_billing_info(user_id)
++
+         layer3_remaining = None
+         if plan == 'pro':
+             from datetime import datetime, timezone
+@@ -1448,8 +1512,7 @@ JSONのみ出力してください。"""
+             if reset_at and reset_at.tzinfo is None:
+                 reset_at = reset_at.replace(tzinfo=timezone.utc)
+             needs_reset = (
+-                reset_at is None or
+-                reset_at.year < now.year or
++                reset_at is None or reset_at.year < now.year or
+                 (reset_at.year == now.year and reset_at.month < now.month)
+             )
+             current_count = 0 if needs_reset else layer3_monthly_count
+@@ -1462,87 +1525,66 @@ JSONのみ出力してください。"""
+             )
+         )
+         if not can_use_layer3 and plan in ('free', 'standard') and trial_layer3_used and is_trial_request == 'layer3':
+-            return jsonify({
+-                "error": "戦略レポートはproプランでご利用いただけます",
+-                "code": "PLAN_LIMIT"
+-            }), 403
+-        if can_use_layer3:
+-            l3_tmpl_prompt = LAYER3_TEMPLATES.get(category, LAYER3_TEMPLATES['strategy'])
+-            layer3_prompt = f"""{l3_tmpl_prompt}
++            return jsonify({"error": "戦略レポートはproプランでご利用いただけます", "code": "PLAN_LIMIT"}), 403
++        if not can_use_layer3:
++            return jsonify({"layer3": None, "layer3_remaining": layer3_remaining})
++
++        discussion, _ = _build_discussion_text(summary)
++        member_names = ", ".join([m["name"] for m in summary["members"]])
++        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
++
++        l3_tmpl_prompt = LAYER3_TEMPLATES.get(category, LAYER3_TEMPLATES['strategy'])
++        layer3_prompt = f"""{l3_tmpl_prompt}
+ 議題：{summary['topic']}
+ 参加者：{member_names}
+ 議論内容：
+ {discussion if discussion else "（議論なし）"}"""
+ 
+-            layer3_res = client.messages.create(
+-                model="claude-sonnet-4-6",
+-                max_tokens=4000,
+-                messages=[{"role": "user", "content": layer3_prompt}]
+-            )
+-            if layer3_res.stop_reason == "max_tokens":
+-                app.logger.warning(f"[LAYER3_TRUNCATED] session={session_id} category={category} stop_reason=max_tokens")
+-            layer3_text = layer3_res.content[0].text.strip().replace("```json", "").replace("```", "").strip()
++        layer3_res = client.messages.create(
++            model="claude-sonnet-4-6", max_tokens=4000,
++            messages=[{"role": "user", "content": layer3_prompt}]
++        )
++        if layer3_res.stop_reason == "max_tokens":
++            app.logger.warning(f"[LAYER3_TRUNCATED] session={session_id} category={category} stop_reason=max_tokens")
++        layer3_text = layer3_res.content[0].text.strip().replace("```json", "").replace("```", "").strip()
++        try:
++            layer3_data = json.loads(layer3_text)
++            layer3_parse_ok = True
++        except (json.JSONDecodeError, ValueError):
++            app.logger.error(f"[LAYER3_PARSE_ERROR] session={session_id} category={category} raw={layer3_text[:200]}")
++            layer3_data = {"error": "レポートの生成に失敗しました。もう一度お試しください。"}
+             layer3_parse_ok = False
++
++        # ★最重要：成功時のみtrial flag・月次カウントを更新する。この条件を変更しないこと
++        if layer3_parse_ok and plan in ('free', 'standard') and not trial_layer3_used and user_id:
++            from src.database import get_connection
++            conn3 = get_connection()
+             try:
+-                layer3_data = json.loads(layer3_text)
+-                layer3_parse_ok = True
+-            except (json.JSONDecodeError, ValueError):
+-                app.logger.error(f"[LAYER3_PARSE_ERROR] session={session_id} category={category} raw={layer3_text[:200]}")
+-                layer3_data = {"error": "レポートの生成に失敗しました。もう一度お試しください。"}
+-
+-            # free/standardプランのお試し使用済みフラグを更新（parse成功時のみ）
+-            if layer3_parse_ok and plan in ('free', 'standard') and not trial_layer3_used and user_id:
+-                from src.database import get_connection
+-                conn3 = get_connection()
+-                try:
+-                    conn3.run(
+-                        "UPDATE users SET trial_layer3_used = TRUE WHERE id = :uid",
+-                        uid=user_id
+-                    )
+-                finally:
+-                    conn3.close()
+-                trial_layer3_used = True
+-
+-            # BUG-16修正：proプランのLayer3月次カウントを/brief時に+1（仕様：コンテンツ生成から制限）
+-            if layer3_parse_ok and plan == 'pro' and user_id:
+-                from src.database import get_connection
+-                from datetime import datetime, timezone
+-                conn_l3 = get_connection()
+-                try:
+-                    now = datetime.now(timezone.utc)
+-                    needs_reset_now = (
+-                        layer3_monthly_reset_at is None or
+-                        layer3_monthly_reset_at.year < now.year or
+-                        (layer3_monthly_reset_at.year == now.year and
+-                         layer3_monthly_reset_at.month < now.month)
+-                    )
+-                    if needs_reset_now:
+-                        conn_l3.run(
+-                            "UPDATE users SET layer3_monthly_count=1, layer3_monthly_reset_at=NOW() WHERE id=:uid",
+-                            uid=user_id
+-                        )
+-                        layer3_remaining = 29
+-                    else:
+-                        conn_l3.run(
+-                            "UPDATE users SET layer3_monthly_count=layer3_monthly_count+1 WHERE id=:uid",
+-                            uid=user_id
+-                        )
+-                        layer3_remaining = max(0, layer3_remaining - 1)
+-                finally:
+-                    conn_l3.close()
++                conn3.run("UPDATE users SET trial_layer3_used = TRUE WHERE id = :uid", uid=user_id)
++            finally:
++                conn3.close()
+ 
+-        return jsonify({
+-            "plan": plan,
+-            "topic": summary["topic"],
+-            "category": category,
+-            "trial_layer2_used": trial_layer2_used,
+-            "trial_layer3_used": trial_layer3_used,
+-            "layer1": layer1_data,
+-            "layer2": layer2_data,
+-            "layer3": layer3_data,
+-            "layer3_available": category in LAYER3_TEMPLATES,
+-            "layer3_remaining": layer3_remaining
+-        })
++        if layer3_parse_ok and plan == 'pro' and user_id:
++            from src.database import get_connection
++            from datetime import datetime, timezone
++            conn_l3 = get_connection()
++            try:
++                now = datetime.now(timezone.utc)
++                needs_reset_now = (
++                    layer3_monthly_reset_at is None or
++                    layer3_monthly_reset_at.year < now.year or
++                    (layer3_monthly_reset_at.year == now.year and layer3_monthly_reset_at.month < now.month)
++                )
++                if needs_reset_now:
++                    conn_l3.run("UPDATE users SET layer3_monthly_count=1, layer3_monthly_reset_at=NOW() WHERE id=:uid", uid=user_id)
++                    layer3_remaining = 29
++                else:
++                    conn_l3.run("UPDATE users SET layer3_monthly_count=layer3_monthly_count+1 WHERE id=:uid", uid=user_id)
++                    layer3_remaining = max(0, layer3_remaining - 1)
++            finally:
++                conn_l3.close()
++
++        return jsonify({"layer3": layer3_data, "layer3_remaining": layer3_remaining})
+     except Exception as e:
+         return jsonify({"error": str(e)}), 500
+ 
