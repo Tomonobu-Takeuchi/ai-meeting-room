@@ -652,6 +652,29 @@
           プランをアップグレード
         </button>
       </div>
+      <div id="layer2Blur" class="hidden">
+        <div id="layer2BlurPreview"></div>
+        <div style="position:relative;border-radius:8px;overflow:hidden;margin-bottom:6px;">
+          <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:12px 14px;filter:blur(4px);user-select:none;pointer-events:none;">
+            <div style="font-size:12px;font-weight:700;color:var(--accent-blue);margin-bottom:6px;">③ 論点分析</div>
+            <div style="font-size:13px;line-height:1.7;">各ペルソナの意見の対立点・合意点・懸念事項が詳細に分析されます。重要な論点ごとに支持・反対・懸念の立場が整理されます。</div>
+          </div>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.15);border-radius:8px;">
+            <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:8px 16px;font-size:11px;font-weight:700;color:var(--accent-blue);">🔒 続きを見るにはアップグレードが必要です</div>
+          </div>
+        </div>
+        <div style="position:relative;border-radius:8px;overflow:hidden;margin-bottom:6px;">
+          <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:12px 14px;filter:blur(4px);user-select:none;pointer-events:none;">
+            <div style="font-size:12px;font-weight:700;color:var(--accent-blue);margin-bottom:6px;">④ 合意事項 / ⑤ 未解決事項 / ⑥ 次のアクション</div>
+            <div style="font-size:13px;line-height:1.7;">議論で合意した事項、未解決の論点、次に取るべきアクションが整理されます。具体的な実行計画と優先順位が明確になります。</div>
+          </div>
+        </div>
+        <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;margin-top:10px;">
+          <div style="font-size:13px;font-weight:700;margin-bottom:4px;">③〜⑥の全内容を読むには</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">StandardまたはProプランにアップグレードしてください</div>
+          <button class="btn btn-green" onclick="document.getElementById('reportModal').classList.add('hidden');openPricingModal();">プランを見る →</button>
+        </div>
+      </div>
     </div>
 
     <hr style="border:none;border-top:1px solid var(--border);margin:20px 0;">
@@ -681,6 +704,29 @@
         <button class="btn btn-green" onclick="document.getElementById('reportModal').classList.add('hidden');openPricingModal();">
           プランをアップグレード
         </button>
+      </div>
+      <div id="layer3Blur" class="hidden">
+        <div id="layer3BlurPreview"></div>
+        <div style="position:relative;border-radius:8px;overflow:hidden;margin-bottom:6px;">
+          <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:12px 14px;filter:blur(4px);user-select:none;pointer-events:none;">
+            <div style="font-size:12px;font-weight:700;margin-bottom:6px;">📊 SWOT分析</div>
+            <div style="font-size:13px;line-height:1.7;">強み・弱み・機会・脅威の4象限でビジネス状況を分析します。内部要因と外部環境の両面から戦略的な判断材料を提供します。</div>
+          </div>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.15);border-radius:8px;">
+            <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:8px 16px;font-size:11px;font-weight:700;color:var(--accent-blue);">🔒 続きを見るにはProプランが必要です</div>
+          </div>
+        </div>
+        <div style="position:relative;border-radius:8px;overflow:hidden;margin-bottom:6px;">
+          <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:12px 14px;filter:blur(4px);user-select:none;pointer-events:none;">
+            <div style="font-size:12px;font-weight:700;margin-bottom:6px;">🎯 ターゲット市場 / 🚀 実行戦略 / 🛡️ リスクと対策</div>
+            <div style="font-size:13px;line-height:1.7;">ターゲット市場の特定、4P戦略、OKR、競合との差別化、リスク対策まで網羅した戦略フレームワークが提供されます。</div>
+          </div>
+        </div>
+        <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;margin-top:10px;">
+          <div style="font-size:13px;font-weight:700;margin-bottom:4px;">全ての戦略フレームワークを読むには</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Proプランにアップグレードしてください</div>
+          <button class="btn btn-green" onclick="document.getElementById('reportModal').classList.add('hidden');openPricingModal();">プランを見る →</button>
+        </div>
       </div>
       <div id="layer3ProLocked" class="hidden" style="text-align:center;padding:20px;background:rgba(124,58,237,0.06);border-radius:8px;">
         <div style="font-size:28px;margin-bottom:8px;">🔒</div>

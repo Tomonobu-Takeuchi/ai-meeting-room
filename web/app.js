@@ -1014,7 +1014,7 @@ async function loadLayer2(sid, category) {
       DOM.downloadLayer2Btn.style.display = 'none';
       const layer2CostInfo = $('layer2CostInfo');
       if (layer2CostInfo) layer2CostInfo.style.display = 'none';
-      DOM.layer2Locked.classList.remove('hidden');
+      showLayer2Blur(_briefSessionId, 'chat');
     }
   } catch (e) {
     DOM.layer2Content.innerHTML = `<div style="padding:16px;text-align:center;color:var(--text-secondary);font-size:13px;">⚠️ 議論分析レポートの生成に失敗しました。</div>`;
@@ -1048,7 +1048,7 @@ async function loadLayer3(sid, category) {
       DOM.layer3Trial.classList.remove('hidden');
     } else {
       DOM.downloadLayer3Btn.style.display = 'none';
-      DOM.layer3Locked.classList.remove('hidden');
+      showLayer3Blur(_briefSessionId, State.meetingCategory || 'strategy');
     }
   } catch (e) {
     const isExtBlock = (e?.message || '').toLowerCase().includes('message port');
@@ -1080,9 +1080,13 @@ async function showReportModal() {
   DOM.layer2Content.innerHTML = '';
   DOM.layer2Trial.classList.add('hidden');
   DOM.layer2Locked.classList.add('hidden');
+  const l2BlurEl = $('layer2Blur'); if (l2BlurEl) l2BlurEl.classList.add('hidden');
+  const l2BlurPrev = $('layer2BlurPreview'); if (l2BlurPrev) l2BlurPrev.innerHTML = '';
   DOM.layer3Content.innerHTML = '';
   DOM.layer3Trial.classList.add('hidden');
   DOM.layer3Locked.classList.add('hidden');
+  const l3BlurEl = $('layer3Blur'); if (l3BlurEl) l3BlurEl.classList.add('hidden');
+  const l3BlurPrev = $('layer3BlurPreview'); if (l3BlurPrev) l3BlurPrev.innerHTML = '';
   DOM.downloadLayer2Btn.style.display = 'none';
   const _initLayer2CostInfo = $('layer2CostInfo');
   if (_initLayer2CostInfo) _initLayer2CostInfo.style.display = 'none';
@@ -1154,7 +1158,7 @@ async function showReportModal() {
       DOM.downloadLayer2Btn.style.display = 'none';
       const layer2CostInfo = $('layer2CostInfo');
       if (layer2CostInfo) layer2CostInfo.style.display = 'none';
-      DOM.layer2Locked.classList.remove('hidden');
+      showLayer2Blur(sid, data.category || 'chat');
     }
 
     if (data.layer3_available === false) {
@@ -1173,7 +1177,7 @@ async function showReportModal() {
         DOM.layer3Trial.classList.remove('hidden');
       } else {
         DOM.downloadLayer3Btn.style.display = 'none';
-        DOM.layer3Locked.classList.remove('hidden');
+        showLayer3Blur(sid, data.category || 'strategy');
       }
     }
 
@@ -1192,6 +1196,76 @@ async function showReportModal() {
       }
     }
   }
+}
+
+
+// ===== Layer2 ぼかし表示（free試用消化後）=====
+async function showLayer2Blur(sid, category) {
+  const blurEl = $('layer2Blur');
+  if (!blurEl) return;
+  blurEl.classList.remove('hidden');
+  // ぼかし用にAPIからデータ取得してサマリ・議題のみ表示
+  try {
+    const data = await API.post(`/api/meeting/${sid}/brief_layer2`, { category }, 120000);
+    if (data.layer2) {
+      const l2 = data.layer2;
+      const topic = _briefData?.topic || '';
+      const issues = _briefIssues || [];
+      let previewHtml = '';
+      if (topic) {
+        previewHtml += `<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:10px;">`;
+        previewHtml += `<div style="font-size:12px;font-weight:700;color:var(--accent-blue);margin-bottom:6px;">① 議題・解決すべき課題</div>`;
+        previewHtml += `<div style="font-size:13px;line-height:1.7;">${escapeHtml(topic)}</div>`;
+        if (issues.length > 0) {
+          issues.forEach(i => { previewHtml += `<div style="font-size:13px;line-height:1.8;margin-top:4px;">・${escapeHtml(i)}</div>`; });
+        }
+        previewHtml += `</div>`;
+      }
+      if (l2.summary) {
+        previewHtml += `<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:10px;">`;
+        previewHtml += `<div style="font-size:12px;font-weight:700;color:var(--accent-blue);margin-bottom:6px;">② 全体サマリ</div>`;
+        previewHtml += `<div style="font-size:13px;line-height:1.7;">${escapeHtml(l2.summary)}</div>`;
+        previewHtml += `</div>`;
+      }
+      const previewEl = $('layer2BlurPreview');
+      if (previewEl) previewEl.innerHTML = previewHtml;
+    }
+  } catch(e) {}
+}
+
+// ===== Layer3 ぼかし表示（free/standard試用消化後）=====
+async function showLayer3Blur(sid, category) {
+  const blurEl = $('layer3Blur');
+  if (!blurEl) return;
+  blurEl.classList.remove('hidden');
+  try {
+    const data = await API.post(`/api/meeting/${sid}/brief_layer3`, { category }, 120000);
+    if (data.layer3) {
+      const l3 = data.layer3;
+      const topic = _briefData?.topic || '';
+      let previewHtml = '';
+      if (topic) {
+        previewHtml += `<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:10px;">`;
+        previewHtml += `<div style="font-size:12px;font-weight:700;color:var(--accent-blue);margin-bottom:6px;">📋 議題</div>`;
+        previewHtml += `<div style="font-size:13px;line-height:1.7;">${escapeHtml(topic)}</div>`;
+        previewHtml += `</div>`;
+      }
+      if (l3.summary) {
+        previewHtml += `<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:10px;">`;
+        previewHtml += `<div style="font-size:12px;font-weight:700;color:var(--accent-blue);margin-bottom:6px;">📝 全体サマリ</div>`;
+        previewHtml += `<div style="font-size:13px;line-height:1.7;">${escapeHtml(l3.summary)}</div>`;
+        previewHtml += `</div>`;
+      }
+      if (l3.vision) {
+        previewHtml += `<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:10px;">`;
+        previewHtml += `<div style="font-size:12px;font-weight:700;color:var(--accent-blue);margin-bottom:6px;">🔭 ビジョン</div>`;
+        previewHtml += `<div style="font-size:13px;line-height:1.7;">${escapeHtml(l3.vision)}</div>`;
+        previewHtml += `</div>`;
+      }
+      const previewEl = $('layer3BlurPreview');
+      if (previewEl) previewEl.innerHTML = previewHtml;
+    }
+  } catch(e) {}
 }
 
 function buildLayer2HTML(l2, cat, topic, issues) {
