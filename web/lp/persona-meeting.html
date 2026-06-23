@@ -55,6 +55,28 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(8,14,26,0.94
 .desc{font-size:14px;color:#9AB0C8;line-height:1.85;max-width:680px}
 
 @media(max-width:768px){.nav-tabs{display:none}}
+
+    .report-samples {
+      margin: 16px 0 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .report-sample-item {}
+    .report-sample-label {
+      font-size: 13px;
+      color: #a0c4ff;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    .report-sample-img {
+      width: 100%;
+      max-width: 560px;
+      border-radius: 8px;
+      border: 1px solid #2a3a6e;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+      display: block;
+    }
 </style>
 <script>
 function openModal(src,cap){
@@ -187,6 +209,16 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
           <li>Layer2：議論分析レポートPDF（Standard/Pro）</li>
           <li>Layer3：SWOT・4P・戦略フレームワークPDF（Proプラン）</li>
         </ul>
+        <div class="report-samples">
+          <div class="report-sample-item">
+            <p class="report-sample-label">▼ Layer1：アクション・ブリーフ（全プラン）</p>
+            <img src="/static/images/report_examples/layer1_report.png" alt="Layer1 アクション・ブリーフ サンプル" class="report-sample-img">
+          </div>
+          <div class="report-sample-item">
+            <p class="report-sample-label">▼ Layer2：議論分析レポート（Standard/Pro）</p>
+            <img src="/static/images/report_examples/layer2_report.png" alt="Layer2 議論分析レポート サンプル" class="report-sample-img">
+          </div>
+        </div>
         <button class="screen-btn" onclick="document.getElementById('framework-modal').style.display='flex'">📊 フレームワークとレポートの内容を見る</button>
       </div>
 
