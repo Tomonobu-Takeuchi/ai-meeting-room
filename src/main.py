@@ -1,4 +1,4 @@
-"""
+﻿"""
 AI-PERSONA会議室 - メインサーバー（ユーザー認証対応版）
 """
 import io
@@ -1177,7 +1177,7 @@ LAYER3_TEMPLATES = {
   },
   "competitive": {"differentiation": "競合との差別化根拠を2〜3文で"},
   "open_issues": [{"issue": "未解決課題1", "why": "重要な理由"}],
-  "risks": [{"risk": "リスク1", "advice": "対処法"}]
+  "risks": [{"level": "高/中/低", "name": "リスク名", "reason": "リスクの理由", "advice": "対処法"}]
 }
 JSONのみ出力してください。""",
     'practice': """以下の提案・企画強化の会議から「企画強化レポート」を作成してください。

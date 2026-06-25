@@ -1427,7 +1427,8 @@ function buildLayer3HTML(l3, cat, topic, issues) {
       html += `<div style="font-size:13px;font-weight:700;margin:12px 0 8px;">🛡️ リスクと対策</div>`;
       l3.risks.forEach(r => {
         html += `<div style="margin-bottom:8px;padding:10px 12px;border-radius:8px;background:var(--bg-base);">`;
-        html += `<div style="font-size:12px;font-weight:600;color:#DC2626;margin-bottom:4px;">⚠ ${r.risk||''}</div>`;
+        html += `<div style="font-size:12px;font-weight:600;color:#DC2626;margin-bottom:4px;">⚠ [${r.level||''}] ${r.name||''}</div>`;
+        html += `<div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px;">${r.reason||''}</div>`;
         html += `<div style="font-size:12px;color:var(--text-secondary);line-height:1.5;">→ ${r.advice||''}</div></div>`;
       });
     }
