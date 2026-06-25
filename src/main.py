@@ -1,4 +1,4 @@
-﻿"""
+"""
 AI-PERSONA会議室 - メインサーバー（ユーザー認証対応版）
 """
 import io
@@ -1629,20 +1629,15 @@ def end_meeting(session_id):
 @app.route("/api/meeting/<session_id>/brief_pdf", methods=["POST"])
 @login_required
 def generate_brief_pdf(session_id):
-    """Layer 1（アクション・ブリーフ）をPDF化して返す"""
+    """Layer1（アクション・ブリーフ）をweasyprintでPDF化して返す"""
     summary = meeting_room.get_session_summary(session_id)
     if not summary:
         return jsonify({"error": "セッションが見つかりません"}), 404
     try:
         import io
         from datetime import datetime
-        from reportlab.lib.pagesizes import A4
-        from reportlab.lib.styles import ParagraphStyle
-        from reportlab.lib.units import mm
-        from reportlab.lib.colors import HexColor
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
-        from reportlab.pdfbase import pdfmetrics
-        from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+        from weasyprint import HTML
+        from jinja2 import Environment, FileSystemLoader
 
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         discussion = ""
@@ -1685,222 +1680,73 @@ JSONのみ出力してください。"""
         text = res.content[0].text.strip().replace("```json", "").replace("```", "").strip()
         data = json.loads(text)
 
-        pdfmetrics.registerFont(UnicodeCIDFont('HeiseiMin-W3'))
-        buf = io.BytesIO()
+        issues = _extract_issues(client, summary['topic'])
         now = datetime.now()
-        doc = SimpleDocTemplate(buf, pagesize=A4,
-            rightMargin=20*mm, leftMargin=20*mm,
-            topMargin=20*mm, bottomMargin=20*mm)
 
-        def make_style(size=11, color=None):
-            s = ParagraphStyle('s', fontName='HeiseiMin-W3', fontSize=size, leading=size*1.8)
-            if color:
-                s.textColor = HexColor(color)
-            return s
+        tmpl_dir = os.path.join(os.path.dirname(__file__), "templates")
+        env = Environment(loader=FileSystemLoader(tmpl_dir))
+        tmpl = env.get_template("pdf_layer1.html")
+        html_str = tmpl.render(
+            topic=summary['topic'],
+            date=now.strftime('%Y年%m月%d日 %H:%M'),
+            conclusion=data.get('conclusion', ''),
+            actions=data.get('actions', []),
+            user_basis=data.get('user_basis', ''),
+            issues=issues,
+        )
 
-        story = []
-        story.append(Paragraph('アクション・ブリーフ', make_style(18, '#1a1a2e')))
-        story.append(Spacer(1, 2*mm))
-        story.append(HRFlowable(width='100%', thickness=1, color=HexColor('#2563EB')))
-        story.append(Spacer(1, 3*mm))
-        # ===== 議題・解決すべき課題ブロック =====
-        _l1_issues = _extract_issues(client, summary['topic'])
-        story.append(Paragraph('📋 議題', make_style(13, '#1B4FD8')))
-        story.append(Spacer(1, 2*mm))
-        story.append(Paragraph(summary['topic'], make_style(11)))
-        story.append(Spacer(1, 4*mm))
-        story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
-        story.append(Spacer(1, 4*mm))
-        if _l1_issues:
-            story.append(Paragraph('🎯 解決すべき課題', make_style(13, '#1B4FD8')))
-            story.append(Spacer(1, 2*mm))
-            for _iss in _l1_issues:
-                story.append(Paragraph(f'・{_iss}', make_style(10)))
-                story.append(Spacer(1, 1*mm))
-            story.append(Spacer(1, 4*mm))
-            story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
-            story.append(Spacer(1, 4*mm))
-        # ===== ここまで =====
-
-        for label, value in [
-            ('日時', now.strftime('%Y年%m月%d日 %H:%M')),
-            ('議題', summary['topic']),
-            ('参加者', member_names),
-        ]:
-            story.append(Paragraph(f'<b>{label}：</b>{value}', make_style(10)))
-        story.append(Spacer(1, 5*mm))
-
-        story.append(Paragraph('■ 結論', make_style(13, '#2563EB')))
-        story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
-        story.append(Spacer(1, 2*mm))
-        story.append(Paragraph(data.get('conclusion', ''), make_style(10)))
-        story.append(Spacer(1, 5*mm))
-
-        story.append(Paragraph('■ 次にやること', make_style(13, '#2563EB')))
-        story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
-        story.append(Spacer(1, 2*mm))
-        for action in data.get('actions', []):
-            story.append(Paragraph(f'・{action}', make_style(10)))
-            story.append(Spacer(1, 1*mm))
-        story.append(Spacer(1, 5*mm))
-
-        story.append(Paragraph('■ あなたの発言から', make_style(13, '#2563EB')))
-        story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
-        story.append(Spacer(1, 2*mm))
-        story.append(Paragraph(data.get('user_basis', ''), make_style(10)))
-
-        doc.build(story)
+        buf = io.BytesIO()
+        HTML(string=html_str, base_url=os.path.dirname(__file__)).write_pdf(buf)
         buf.seek(0)
         topic_short = summary['topic'][:20].replace('/', '_').replace('\\', '_')
-        filename = f'アクションブリーフ_{topic_short}_{now.strftime("%Y%m%d")}.pdf'
+        filename = f"アクションブリーフ_{topic_short}_{now.strftime('%Y%m%d')}.pdf"
         return send_file(buf, as_attachment=True, download_name=filename, mimetype='application/pdf')
     except Exception as e:
+        app.logger.error(f"[PDF_LAYER1_ERROR] {e}")
         return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/meeting/<session_id>/brief_pdf_layer2", methods=["POST"])
 @login_required
 def generate_brief_pdf_layer2(session_id):
-    """Layer2（議論分析レポート）をPDF化して返す。フロントからJSONを受け取る"""
+    """Layer2（議論分析レポート）をweasyprintでPDF化して返す"""
     data = request.get_json()
     l2 = data.get('layer2', {})
     topic = data.get('topic', '議論分析')
     try:
         import io
         from datetime import datetime
-        from reportlab.lib.pagesizes import A4
-        from reportlab.lib.styles import ParagraphStyle
-        from reportlab.lib.units import mm
-        from reportlab.lib.colors import HexColor
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Table, TableStyle
-        from reportlab.pdfbase import pdfmetrics
-        from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+        from weasyprint import HTML
+        from jinja2 import Environment, FileSystemLoader
 
-        pdfmetrics.registerFont(UnicodeCIDFont('HeiseiMin-W3'))
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        issues = _extract_issues(client, topic)
+        now = datetime.now()
+
+        tmpl_dir = os.path.join(os.path.dirname(__file__), "templates")
+        env = Environment(loader=FileSystemLoader(tmpl_dir))
+        tmpl = env.get_template("pdf_layer2.html")
+        html_str = tmpl.render(
+            topic=topic,
+            date=now.strftime('%Y年%m月%d日 %H:%M'),
+            l2=l2,
+            issues=issues,
+        )
+
         buf = io.BytesIO()
-        doc = SimpleDocTemplate(buf, pagesize=A4,
-            leftMargin=20*mm, rightMargin=20*mm,
-            topMargin=20*mm, bottomMargin=20*mm)
-
-        styles_base = ParagraphStyle('base', fontName='HeiseiMin-W3', fontSize=11, leading=16)
-        styles_title = ParagraphStyle('title', fontName='HeiseiMin-W3', fontSize=16, leading=24, textColor=HexColor('#2563EB'))
-        styles_h2 = ParagraphStyle('h2', fontName='HeiseiMin-W3', fontSize=13, leading=18, textColor=HexColor('#E6EDF3'), spaceAfter=4)
-        styles_small = ParagraphStyle('small', fontName='HeiseiMin-W3', fontSize=9, leading=14, textColor=HexColor('#8B949E'))
-
-        story = []
-        story.append(Paragraph('🔍 議論分析レポート', styles_title))
-        story.append(Paragraph(f'議題：{topic}', styles_small))
-        story.append(Paragraph(datetime.now().strftime('%Y年%m月%d日'), styles_small))
-        story.append(Spacer(1, 6*mm))
-        story.append(HRFlowable(width='100%', color=HexColor('#30363D')))
-        story.append(Spacer(1, 4*mm))
-        # ===== 議題・解決すべき課題ブロック =====
-        _l2_client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
-        _l2_issues = _extract_issues(_l2_client, topic)
-        story.append(Paragraph('📋 議題', ParagraphStyle('hdr2t', fontName='HeiseiMin-W3', fontSize=13, leading=18, textColor=HexColor('#1B4FD8'))))
-        story.append(Spacer(1, 2*mm))
-        story.append(Paragraph(topic, styles_small))
-        story.append(Spacer(1, 4*mm))
-        story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
-        story.append(Spacer(1, 4*mm))
-        if _l2_issues:
-            story.append(Paragraph('🎯 解決すべき課題', ParagraphStyle('hdr2i', fontName='HeiseiMin-W3', fontSize=13, leading=18, textColor=HexColor('#1B4FD8'))))
-            story.append(Spacer(1, 2*mm))
-            for _iss in _l2_issues:
-                story.append(Paragraph(f'・{_iss}', styles_small))
-                story.append(Spacer(1, 1*mm))
-            story.append(Spacer(1, 4*mm))
-            story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
-            story.append(Spacer(1, 4*mm))
-        # ===== ここまで =====
-
-        CIRCLED = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩']
-        stance_colors = {'支持': ('#15803D', '#EAF7EF'), '反対': ('#B91C1C', '#FCEAEA'), '懸念': ('#B45309', '#FBF2DF')}
-
-        def action_tag(related_issue):
-            ri = related_issue or 0
-            if not ri:
-                return "全体"
-            if ri <= len(CIRCLED):
-                return f"論点{CIRCLED[ri-1]}"
-            return f"論点{ri}"
-
-        def direction_tag(related_unresolved):
-            refs = related_unresolved or []
-            if not refs:
-                return ""
-            return "未解決" + "".join(CIRCLED[r-1] if r <= len(CIRCLED) else str(r) for r in refs)
-
-        if l2.get('summary'):
-            story.append(Paragraph('📝 全体サマリ', styles_h2))
-            story.append(Paragraph(l2['summary'], styles_base))
-            story.append(Spacer(1, 4*mm))
-
-        if l2.get('discussion_points'):
-            story.append(Paragraph('💬 論点と対立構造', styles_h2))
-            story.append(Spacer(1, 2*mm))
-            issue_title_style = ParagraphStyle('issuet', fontName='HeiseiMin-W3', fontSize=11, leading=15, textColor=HexColor('#6D28D9'))
-            pos_text_style = ParagraphStyle('postxt', fontName='HeiseiMin-W3', fontSize=9.5, leading=14)
-            for idx, dp in enumerate(l2['discussion_points'], start=1):
-                num = CIRCLED[idx-1] if idx <= len(CIRCLED) else str(idx)
-                story.append(Paragraph(f"論点{num}　{dp.get('issue','')}", issue_title_style))
-                story.append(Spacer(1, 1.5*mm))
-                positions = dp.get('positions', [])[:2]
-                cells, bgs = [], []
-                for p in positions:
-                    color, bg = stance_colors.get(p.get('stance',''), ('#6B7280', '#F3F4F6'))
-                    cells.append(Paragraph(f"<font color='{color}'><b>{p.get('stance','')}</b></font><br/>{p.get('name','')}：{p.get('opinion','')}", pos_text_style))
-                    bgs.append(bg)
-                while len(cells) < 2:
-                    cells.append(Paragraph('', pos_text_style))
-                    bgs.append('#FFFFFF')
-                t = Table([cells], colWidths=[83*mm, 83*mm], style=TableStyle([
-                    ('BACKGROUND', (0,0), (0,0), HexColor(bgs[0])),
-                    ('BACKGROUND', (1,0), (1,0), HexColor(bgs[1])),
-                    ('VALIGN', (0,0), (-1,-1), 'TOP'),
-                    ('TOPPADDING', (0,0), (-1,-1), 6), ('BOTTOMPADDING', (0,0), (-1,-1), 6),
-                    ('LEFTPADDING', (0,0), (-1,-1), 8), ('RIGHTPADDING', (0,0), (-1,-1), 8),
-                ]))
-                story.append(t)
-                story.append(Spacer(1, 4*mm))
-
-        if l2.get('next_actions'):
-            story.append(Paragraph('🚀 直近のアクションプラン', styles_h2))
-            for a in l2['next_actions']:
-                tag = action_tag(a.get('related_issue'))
-                story.append(Paragraph(f"・<font color='#6D28D9' size='8'>[{tag}]</font> {a.get('action','')}", styles_base))
-            story.append(Spacer(1, 4*mm))
-
-        if l2.get('unresolved_points'):
-            story.append(Paragraph('⚠️ 未解決論点', styles_h2))
-            udetail_style = ParagraphStyle('udetail', fontName='HeiseiMin-W3', fontSize=9, leading=13, textColor=HexColor('#6B7280'))
-            for idx, u in enumerate(l2['unresolved_points'], start=1):
-                num = CIRCLED[idx-1] if idx <= len(CIRCLED) else str(idx)
-                story.append(Paragraph(f"未解決{num}　{u.get('title','')}", styles_base))
-                story.append(Paragraph(u.get('detail',''), udetail_style))
-                story.append(Spacer(1, 2*mm))
-            story.append(Spacer(1, 2*mm))
-
-        if l2.get('future_directions'):
-            story.append(Paragraph('🧭 今後の検討の方向性', styles_h2))
-            for fd in l2['future_directions']:
-                tag = direction_tag(fd.get('related_unresolved'))
-                story.append(Paragraph(f"<font color='#B91C1C' size='8'>[{tag}]</font> {fd.get('direction','')}", styles_base))
-                story.append(Spacer(1, 2*mm))
-
-        doc.build(story)
+        HTML(string=html_str, base_url=os.path.dirname(__file__)).write_pdf(buf)
         buf.seek(0)
-        filename = f"議論分析レポート_{datetime.now().strftime('%Y%m%d')}.pdf"
-        return send_file(buf, mimetype='application/pdf',
-            as_attachment=True, download_name=filename)
+        filename = f"議論分析レポート_{now.strftime('%Y%m%d')}.pdf"
+        return send_file(buf, mimetype='application/pdf', as_attachment=True, download_name=filename)
     except Exception as e:
+        app.logger.error(f"[PDF_LAYER2_ERROR] {e}")
         return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/meeting/<session_id>/brief_pdf_layer3", methods=["POST"])
 @login_required
 def generate_brief_pdf_layer3(session_id):
-    """Layer3（戦略フレームワーク）をPDF化して返す。フロントからJSONを受け取る"""
+    """Layer3（戦略フレームワーク）をweasyprintでPDF化して返す"""
     user_id = get_current_user_id()
     if not user_id:
         return jsonify({"error": "ログインが必要です"}), 401
@@ -1912,257 +1758,32 @@ def generate_brief_pdf_layer3(session_id):
     try:
         import io
         from datetime import datetime
-        from reportlab.lib.pagesizes import A4
-        from reportlab.lib.styles import ParagraphStyle
-        from reportlab.lib.units import mm
-        from reportlab.lib.colors import HexColor
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
-        from reportlab.pdfbase import pdfmetrics
-        from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+        from weasyprint import HTML
+        from jinja2 import Environment, FileSystemLoader
 
-        pdfmetrics.registerFont(UnicodeCIDFont('HeiseiMin-W3'))
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        issues = _extract_issues(client, topic)
+        now = datetime.now()
+
+        tmpl_dir = os.path.join(os.path.dirname(__file__), "templates")
+        env = Environment(loader=FileSystemLoader(tmpl_dir))
+        tmpl = env.get_template("pdf_layer3.html")
+        html_str = tmpl.render(
+            topic=topic,
+            date=now.strftime('%Y年%m月%d日 %H:%M'),
+            l3=l3,
+            cat=category,
+            issues=issues,
+        )
+
         buf = io.BytesIO()
-        doc = SimpleDocTemplate(buf, pagesize=A4,
-            leftMargin=20*mm, rightMargin=20*mm,
-            topMargin=20*mm, bottomMargin=20*mm)
-
-        styles_base = ParagraphStyle('base', fontName='HeiseiMin-W3', fontSize=10, leading=16)
-        styles_title = ParagraphStyle('title', fontName='HeiseiMin-W3', fontSize=16, leading=24, textColor=HexColor('#7C3AED'))
-        styles_h2 = ParagraphStyle('h2', fontName='HeiseiMin-W3', fontSize=12, leading=18, textColor=HexColor('#1C2333'), spaceAfter=4)
-        styles_small = ParagraphStyle('small', fontName='HeiseiMin-W3', fontSize=9, leading=14, textColor=HexColor('#8B949E'))
-
-        story = []
-        story.append(Paragraph('📊 戦略フレームワーク・レポート', styles_title))
-        story.append(Paragraph(f'議題：{topic}', styles_small))
-        story.append(Paragraph(datetime.now().strftime('%Y年%m月%d日'), styles_small))
-        story.append(Spacer(1, 6*mm))
-        story.append(HRFlowable(width='100%', color=HexColor('#30363D')))
-        story.append(Spacer(1, 4*mm))
-        # ===== 議題・解決すべき課題ブロック =====
-        _l3_client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
-        _l3_issues = _extract_issues(_l3_client, topic)
-        story.append(Paragraph('📋 議題', ParagraphStyle('hdr3t', fontName='HeiseiMin-W3', fontSize=13, leading=18, textColor=HexColor('#1B4FD8'))))
-        story.append(Spacer(1, 2*mm))
-        story.append(Paragraph(topic, styles_small))
-        story.append(Spacer(1, 4*mm))
-        story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
-        story.append(Spacer(1, 4*mm))
-        if _l3_issues:
-            story.append(Paragraph('🎯 解決すべき課題', ParagraphStyle('hdr3i', fontName='HeiseiMin-W3', fontSize=13, leading=18, textColor=HexColor('#1B4FD8'))))
-            story.append(Spacer(1, 2*mm))
-            for _iss in _l3_issues:
-                story.append(Paragraph(f'・{_iss}', styles_small))
-                story.append(Spacer(1, 1*mm))
-            story.append(Spacer(1, 4*mm))
-            story.append(HRFlowable(width='100%', thickness=0.5, color=HexColor('#cccccc')))
-            story.append(Spacer(1, 4*mm))
-        # ===== ここまで =====
-
-        if l3.get('summary'):
-            story.append(Paragraph('■ 議論概要', styles_h2))
-            story.append(Paragraph(l3['summary'], styles_base))
-            story.append(Spacer(1, 4*mm))
-
-        if category == 'practice':
-            if l3.get('summary'):
-                story.append(Paragraph('■ 要点サマリー', styles_h2))
-                story.append(Paragraph(l3['summary'], styles_base))
-                story.append(Spacer(1, 4*mm))
-            lc = l3.get('logic_check', {})
-            if lc.get('strengths') or lc.get('gaps'):
-                story.append(Paragraph('■ 論理構造分析', styles_h2))
-                for s in lc.get('strengths', []):
-                    story.append(Paragraph(f'✅ {s}', styles_base))
-                for g in lc.get('gaps', []):
-                    story.append(Paragraph(f'⚠ {g}', styles_base))
-                story.append(Spacer(1, 4*mm))
-            objections = l3.get('objections', [])
-            if objections:
-                story.append(Paragraph('■ 反論予測と対処法', styles_h2))
-                for o in objections:
-                    story.append(Paragraph(f"【反論】{o.get('objection','')}", styles_base))
-                    story.append(Paragraph(f"  → {o.get('counter','')}", styles_base))
-                    story.append(Spacer(1, 2*mm))
-                story.append(Spacer(1, 2*mm))
-            qa = l3.get('qa_list', [])
-            if qa:
-                story.append(Paragraph('■ 想定Q&A', styles_h2))
-                for q in qa:
-                    styles_q = ParagraphStyle('q', fontName='HeiseiMin-W3', fontSize=11, leading=16, textColor=HexColor('#60A5FA'))
-                    story.append(Paragraph(f"Q: {q.get('question','')}", styles_q))
-                    story.append(Paragraph(f"A: {q.get('answer','')}", styles_base))
-                    story.append(Spacer(1, 3*mm))
-                story.append(Spacer(1, 2*mm))
-            if l3.get('improvement'):
-                story.append(Paragraph('■ 改善アドバイス', styles_h2))
-                story.append(Paragraph(l3['improvement'], styles_base))
-                story.append(Spacer(1, 4*mm))
-            checklist = l3.get('checklist', [])
-            if checklist:
-                story.append(Paragraph('■ 提出前チェックリスト', styles_h2))
-                for c in checklist:
-                    story.append(Paragraph(f'□ {c}', styles_base))
-                    story.append(Spacer(1, 1*mm))
-
-        elif category == 'study':
-            ev = l3.get('expert_evaluation', {})
-            if ev.get('overall'):
-                story.append(Paragraph('■ 賢人の総合評価', styles_h2))
-                story.append(Paragraph(ev['overall'], styles_base))
-                story.append(Spacer(1, 4*mm))
-            if ev.get('strengths'):
-                story.append(Paragraph('■ 優れている点', styles_h2))
-                story.append(Paragraph(ev['strengths'], styles_base))
-                story.append(Spacer(1, 2*mm))
-            if ev.get('issues'):
-                story.append(Paragraph('■ 改善が必要な点', styles_h2))
-                story.append(Paragraph(ev['issues'], styles_base))
-                story.append(Spacer(1, 4*mm))
-            priorities = l3.get('improvement_priority', [])
-            if priorities:
-                story.append(Paragraph('■ 改善の優先順位', styles_h2))
-                for p in priorities:
-                    story.append(Paragraph(f"【{p.get('rank','')}位】{p.get('action','')}", styles_base))
-                    story.append(Paragraph(f"  理由：{p.get('reason','')}", styles_base))
-                    story.append(Spacer(1, 2*mm))
-                story.append(Spacer(1, 2*mm))
-            roadmap = l3.get('roadmap', [])
-            if roadmap:
-                story.append(Paragraph('■ 習得・上達ロードマップ', styles_h2))
-                for r in roadmap:
-                    story.append(Paragraph(f"【{r.get('phase','')}：{r.get('period','')}】{r.get('theme','')}", styles_base))
-                    for act in r.get('actions', []):
-                        story.append(Paragraph(f"  ・{act}", styles_base))
-                    if r.get('input_source'):
-                        story.append(Paragraph(f"  📚 {r.get('input_source','')}", styles_base))
-                    story.append(Spacer(1, 3*mm))
-                story.append(Spacer(1, 2*mm))
-            cont = l3.get('continuity', {})
-            if cont.get('obstacles') or cont.get('solutions'):
-                story.append(Paragraph('■ 継続の仕組み', styles_h2))
-                for o in cont.get('obstacles', []):
-                    story.append(Paragraph(f'・続かない理由：{o}', styles_base))
-                for s in cont.get('solutions', []):
-                    story.append(Paragraph(f'・仕組み：{s}', styles_base))
-
-        elif category == 'consulting':
-            inv = l3.get('asset_inventory', {})
-            if inv.get('market_value'):
-                story.append(Paragraph('■ 市場価値評価', styles_h2))
-                story.append(Paragraph(inv['market_value'], styles_base))
-                story.append(Spacer(1, 4*mm))
-            skills = inv.get('skills', [])
-            if skills:
-                story.append(Paragraph('■ スキル・強み', styles_h2))
-                for s in skills:
-                    story.append(Paragraph(f'・{s}', styles_base))
-                story.append(Spacer(1, 4*mm))
-            scenarios = l3.get('scenarios', [])
-            if scenarios:
-                story.append(Paragraph('■ シナリオ比較', styles_h2))
-                for sc in scenarios:
-                    story.append(Paragraph(f"【{sc.get('option','')}】", styles_base))
-                    story.append(Paragraph(f"  1年後：{sc.get('year1','')}", styles_base))
-                    story.append(Paragraph(f"  5年後：{sc.get('year5','')}", styles_base))
-                    story.append(Paragraph(f"  リスク：{sc.get('risk','')}", styles_base))
-                    story.append(Spacer(1, 3*mm))
-                story.append(Spacer(1, 2*mm))
-            if l3.get('regret_check'):
-                story.append(Paragraph('■ 後悔最小化の視点', styles_h2))
-                story.append(Paragraph(l3['regret_check'], styles_base))
-                story.append(Spacer(1, 4*mm))
-            if l3.get('recommendation'):
-                story.append(Paragraph('■ 推奨', styles_h2))
-                story.append(Paragraph(l3['recommendation'], styles_base))
-                story.append(Spacer(1, 4*mm))
-            first_action = l3.get('first_action', [])
-            if first_action:
-                story.append(Paragraph('■ 第一歩', styles_h2))
-                for a in first_action:
-                    story.append(Paragraph(f'・{a}', styles_base))
-                story.append(Spacer(1, 4*mm))
-
-        elif category == 'relationship':
-            struct = l3.get('structure_analysis', {})
-            if struct.get('root_cause'):
-                story.append(Paragraph('■ 問題の本質', styles_h2))
-                story.append(Paragraph(struct['root_cause'], styles_base))
-                story.append(Spacer(1, 4*mm))
-            if struct.get('user_position'):
-                story.append(Paragraph('■ あなたの立場', styles_h2))
-                story.append(Paragraph(struct['user_position'], styles_base))
-                story.append(Spacer(1, 2*mm))
-            if struct.get('other_position'):
-                story.append(Paragraph('■ 相手の立場（推定）', styles_h2))
-                story.append(Paragraph(struct['other_position'], styles_base))
-                story.append(Spacer(1, 4*mm))
-            scenarios = l3.get('dialogue_scenarios', [])
-            if scenarios:
-                story.append(Paragraph('■ 対話シナリオ3択', styles_h2))
-                for s in scenarios:
-                    story.append(Paragraph(f"【{s.get('approach','')}】", styles_base))
-                    styles_phrase = ParagraphStyle('phrase', fontName='HeiseiMin-W3', fontSize=10, leading=16, textColor=HexColor('#7C3AED'))
-                    story.append(Paragraph(f"セリフ例：「{s.get('phrase','')}」", styles_phrase))
-                    story.append(Paragraph(f"  メリット：{s.get('merit','')}", styles_base))
-                    story.append(Paragraph(f"  リスク：{s.get('risk','')}", styles_base))
-                    story.append(Spacer(1, 3*mm))
-                story.append(Spacer(1, 2*mm))
-            if l3.get('recommendation'):
-                story.append(Paragraph('■ 推奨アプローチ', styles_h2))
-                story.append(Paragraph(l3['recommendation'], styles_base))
-                story.append(Spacer(1, 4*mm))
-            if l3.get('caution'):
-                styles_caution = ParagraphStyle('caution', fontName='HeiseiMin-W3', fontSize=9, leading=14, textColor=HexColor('#D97706'))
-                story.append(Paragraph(l3['caution'], styles_caution))
-
-        else:  # strategy（デフォルト）
-            if l3.get('vision'):
-                story.append(Paragraph('■ 目指す姿', styles_h2))
-                story.append(Paragraph(l3['vision'], styles_base))
-                story.append(Spacer(1, 4*mm))
-            swot = l3.get('swot', {})
-            if any(swot.get(k) for k in ['strength','weakness','opportunity','threat']):
-                story.append(Paragraph('■ SWOT分析', styles_h2))
-                for label, key in [('強み','strength'),('弱み','weakness'),('機会','opportunity'),('脅威','threat')]:
-                    items = swot.get(key, [])
-                    if items:
-                        story.append(Paragraph(f'【{label}】', styles_base))
-                        for item in items:
-                            story.append(Paragraph(f'・{item}', styles_base))
-                story.append(Spacer(1, 4*mm))
-            tm = l3.get('target_market', {})
-            if tm.get('primary'):
-                story.append(Paragraph('■ ターゲット市場', styles_h2))
-                story.append(Paragraph(f"{tm.get('primary','')}　{tm.get('reason','')}", styles_base))
-                story.append(Spacer(1, 4*mm))
-            s4p = l3.get('strategy_4p', {})
-            if any(s4p.get(k) for k in ['product','price','place','promotion']):
-                story.append(Paragraph('■ 4P戦略', styles_h2))
-                for label, key in [('製品','product'),('価格','price'),('流通','place'),('販促','promotion')]:
-                    if s4p.get(key):
-                        story.append(Paragraph(f'【{label}】{s4p[key]}', styles_base))
-                story.append(Spacer(1, 4*mm))
-            if l3.get('open_issues'):
-                story.append(Paragraph('■ 未解決課題', styles_h2))
-                for issue in l3['open_issues']:
-                    story.append(Paragraph(f"・{issue.get('issue','')}　{issue.get('why','')}", styles_base))
-                story.append(Spacer(1, 4*mm))
-            if l3.get('risks'):
-                story.append(Paragraph('■ リスクと対策', styles_h2))
-                for r in l3['risks']:
-                    story.append(Paragraph(f"[{r.get('level','')}] {r.get('name','')}：{r.get('reason','')}", styles_base))
-                    if r.get('advice'):
-                        story.append(Paragraph(f'　回避策：{r["advice"]}', styles_base))
-                    story.append(Spacer(1, 2*mm))
-
-        doc.build(story)
+        HTML(string=html_str, base_url=os.path.dirname(__file__)).write_pdf(buf)
         buf.seek(0)
-        filename = f"戦略レポート_{datetime.now().strftime('%Y%m%d')}.pdf"
-        return send_file(buf, mimetype='application/pdf',
-            as_attachment=True, download_name=filename)
+        filename = f"戦略レポート_{now.strftime('%Y%m%d')}.pdf"
+        return send_file(buf, mimetype='application/pdf', as_attachment=True, download_name=filename)
     except Exception as e:
+        app.logger.error(f"[PDF_LAYER3_ERROR] {e}")
         return jsonify({"error": str(e)}), 500
-
 # ===== TTS API =====
 
 @app.route("/api/tts", methods=["POST"])

@@ -1,0 +1,34 @@
+﻿{% extends "pdf_base.html" %}
+{% block content %}
+<h1 class="report-title">📋 アクション・ブリーフ</h1>
+<div class="report-meta">{{ topic }} ／ {{ date }}</div>
+<hr class="divider">
+
+{% if issues %}
+<div class="card" style="margin-bottom:10pt;">
+  <div class="card-label text-blue">🎯 解決すべき課題</div>
+  {% for iss in issues %}
+  <div style="font-size:10pt;line-height:1.8;">・{{ iss }}</div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="section-title">■ 結論</div>
+<div class="card">
+  <div style="font-size:11pt;line-height:1.8;">{{ conclusion }}</div>
+</div>
+
+<div class="section-title">■ 次にやること</div>
+{% for action in actions %}
+<div style="font-size:11pt;padding:5pt 0 5pt 10pt;border-bottom:0.5px solid #21262D;">・{{ action }}</div>
+{% endfor %}
+
+<div style="margin-top:12pt;">
+<div class="section-title">■ あなたの発言から</div>
+<div class="accent-left-blue" style="font-size:11pt;line-height:1.8;">{{ user_basis }}</div>
+</div>
+
+<div style="margin-top:16pt;padding-top:8pt;border-top:0.5px solid #30363D;">
+  <div style="font-size:8pt;color:#484F58;text-align:right;">AI-PERSONA会議室 ／ ai-paradise.net</div>
+</div>
+{% endblock %}

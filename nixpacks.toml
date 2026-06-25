@@ -1,5 +1,5 @@
 [phases.setup]
-aptPkgs = ["libpq-dev", "ffmpeg", "python3-dev"]
+aptPkgs = ["libpq-dev", "ffmpeg", "python3-dev", "libpango-1.0-0", "libcairo2", "libgdk-pixbuf2.0-0", "libffi-dev", "shared-mime-info", "fonts-noto-cjk"]
 
 [variables]
 NIXPACKS_PYTHON_VERSION = "3.12.0"

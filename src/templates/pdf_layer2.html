@@ -1,0 +1,75 @@
+﻿{% extends "pdf_base.html" %}
+{% block content %}
+<h1 class="report-title">🔍 議論分析レポート</h1>
+<div class="report-meta">{{ topic }} ／ {{ date }}</div>
+<hr class="divider">
+
+{% if issues %}
+<div class="card" style="margin-bottom:10pt;">
+  <div class="card-label text-blue">🎯 解決すべき課題</div>
+  {% for iss in issues %}<div style="font-size:10pt;line-height:1.8;">・{{ iss }}</div>{% endfor %}
+</div>
+{% endif %}
+
+{% if l2.summary %}
+<div class="section-title">📝 全体サマリ</div>
+<div class="card" style="margin-bottom:10pt;">
+  <div style="font-size:11pt;line-height:1.8;">{{ l2.summary }}</div>
+</div>
+{% endif %}
+
+{% if l2.discussion_points %}
+<div class="section-title">💬 論点と対立構造</div>
+{% for dp in l2.discussion_points %}
+<div class="card" style="border-left:3pt solid #7C3AED;margin-bottom:8pt;">
+  <div style="font-size:10pt;font-weight:700;color:#A78BFA;margin-bottom:6pt;">
+    論点{{ loop.index }}　{{ dp.issue }}
+  </div>
+  <div class="grid-2">
+    {% for p in dp.positions[:2] %}
+    {% set bg = "rgba(22,163,74,0.1)" if p.stance == "支持" else ("rgba(220,38,38,0.1)" if p.stance == "反対" else "rgba(217,119,6,0.1)") %}
+    {% set col = "#4ADE80" if p.stance == "支持" else ("#F87171" if p.stance == "反対" else "#FBBF24") %}
+    <div style="background:{{ bg }};border-radius:5pt;padding:8pt;">
+      <div style="font-size:9pt;font-weight:700;color:{{ col }};margin-bottom:4pt;">{{ p.stance }}</div>
+      <div style="font-size:10pt;line-height:1.6;">{{ p.name }}：{{ p.opinion }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if l2.next_actions %}
+<div class="section-title">🚀 直近のアクションプラン</div>
+{% for a in l2.next_actions %}
+<div class="action-row">
+  <span class="badge badge-purple">{% if a.related_issue %}論点{{ a.related_issue }}{% else %}全体{% endif %}</span>
+  <span style="font-size:11pt;">{{ a.action }}</span>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if l2.unresolved_points %}
+<div class="section-title" style="margin-top:10pt;">⚠️ 未解決論点</div>
+{% for u in l2.unresolved_points %}
+<div class="card" style="margin-bottom:6pt;">
+  <div style="font-size:10pt;font-weight:600;">未解決{{ loop.index }}　{{ u.title }}</div>
+  <div style="font-size:9pt;color:#8B949E;line-height:1.5;margin-top:3pt;">{{ u.detail }}</div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if l2.future_directions %}
+<div class="section-title" style="margin-top:10pt;">🧭 今後の検討の方向性</div>
+{% for fd in l2.future_directions %}
+<div class="card" style="margin-bottom:6pt;">
+  <span class="badge badge-red">未解決</span>
+  <span style="font-size:11pt;margin-left:6pt;">{{ fd.direction }}</span>
+</div>
+{% endfor %}
+{% endif %}
+
+<div style="margin-top:16pt;padding-top:8pt;border-top:0.5px solid #30363D;">
+  <div style="font-size:8pt;color:#484F58;text-align:right;">AI-PERSONA会議室 ／ ai-paradise.net</div>
+</div>
+{% endblock %}

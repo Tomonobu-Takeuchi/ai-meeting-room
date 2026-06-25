@@ -1,0 +1,272 @@
+﻿{% extends "pdf_base.html" %}
+{% block content %}
+<h1 class="report-title">📊 戦略フレームワーク・レポート</h1>
+<div class="report-meta">{{ topic }} ／ {{ date }}</div>
+<hr class="divider">
+
+{% if issues %}
+<div class="card" style="margin-bottom:10pt;">
+  <div class="card-label text-blue">🎯 解決すべき課題</div>
+  {% for iss in issues %}<div style="font-size:10pt;line-height:1.8;">・{{ iss }}</div>{% endfor %}
+</div>
+{% endif %}
+
+{% if l3.summary %}
+<div class="card" style="margin-bottom:10pt;">
+  <div style="font-size:11pt;line-height:1.8;">{{ l3.summary }}</div>
+</div>
+{% endif %}
+
+{% if l3.vision %}
+<div class="section-title">🔭 目指す姿（ビジョン）</div>
+<div class="accent-left-purple" style="font-size:11pt;margin-bottom:10pt;">{{ l3.vision }}</div>
+{% endif %}
+
+{# ===== strategy ===== #}
+{% if cat == 'strategy' %}
+
+{% if l3.swot %}
+<div class="section-title">📊 SWOT分析</div>
+<div class="grid-2" style="margin-bottom:10pt;">
+  <div style="background:rgba(22,163,74,0.12);border-radius:6pt;padding:9pt 11pt;">
+    <div style="font-size:9pt;font-weight:700;color:#4ADE80;margin-bottom:5pt;">強み（自社の優位性）</div>
+    {% for i in l3.swot.strength %}<div style="font-size:10pt;line-height:1.6;">・{{ i }}</div>{% endfor %}
+  </div>
+  <div style="background:rgba(220,38,38,0.12);border-radius:6pt;padding:9pt 11pt;">
+    <div style="font-size:9pt;font-weight:700;color:#F87171;margin-bottom:5pt;">弱み（内部課題）</div>
+    {% for i in l3.swot.weakness %}<div style="font-size:10pt;line-height:1.6;">・{{ i }}</div>{% endfor %}
+  </div>
+  <div style="background:rgba(37,99,235,0.12);border-radius:6pt;padding:9pt 11pt;">
+    <div style="font-size:9pt;font-weight:700;color:#60A5FA;margin-bottom:5pt;">機会（外部の追い風）</div>
+    {% for i in l3.swot.opportunity %}<div style="font-size:10pt;line-height:1.6;">・{{ i }}</div>{% endfor %}
+  </div>
+  <div style="background:rgba(217,119,6,0.12);border-radius:6pt;padding:9pt 11pt;">
+    <div style="font-size:9pt;font-weight:700;color:#FBBF24;margin-bottom:5pt;">脅威（外部リスク）</div>
+    {% for i in l3.swot.threat %}<div style="font-size:10pt;line-height:1.6;">・{{ i }}</div>{% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if l3.target_market %}
+<div class="section-title">🎯 ターゲット市場</div>
+<div class="card" style="margin-bottom:10pt;">
+  <div style="font-size:12pt;font-weight:600;margin-bottom:4pt;">{{ l3.target_market.primary }}</div>
+  <div style="font-size:10pt;color:#8B949E;line-height:1.6;">{{ l3.target_market.reason }}</div>
+</div>
+{% endif %}
+
+{% if l3.strategy_4p %}
+<div class="section-title">🚀 実行戦略（4P）</div>
+{% for key, label in [['product','製品'],['price','価格'],['place','流通'],['promotion','販促']] %}
+{% if l3.strategy_4p[key] %}
+<div style="display:flex;gap:10pt;align-items:flex-start;padding:7pt 11pt;background:#0D1117;border-radius:6pt;margin-bottom:5pt;">
+  <span class="badge badge-purple" style="flex-shrink:0;white-space:nowrap;">{{ label }}</span>
+  <span style="font-size:11pt;line-height:1.5;">{{ l3.strategy_4p[key] }}</span>
+</div>
+{% endif %}
+{% endfor %}
+{% endif %}
+
+{% if l3.okr %}
+<div class="section-title" style="margin-top:10pt;">🎯 OKR（3ヶ月）</div>
+<div class="accent-left-purple" style="margin-bottom:10pt;">
+  <div style="font-size:12pt;font-weight:600;margin-bottom:5pt;">O：{{ l3.okr.objective }}</div>
+  {% for kr in l3.okr.key_results %}
+  <div style="font-size:10pt;color:#8B949E;line-height:1.6;">KR{{ loop.index }}：{{ kr }}</div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if l3.competitive and l3.competitive.differentiation %}
+<div class="section-title">⚔️ 競合との差別化</div>
+<div class="accent-left-blue" style="font-size:11pt;margin-bottom:10pt;">{{ l3.competitive.differentiation }}</div>
+{% endif %}
+
+{% if l3.open_issues %}
+<div class="section-title">❓ 未解決課題</div>
+{% for i in l3.open_issues %}
+<div style="margin-bottom:7pt;padding:9pt 11pt;border-radius:6pt;border:0.5px solid #F7C1C1;background:#1C1010;">
+  <div style="font-size:11pt;font-weight:600;color:#F87171;margin-bottom:3pt;">{{ i.issue }}</div>
+  <div style="font-size:10pt;color:#8B949E;line-height:1.5;">{{ i.why }}</div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if l3.risks %}
+<div class="section-title">🛡️ リスクと対策</div>
+{% for r in l3.risks %}
+<div class="card" style="margin-bottom:6pt;">
+  <div style="font-size:10pt;font-weight:600;color:#F87171;margin-bottom:3pt;">⚠ [{{ r.level }}] {{ r.name }}</div>
+  <div style="font-size:10pt;color:#8B949E;margin-bottom:4pt;">{{ r.reason }}</div>
+  <div style="font-size:10pt;padding:5pt 9pt;background:rgba(22,163,74,0.1);border-radius:4pt;color:#4ADE80;">→ {{ r.advice }}</div>
+</div>
+{% endfor %}
+{% endif %}
+
+{# ===== practice ===== #}
+{% elif cat == 'practice' %}
+{% if l3.logic_check %}
+<div class="section-title">🔍 論理構造分析</div>
+<div class="grid-2" style="margin-bottom:10pt;">
+  <div style="background:rgba(22,163,74,0.08);border-radius:6pt;padding:9pt 11pt;">
+    <div style="font-size:9pt;font-weight:700;color:#4ADE80;margin-bottom:5pt;">論理的に強い点</div>
+    {% for s in l3.logic_check.strengths %}<div style="font-size:10pt;line-height:1.6;">・{{ s }}</div>{% endfor %}
+  </div>
+  <div style="background:rgba(220,38,38,0.08);border-radius:6pt;padding:9pt 11pt;">
+    <div style="font-size:9pt;font-weight:700;color:#F87171;margin-bottom:5pt;">論理の穴・飛躍</div>
+    {% for g in l3.logic_check.gaps %}<div style="font-size:10pt;line-height:1.6;">・{{ g }}</div>{% endfor %}
+  </div>
+</div>
+{% endif %}
+{% if l3.objections %}
+<div class="section-title">⚔️ 反論予測と対処法</div>
+{% for o in l3.objections %}
+<div class="card" style="margin-bottom:6pt;">
+  <div style="font-size:10pt;font-weight:600;color:#F87171;margin-bottom:3pt;">反論：{{ o.objection }}</div>
+  <div style="font-size:10pt;color:#4ADE80;">→ {{ o.counter }}</div>
+</div>
+{% endfor %}
+{% endif %}
+{% if l3.qa_list %}
+<div class="section-title">❓ 想定Q&A</div>
+{% for q in l3.qa_list %}
+<div class="card" style="margin-bottom:5pt;">
+  <div style="font-size:10pt;font-weight:600;margin-bottom:3pt;">Q: {{ q.question }}</div>
+  <div style="font-size:10pt;color:#8B949E;">A: {{ q.answer }}</div>
+</div>
+{% endfor %}
+{% endif %}
+{% if l3.improvement %}
+<div class="section-title">💡 改善アドバイス</div>
+<div class="accent-left-purple" style="font-size:11pt;margin-bottom:10pt;">{{ l3.improvement }}</div>
+{% endif %}
+{% if l3.checklist %}
+<div class="section-title">✅ 提出前チェックリスト</div>
+{% for c in l3.checklist %}
+<div style="font-size:11pt;padding:5pt 0;border-bottom:0.5px solid #21262D;">□ {{ c }}</div>
+{% endfor %}
+{% endif %}
+
+{# ===== study ===== #}
+{% elif cat == 'study' %}
+{% if l3.expert_evaluation %}
+<div class="section-title">🔍 賢人の評価</div>
+{% if l3.expert_evaluation.overall %}
+<div class="accent-left-purple" style="font-size:11pt;margin-bottom:10pt;">{{ l3.expert_evaluation.overall }}</div>
+{% endif %}
+{% if l3.expert_evaluation.strengths or l3.expert_evaluation.issues %}
+<div class="grid-2" style="margin-bottom:10pt;">
+  <div style="background:rgba(22,163,74,0.08);border-radius:6pt;padding:9pt 11pt;">
+    <div style="font-size:9pt;font-weight:700;color:#4ADE80;margin-bottom:5pt;">✅ 優れている点</div>
+    <div style="font-size:10pt;line-height:1.6;">{{ l3.expert_evaluation.strengths }}</div>
+  </div>
+  <div style="background:rgba(220,38,38,0.08);border-radius:6pt;padding:9pt 11pt;">
+    <div style="font-size:9pt;font-weight:700;color:#F87171;margin-bottom:5pt;">⚠ 改善が必要な点</div>
+    <div style="font-size:10pt;line-height:1.6;">{{ l3.expert_evaluation.issues }}</div>
+  </div>
+</div>
+{% endif %}
+{% endif %}
+{% if l3.improvement_priority %}
+<div class="section-title">📋 改善の優先順位</div>
+{% for p in l3.improvement_priority %}
+<div class="card" style="margin-bottom:6pt;display:flex;gap:10pt;align-items:flex-start;">
+  <span class="badge badge-purple" style="flex-shrink:0;">{{ p.rank }}位</span>
+  <div>
+    <div style="font-size:11pt;font-weight:600;margin-bottom:2pt;">{{ p.action }}</div>
+    <div style="font-size:9pt;color:#8B949E;">{{ p.reason }}</div>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+{% if l3.roadmap %}
+<div class="section-title">🗺️ 習得・上達ロードマップ</div>
+{% for r in l3.roadmap %}
+{% set bg = ["rgba(37,99,235,0.08)","rgba(22,163,74,0.08)","rgba(124,58,237,0.08)"] %}
+<div style="margin-bottom:9pt;padding:9pt 13pt;border-radius:6pt;background:{{ bg[loop.index0 % 3] }};">
+  <div style="font-size:10pt;font-weight:600;margin-bottom:4pt;">{{ r.phase }} <span style="color:#8B949E;font-weight:400;">{{ r.period }}</span> ／ {{ r.theme }}</div>
+  {% for act in r.actions %}<div style="font-size:10pt;line-height:1.6;">・{{ act }}</div>{% endfor %}
+  {% if r.input_source %}<div style="font-size:9pt;color:#8B949E;margin-top:3pt;">📚 {{ r.input_source }}</div>{% endif %}
+</div>
+{% endfor %}
+{% endif %}
+
+{# ===== consulting ===== #}
+{% elif cat == 'consulting' %}
+{% if l3.asset_inventory %}
+<div class="section-title">💼 キャリア資産</div>
+{% if l3.asset_inventory.market_value %}
+<div class="accent-left-blue" style="font-size:11pt;margin-bottom:8pt;">{{ l3.asset_inventory.market_value }}</div>
+{% endif %}
+{% endif %}
+{% if l3.scenarios %}
+<div class="section-title">🔀 シナリオ比較</div>
+{% for s in l3.scenarios %}
+{% set bg = ["rgba(22,163,74,0.08)","rgba(37,99,235,0.08)","rgba(124,58,237,0.08)"] %}
+<div style="margin-bottom:9pt;padding:9pt 13pt;border-radius:6pt;background:{{ bg[loop.index0 % 3] }};">
+  <div style="font-size:12pt;font-weight:600;margin-bottom:5pt;">{{ s.option }}</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6pt;font-size:10pt;">
+    <div><span style="font-size:9pt;color:#8B949E;">1年後</span><br>{{ s.year1 }}</div>
+    <div><span style="font-size:9pt;color:#8B949E;">5年後</span><br>{{ s.year5 }}</div>
+    <div><span style="font-size:9pt;color:#F87171;">リスク</span><br>{{ s.risk }}</div>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+{% if l3.recommendation %}
+<div class="section-title">🎯 推奨</div>
+<div style="padding:9pt 13pt;border-left:3pt solid #16A34A;background:rgba(22,163,74,0.08);border-radius:0 6pt 6pt 0;font-size:11pt;line-height:1.7;margin-bottom:10pt;">{{ l3.recommendation }}</div>
+{% endif %}
+{% if l3.first_action %}
+<div class="section-title">👟 第一歩</div>
+{% for a in l3.first_action %}
+<div class="action-row">
+  <span class="badge badge-purple" style="flex-shrink:0;">{{ loop.index }}</span>
+  <span style="font-size:11pt;">{{ a }}</span>
+</div>
+{% endfor %}
+{% endif %}
+
+{# ===== relationship ===== #}
+{% elif cat == 'relationship' %}
+{% if l3.structure_analysis %}
+<div class="section-title">🔍 問題の本質</div>
+<div class="accent-left-purple" style="font-size:11pt;margin-bottom:10pt;">{{ l3.structure_analysis.root_cause }}</div>
+<div class="grid-2" style="margin-bottom:10pt;">
+  <div style="background:rgba(37,99,235,0.08);border-radius:6pt;padding:9pt 11pt;">
+    <div style="font-size:9pt;font-weight:700;color:#60A5FA;margin-bottom:5pt;">あなたの立場</div>
+    <div style="font-size:10pt;line-height:1.6;">{{ l3.structure_analysis.user_position }}</div>
+  </div>
+  <div style="background:rgba(220,38,38,0.08);border-radius:6pt;padding:9pt 11pt;">
+    <div style="font-size:9pt;font-weight:700;color:#F87171;margin-bottom:5pt;">相手の立場（推定）</div>
+    <div style="font-size:10pt;line-height:1.6;">{{ l3.structure_analysis.other_position }}</div>
+  </div>
+</div>
+{% endif %}
+{% if l3.dialogue_scenarios %}
+<div class="section-title">💬 対話シナリオ3択</div>
+{% for s in l3.dialogue_scenarios %}
+{% set bg = ["rgba(22,163,74,0.08)","rgba(37,99,235,0.08)","rgba(124,58,237,0.08)"] %}
+<div style="margin-bottom:9pt;padding:9pt 13pt;border-radius:6pt;background:{{ bg[loop.index0 % 3] }};">
+  <div style="font-size:12pt;font-weight:600;margin-bottom:4pt;">{{ s.approach }}</div>
+  <div style="font-size:11pt;padding:5pt 9pt;background:rgba(124,58,237,0.12);border-radius:5pt;color:#A78BFA;margin-bottom:5pt;">「{{ s.phrase }}」</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6pt;font-size:10pt;">
+    <div style="color:#4ADE80;">✅ {{ s.merit }}</div>
+    <div style="color:#FBBF24;">⚠ {{ s.risk }}</div>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+{% if l3.recommendation %}
+<div class="section-title">🎯 推奨アプローチ</div>
+<div style="padding:9pt 13pt;border-left:3pt solid #16A34A;background:rgba(22,163,74,0.08);border-radius:0 6pt 6pt 0;font-size:11pt;line-height:1.7;margin-bottom:10pt;">{{ l3.recommendation }}</div>
+{% endif %}
+{% if l3.caution %}
+<div style="padding:8pt 11pt;background:rgba(217,119,6,0.1);border-radius:5pt;font-size:10pt;color:#FBBF24;margin-top:10pt;">{{ l3.caution }}</div>
+{% endif %}
+{% endif %}
+
+<div style="margin-top:16pt;padding-top:8pt;border-top:0.5px solid #30363D;">
+  <div style="font-size:8pt;color:#484F58;text-align:right;">AI-PERSONA会議室 ／ ai-paradise.net</div>
+</div>
+{% endblock %}
