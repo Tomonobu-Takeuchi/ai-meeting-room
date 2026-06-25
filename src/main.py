@@ -1702,7 +1702,8 @@ JSONのみ出力してください。"""
         filename = f"アクションブリーフ_{topic_short}_{now.strftime('%Y%m%d')}.pdf"
         return send_file(buf, as_attachment=True, download_name=filename, mimetype='application/pdf')
     except Exception as e:
-        app.logger.error(f"[PDF_LAYER1_ERROR] {e}")
+        import traceback
+        app.logger.error(f"[PDF_LAYER1_ERROR] {e}\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -1739,7 +1740,8 @@ def generate_brief_pdf_layer2(session_id):
         filename = f"議論分析レポート_{now.strftime('%Y%m%d')}.pdf"
         return send_file(buf, mimetype='application/pdf', as_attachment=True, download_name=filename)
     except Exception as e:
-        app.logger.error(f"[PDF_LAYER2_ERROR] {e}")
+        import traceback
+        app.logger.error(f"[PDF_LAYER2_ERROR] {e}\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -1782,7 +1784,8 @@ def generate_brief_pdf_layer3(session_id):
         filename = f"戦略レポート_{now.strftime('%Y%m%d')}.pdf"
         return send_file(buf, mimetype='application/pdf', as_attachment=True, download_name=filename)
     except Exception as e:
-        app.logger.error(f"[PDF_LAYER3_ERROR] {e}")
+        import traceback
+        app.logger.error(f"[PDF_LAYER3_ERROR] {e}\n{traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 # ===== TTS API =====
 
