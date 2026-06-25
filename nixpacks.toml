@@ -1,6 +1,5 @@
 [phases.setup]
-aptPkgs = ["libpq-dev", "ffmpeg", "python3-dev", "libpango-1.0-0", "libcairo2", "libgdk-pixbuf-2.0-0", "libglib2.0-0", "libffi-dev", "shared-mime-info", "fonts-noto-cjk", "libpangocairo-1.0-0", "libharfbuzz0b"]
+aptPkgs = ["libpq-dev", "ffmpeg", "python3-dev"]
 
 [variables]
 NIXPACKS_PYTHON_VERSION = "3.12.0"
-BUILD_CACHE_BUST = "20260625001"
