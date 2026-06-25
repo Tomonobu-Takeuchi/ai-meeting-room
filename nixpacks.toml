@@ -3,3 +3,4 @@ aptPkgs = ["libpq-dev", "ffmpeg", "python3-dev", "libpango-1.0-0", "libcairo2", 
 
 [variables]
 NIXPACKS_PYTHON_VERSION = "3.12.0"
+BUILD_CACHE_BUST = "20260625001"
