@@ -404,8 +404,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
     <img id="mImg" src="" alt="">
     <div class="modal-caption" id="mCap"></div>
   <div style="text-align:center;"><button id="modal-back-btn" onclick="closeModal();openStrategyModal();" style="display:none;margin:8px auto 0;padding:8px 28px;background:transparent;border:1px solid #9AB0C8;color:#9AB0C8;border-radius:6px;cursor:pointer;font-size:13px;">← 戻る</button>
-  <button id="modal-sample-btn" onclick="openModal('/static/images/report_examples/report_business.png','ビジネス戦略 レポートサンプル')" style="display:none;padding:8px 28px;background:transparent;border:1.5px solid #00C8E8;color:#00C8E8;border-radius:6px;cursor:pointer;font-size:13px;margin-left:12px;">📄 レポートのサンプルを見る</button></div>
-        <div style="text-align:center;margin-top:16px;"><button onclick="closeModal()" style="background:none;border:1px solid #8ab4c8;color:#8ab4c8;padding:8px 24px;border-radius:8px;cursor:pointer;font-size:14px;">← 戻る</button></div>
+  <button id="modal-sample-btn" onclick="openModal('/static/images/report_examples/report_business.png','ビジネス戦略 レポートサンプル')" style="display:none;padding:8px 28px;background:transparent;border:1.5px solid #00C8E8;color:#00C8E8;border-radius:6px;cursor:pointer;font-size:13px;margin-left:12px;">📄 レポートのサンプルを見る</button></div>
   </div>
 </div>
 
@@ -508,7 +507,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 </map>
 <script>
 var aiMeetingAreas=[[400,330,605,400]];
-var strategyAreas=[[44,328,900,388]];
+var strategyAreas=[[80,359,860,380]];
 function resizeMap(imgId,mapId,origW,origH,areas){
   var img=document.getElementById(imgId);
   if(!img||!img.offsetWidth) return;
