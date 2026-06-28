@@ -59,6 +59,10 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(8,14,26,0.94
 </style>
 <script>
 function openModal(src,cap){
+  var btn=document.getElementById('modal-back-btn');
+  if(btn) btn.style.display='none';
+  var sampleBtn=document.getElementById('modal-sample-btn');
+  if(sampleBtn) sampleBtn.style.display='none';
   document.getElementById('mImg').src=src;
   document.getElementById('mCap').textContent=cap||'';
   document.getElementById('modal').classList.add('open');
@@ -507,7 +511,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 </map>
 <script>
 var aiMeetingAreas=[[400,330,605,400]];
-var strategyAreas=[[80,359,860,380]];
+var strategyAreas=[[80,305,860,359]];
 function resizeMap(imgId,mapId,origW,origH,areas){
   var img=document.getElementById(imgId);
   if(!img||!img.offsetWidth) return;
