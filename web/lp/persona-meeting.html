@@ -159,8 +159,14 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
     <div class="concept-box">
       <p>特定のテーマ（企画や報告資料、お悩みごと等）に対して、複数の偉人や専門家、またあなたが設定した独自のペルソナとの会議シミュレーションを行い、賢人からの知恵を借りて事前に対応策を提案してくれます。</p>
     </div>
-    <img src="/static/images/report_examples/AI-meeting.png" alt="AI-PERSONA会議室 利用イメージ" style="width:100%;max-width:900px;display:block;margin:32px auto 0;cursor:pointer;" onclick="openModal('/static/images/report_examples/AI-meeting.png','AI-PERSONA会議室 利用イメージ')">
-    <p style="text-align:center;font-size:12px;color:#9AB0C8;margin-top:8px;">🔍 クリック・タップで拡大</p>
+    <div style="position:relative;max-width:900px;margin:32px auto 0;" id="ai-meeting-wrap">
+    <img src="/static/images/report_examples/AI-meeting.png" alt="AI-PERSONA会議室 利用イメージ" style="width:100%;display:block;cursor:pointer;" id="ai-meeting-img" usemap="#ai-meeting-map">
+    <map name="ai-meeting-map" id="ai-meeting-map">
+      <area id="area-strategy" shape="rect" coords="400,330,605,400" href="javascript:void(0)" onclick="event.stopPropagation();openStrategyModal()" alt="戦略フレームワーク" title="戦略フレームワークを見る" style="cursor:pointer;">
+    </map>
+  </div>
+    <p style="text-align:center;font-size:12px;color:#9AB0C8;margin-top:8px;">🔍 画像をクリック・タップすると拡大できます</p>
+    <p style="font-size:13px;color:#B8CCDE;margin-top:12px;">＊戦略フレームワークとは、特定の課題解決や目標達成のための「思考の枠組み」です。<br>詳しくは、<a href="javascript:void(0)" onclick="event.stopPropagation();openStrategyModal()" style="color:#00C8E8;text-decoration:underline;">こちら</a>をご覧ください。</p>
   </div>
 </section>
 
@@ -397,6 +403,8 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
     </div>
     <img id="mImg" src="" alt="">
     <div class="modal-caption" id="mCap"></div>
+  <div style="text-align:center;"><button id="modal-back-btn" onclick="closeModal();openStrategyModal();" style="display:none;margin:8px auto 0;padding:8px 28px;background:transparent;border:1px solid #9AB0C8;color:#9AB0C8;border-radius:6px;cursor:pointer;font-size:13px;">← 戻る</button>
+  <button id="modal-sample-btn" onclick="openModal('/static/images/report_examples/report_business.png','ビジネス戦略 レポートサンプル')" style="display:none;padding:8px 28px;background:transparent;border:1.5px solid #00C8E8;color:#00C8E8;border-radius:6px;cursor:pointer;font-size:13px;margin-left:12px;">📄 レポートのサンプルを見る</button></div>
         <div style="text-align:center;margin-top:16px;"><button onclick="closeModal()" style="background:none;border:1px solid #8ab4c8;color:#8ab4c8;padding:8px 24px;border-radius:8px;cursor:pointer;font-size:14px;">← 戻る</button></div>
   </div>
 </div>
@@ -495,5 +503,64 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
     </div>
   </div>
 </div>
+<map name="strategy-map" id="strategy-map">
+  <area id="area-biz" shape="rect" coords="44,310,900,360" href="javascript:void(0)" onclick="event.stopPropagation();openBusinessModal()" alt="ビジネス戦略" title="ビジネス戦略を見る">
+</map>
+<script>
+var aiMeetingAreas=[[400,330,605,400]];
+var strategyAreas=[[44,328,900,388]];
+function resizeMap(imgId,mapId,origW,origH,areas){
+  var img=document.getElementById(imgId);
+  if(!img||!img.offsetWidth) return;
+  var scaleX=img.offsetWidth/origW;
+  var scaleY=img.offsetHeight/origH;
+  var map=document.getElementById(mapId);
+  if(!map) return;
+  var areaEls=map.getElementsByTagName("area");
+  for(var i=0;i<areaEls.length;i++){
+    var o=areas[i];
+    if(!o) continue;
+    areaEls[i].coords=[Math.round(o[0]*scaleX),Math.round(o[1]*scaleY),Math.round(o[2]*scaleX),Math.round(o[3]*scaleY)].join(",");
+  }
+}
+function resizeAiMeetingMap(){ resizeMap("ai-meeting-img","ai-meeting-map",1002,441,aiMeetingAreas); }
+function resizeStrategyMap(){ resizeMap("strategy-img","strategy-map",944,726,strategyAreas); }
+
+function openStrategyModal(){
+  var btn=document.getElementById("modal-back-btn");
+  if(btn) btn.style.display="none";
+  var sampleBtn=document.getElementById("modal-sample-btn");
+  if(sampleBtn) sampleBtn.style.display="none";
+  var mImg=document.getElementById("mImg");
+  mImg.src="/static/images/report_examples/Strategy_Framework.png";
+  mImg.setAttribute("usemap","#strategy-map");
+  document.getElementById("mCap").textContent="";
+  document.getElementById("modal").classList.add("open");
+  document.body.style.overflow="hidden";
+  mImg.onload=function(){ resizeStrategyMap(); };
+  setTimeout(function(){ resizeStrategyMap(); },300);
+}
+function closeStrategyAndOpenBusiness(){
+  openBusinessModal();
+}
+function openBusinessModal(){
+  var mImg=document.getElementById("mImg");
+  mImg.src="/static/images/report_examples/Business_Strategy.png";
+  mImg.removeAttribute("usemap");
+  document.getElementById("mCap").textContent="ビジネス戦略";
+  document.getElementById("modal").classList.add("open");
+  document.body.style.overflow="hidden";
+  document.getElementById("modal-back-btn").style.display="inline-block";
+  var sampleBtn=document.getElementById("modal-sample-btn");
+  if(sampleBtn) sampleBtn.style.display="inline-block";
+}
+
+window.addEventListener("load",function(){
+  resizeAiMeetingMap();
+  var si=document.getElementById("strategy-img");
+  if(si){ si.addEventListener("load",resizeStrategyMap); }
+});
+window.addEventListener("resize",function(){ resizeAiMeetingMap(); resizeStrategyMap(); });
+</script>
 </body>
 </html>
