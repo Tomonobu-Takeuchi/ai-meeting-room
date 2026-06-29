@@ -409,7 +409,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
     </div>
     <img id="mImg" src="" alt="">
     <div class="modal-caption" id="mCap"></div>
-  <div style="text-align:center;"><button id="modal-back-btn" onclick="modalGoBack();" style="display:none;margin:8px auto 0;padding:8px 28px;background:transparent;border:1px solid #9AB0C8;color:#9AB0C8;border-radius:6px;cursor:pointer;font-size:13px;">← 戻る</button>
+  <div style="text-align:center;"><button id="modal-back-btn" onclick="modalBackAction();" style="display:none;margin:8px auto 0;padding:8px 28px;background:transparent;border:1px solid #9AB0C8;color:#9AB0C8;border-radius:6px;cursor:pointer;font-size:13px;">← 戻る</button>
   <button id="modal-sample-btn" onclick="openSampleModal();" style="display:none;padding:8px 28px;background:transparent;border:1.5px solid #00C8E8;color:#00C8E8;border-radius:6px;cursor:pointer;font-size:13px;margin-left:12px;">📄 レポートのサンプルを見る</button></div>
   </div>
 </div>
@@ -519,7 +519,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
   <area id="area-study"  shape="rect" coords="74,611,863,661" href="javascript:void(0)" onclick="event.stopPropagation();openFrameworkModal('study')"    alt="学習・創作"     title="学習・創作を見る">
 </map>
 <script>
-var aiMeetingAreas=[[400,330,605,400],[469,338,710,444]];
+var aiMeetingAreas=[[400,330,605,400],[425,220,644,289]];
 var strategyAreas=[
   [72,304,860,359],
   [76,380,857,456],
@@ -553,8 +553,8 @@ function resizeMap(imgId,mapId,origW,origH,areas){
 function resizeAiMeetingMap(){
   var img=document.getElementById("ai-meeting-img");
   if(!img||!img.offsetWidth) return;
-  var scaleX=img.offsetWidth/1106;
-  var scaleY=img.offsetHeight/678;
+  var scaleX=img.offsetWidth/1002;
+  var scaleY=img.offsetHeight/441;
   var ids=["area-strategy","area-wisdom"];
   for(var i=0;i<ids.length;i++){
     var el=document.getElementById(ids[i]);
@@ -640,6 +640,16 @@ function modalGoBack(){
   if(modalState==='sample') openFrameworkModal(currentFramework);
   else openStrategyModal();
 }
+function modalBackAction(){
+  if(modalState==='discussion'){
+    document.getElementById('modal').classList.remove('open');
+    document.body.style.overflow='';
+  } else if(modalState==='sample'){
+    openFrameworkModal(currentFramework);
+  } else {
+    openStrategyModal();
+  }
+}
 function openDiscussionModal(from){
   var mImg=document.getElementById('mImg');
   mImg.src='/static/images/report_examples/discussion.png';
@@ -647,13 +657,9 @@ function openDiscussionModal(from){
   document.getElementById('mCap').textContent='賢人からの智慧';
   document.getElementById('modal').classList.add('open');
   document.body.style.overflow='hidden';
+  modalState='discussion';
   var backBtn=document.getElementById('modal-back-btn');
-  if(from==='ai-meeting'){
-    backBtn.style.display='inline-block';
-    backBtn.onclick=function(){ openAiMeetingModal(); };
-  } else {
-    backBtn.style.display='none';
-  }
+  backBtn.style.display='inline-block';
   var sampleBtn=document.getElementById('modal-sample-btn');
   if(sampleBtn) sampleBtn.style.display='none';
 }
