@@ -552,9 +552,9 @@ function resizeMap(imgId,mapId,origW,origH,areas){
 }
 function resizeAiMeetingMap(){
   var img=document.getElementById("ai-meeting-img");
-  if(!img||!img.offsetWidth||!img.naturalWidth) return;
-  var scaleX=img.offsetWidth/img.naturalWidth;
-  var scaleY=img.offsetHeight/img.naturalHeight;
+  if(!img||!img.offsetWidth) return;
+  var scaleX=img.offsetWidth/1106;
+  var scaleY=img.offsetHeight/678;
   var ids=["area-strategy","area-wisdom"];
   for(var i=0;i<ids.length;i++){
     var el=document.getElementById(ids[i]);
@@ -658,18 +658,11 @@ function openDiscussionModal(from){
   if(sampleBtn) sampleBtn.style.display='none';
 }
 function openAiMeetingModal(){
-  var mImg=document.getElementById('mImg');
-  mImg.src='/static/images/report_examples/AI-meeting.png';
-  mImg.setAttribute('usemap','#ai-meeting-map');
-  document.getElementById('mCap').textContent='';
-  document.getElementById('modal').classList.add('open');
-  document.body.style.overflow='hidden';
-  document.getElementById('modal-back-btn').style.display='none';
-  var sampleBtn=document.getElementById('modal-sample-btn');
-  if(sampleBtn) sampleBtn.style.display='none';
-  function _ram(){ requestAnimationFrame(function(){ requestAnimationFrame(function(){ requestAnimationFrame(function(){ resizeAiMeetingMap(); }); }); }); }
-  mImg.onload=function(){ _ram(); };
-  if(mImg.complete){ _ram(); }
+  var e=document.createEvent('Events');
+  e.initEvent('click',true,true);
+  var modal=document.getElementById('modal');
+  modal.classList.remove('open');
+  document.body.style.overflow='';
 }
 function openBusinessModal(){ openFrameworkModal('business'); }
 
