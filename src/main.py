@@ -815,8 +815,8 @@ CATEGORY_PATTERNS = {
         'name': '人間関係・交渉',
         'description': '相手役（自動判定）・第三者アドバイザー2名・感情サポートの3〜4人が寄り添います',
         'roles': [
-            {'role': '第三者アドバイザー①', 'persona_id': 'koumei'},
-            {'role': '第三者アドバイザー②', 'persona_id': 'tsuda'},
+            {'role': '第三者アドバイザー①', 'persona_id': 'kukai'},
+            {'role': '第三者アドバイザー②', 'persona_id': 'ichiyo'},
             {'role': '感情サポート',         'persona_id': 'ojii'},
         ]
     },
