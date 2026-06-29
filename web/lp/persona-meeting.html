@@ -553,15 +553,14 @@ function resizeStrategyMap(){ resizeMap("strategy-img","strategy-map",952,728,st
 function resizeStrategyMapOnModal(){
   var img=document.getElementById("mImg");
   if(!img||!img.offsetWidth||!img.naturalWidth) return;
-  var map=document.getElementById("strategy-map");
-  if(!map) return;
   var scaleX=img.offsetWidth/img.naturalWidth;
   var scaleY=img.offsetHeight/img.naturalHeight;
-  var areaEls=map.getElementsByTagName("area");
-  for(var i=0;i<areaEls.length;i++){
+  var ids=["area-biz","area-review","area-career","area-human","area-study"];
+  for(var i=0;i<ids.length;i++){
+    var el=document.getElementById(ids[i]);
     var o=strategyAreas[i];
-    if(!o) continue;
-    areaEls[i].coords=[Math.round(o[0]*scaleX),Math.round(o[1]*scaleY),Math.round(o[2]*scaleX),Math.round(o[3]*scaleY)].join(",");
+    if(!el||!o) continue;
+    el.coords=[Math.round(o[0]*scaleX),Math.round(o[1]*scaleY),Math.round(o[2]*scaleX),Math.round(o[3]*scaleY)].join(",");
   }
 }
 
@@ -576,6 +575,8 @@ function openStrategyModal(){
   document.getElementById("mCap").textContent="";
   document.getElementById("modal").classList.add("open");
   document.body.style.overflow="hidden";
+  setTimeout(function(){ resizeStrategyMapOnModal(); },200);
+  setTimeout(function(){ resizeStrategyMapOnModal(); },400);
 }
 function closeStrategyAndOpenBusiness(){
   openBusinessModal();
