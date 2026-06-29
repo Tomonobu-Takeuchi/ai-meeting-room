@@ -575,8 +575,9 @@ function openStrategyModal(){
   document.getElementById("mCap").textContent="";
   document.getElementById("modal").classList.add("open");
   document.body.style.overflow="hidden";
-  setTimeout(function(){ resizeStrategyMapOnModal(); },200);
-  setTimeout(function(){ resizeStrategyMapOnModal(); },400);
+  function _rsm(){ requestAnimationFrame(function(){ requestAnimationFrame(function(){ requestAnimationFrame(function(){ resizeStrategyMapOnModal(); }); }); }); }
+  mImg.onload=function(){ _rsm(); };
+  if(mImg.complete){ _rsm(); }
 }
 function closeStrategyAndOpenBusiness(){
   openBusinessModal();
@@ -632,7 +633,7 @@ window.addEventListener("load",function(){
   var si=document.getElementById("strategy-img");
   if(si){ si.addEventListener("load",resizeStrategyMap); }
 });
-window.addEventListener("resize",function(){ resizeAiMeetingMap(); resizeStrategyMap(); });
+window.addEventListener("resize",function(){ resizeAiMeetingMap(); resizeStrategyMap(); resizeStrategyMapOnModal(); });
 </script>
 </body>
 </html>
