@@ -506,6 +506,9 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
     </div>
   </div>
 </div>
+<map name="framework-sample-map" id="framework-sample-map">
+  <area id="area-fw-sample" shape="rect" coords="0,0,0,0" href="javascript:void(0)" onclick="event.stopPropagation();openSampleModal()" alt="レポートのサンプルを見る" title="レポートのサンプルを見る">
+</map>
 <map name="strategy-map" id="strategy-map">
   <area id="area-biz"    shape="rect" coords="44,310,900,360" href="javascript:void(0)" onclick="event.stopPropagation();openFrameworkModal('business')" alt="ビジネス戦略"   title="ビジネス戦略を見る">
   <area id="area-review" shape="rect" coords="44,381,900,456" href="javascript:void(0)" onclick="event.stopPropagation();openFrameworkModal('review')"   alt="提案・企画強化" title="提案・企画強化を見る">
@@ -516,18 +519,18 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 <script>
 var aiMeetingAreas=[[400,330,605,400]];
 var strategyAreas=[
-  [74,305,860,359],
-  [74,381,857,456],
-  [76,509,861,532],
-  [73,584,863,608],
-  [75,660,863,661]
+  [72,304,860,359],
+  [76,380,857,456],
+  [72,508,863,532],
+  [72,584,863,609],
+  [74,611,863,661]
 ];
 var FRAMEWORK_CONFIG={
-  'business':{ img:'Business_Strategy.png',  cap:'ビジネス戦略',   sample:'report_business.png' },
-  'review':  { img:'review_Flamework.png',    cap:'提案・企画強化', sample:'report_review.png'   },
-  'career':  { img:'career_Flamework.png',    cap:'キャリア・転職', sample:'report_career.png'   },
-  'human':   { img:'Human_Flamework.png',     cap:'人間関係・交渉', sample:'report_human.png'    },
-  'study':   { img:'Study_Flamework.png',     cap:'学習・創作',     sample:'report_study.png'    }
+  'business':{ img:'Business_Strategy.png',  w:932, h:1520, cap:'ビジネス戦略',   sample:'report_business.png', btn:[329,1272,615,1329] },
+  'review':  { img:'review_Flamework.png',   w:939, h:1194, cap:'提案・企画強化', sample:'report_review.png',   btn:[347,949,629,1007]  },
+  'career':  { img:'career_Flamework.png',   w:933, h:1205, cap:'キャリア・転職', sample:'report_career.png',   btn:[341,977,626,1035]  },
+  'human':   { img:'Human_Flamework.png',    w:934, h:1199, cap:'人間関係・交渉', sample:'report_human.png',    btn:[341,947,625,1005]  },
+  'study':   { img:'Study_Flamework.png',    w:936, h:1204, cap:'学習・創作',     sample:'report_study.png',    btn:[343,988,622,1046]  }
 };
 var currentFramework=null;
 var modalState='strategy';
@@ -567,19 +570,33 @@ function openStrategyModal(){
 function closeStrategyAndOpenBusiness(){
   openBusinessModal();
 }
+function resizeFrameworkSampleMap(key){
+  var cfg=FRAMEWORK_CONFIG[key];
+  var mImg=document.getElementById('mImg');
+  if(!mImg||!mImg.offsetWidth) return;
+  var scaleX=mImg.offsetWidth/cfg.w;
+  var scaleY=mImg.offsetHeight/cfg.h;
+  var area=document.getElementById('area-fw-sample');
+  if(!area) return;
+  var b=cfg.btn;
+  area.coords=[Math.round(b[0]*scaleX),Math.round(b[1]*scaleY),Math.round(b[2]*scaleX),Math.round(b[3]*scaleY)].join(',');
+}
 function openFrameworkModal(key){
   var cfg=FRAMEWORK_CONFIG[key];
   currentFramework=key;
   modalState='framework';
   var mImg=document.getElementById('mImg');
   mImg.src='/static/images/report_examples/'+cfg.img;
-  mImg.removeAttribute('usemap');
+  mImg.setAttribute('usemap','#framework-sample-map');
   document.getElementById('mCap').textContent=cfg.cap;
   document.getElementById('modal').classList.add('open');
   document.body.style.overflow='hidden';
   document.getElementById('modal-back-btn').style.display='inline-block';
   var sampleBtn=document.getElementById('modal-sample-btn');
-  if(sampleBtn) sampleBtn.style.display='inline-block';
+  if(sampleBtn) sampleBtn.style.display='none';
+  mImg.onload=function(){ resizeFrameworkSampleMap(key); };
+  setTimeout(function(){ resizeFrameworkSampleMap(key); },100);
+  setTimeout(function(){ resizeFrameworkSampleMap(key); },500);
 }
 function openSampleModal(){
   if(!currentFramework) return;
