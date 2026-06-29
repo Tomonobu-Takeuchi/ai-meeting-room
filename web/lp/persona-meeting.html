@@ -407,8 +407,8 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
     </div>
     <img id="mImg" src="" alt="">
     <div class="modal-caption" id="mCap"></div>
-  <div style="text-align:center;"><button id="modal-back-btn" onclick="closeModal();openStrategyModal();" style="display:none;margin:8px auto 0;padding:8px 28px;background:transparent;border:1px solid #9AB0C8;color:#9AB0C8;border-radius:6px;cursor:pointer;font-size:13px;">← 戻る</button>
-  <button id="modal-sample-btn" onclick="openModal('/static/images/report_examples/report_business.png','ビジネス戦略 レポートサンプル')" style="display:none;padding:8px 28px;background:transparent;border:1.5px solid #00C8E8;color:#00C8E8;border-radius:6px;cursor:pointer;font-size:13px;margin-left:12px;">📄 レポートのサンプルを見る</button></div>
+  <div style="text-align:center;"><button id="modal-back-btn" onclick="modalGoBack();" style="display:none;margin:8px auto 0;padding:8px 28px;background:transparent;border:1px solid #9AB0C8;color:#9AB0C8;border-radius:6px;cursor:pointer;font-size:13px;">← 戻る</button>
+  <button id="modal-sample-btn" onclick="openSampleModal();" style="display:none;padding:8px 28px;background:transparent;border:1.5px solid #00C8E8;color:#00C8E8;border-radius:6px;cursor:pointer;font-size:13px;margin-left:12px;">📄 レポートのサンプルを見る</button></div>
   </div>
 </div>
 
@@ -507,11 +507,30 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
   </div>
 </div>
 <map name="strategy-map" id="strategy-map">
-  <area id="area-biz" shape="rect" coords="44,310,900,360" href="javascript:void(0)" onclick="event.stopPropagation();openBusinessModal()" alt="ビジネス戦略" title="ビジネス戦略を見る">
+  <area id="area-biz"    shape="rect" coords="44,310,900,360" href="javascript:void(0)" onclick="event.stopPropagation();openFrameworkModal('business')" alt="ビジネス戦略"   title="ビジネス戦略を見る">
+  <area id="area-review" shape="rect" coords="44,381,900,456" href="javascript:void(0)" onclick="event.stopPropagation();openFrameworkModal('review')"   alt="提案・企画強化" title="提案・企画強化を見る">
+  <area id="area-career" shape="rect" coords="44,509,900,532" href="javascript:void(0)" onclick="event.stopPropagation();openFrameworkModal('career')"   alt="キャリア・転職" title="キャリア・転職を見る">
+  <area id="area-human"  shape="rect" coords="44,584,900,608" href="javascript:void(0)" onclick="event.stopPropagation();openFrameworkModal('human')"    alt="人間関係・交渉" title="人間関係・交渉を見る">
+  <area id="area-study"  shape="rect" coords="44,660,900,661" href="javascript:void(0)" onclick="event.stopPropagation();openFrameworkModal('study')"    alt="学習・創作"     title="学習・創作を見る">
 </map>
 <script>
 var aiMeetingAreas=[[400,330,605,400]];
-var strategyAreas=[[75,303,865,359]];
+var strategyAreas=[
+  [74,305,860,359],
+  [74,381,857,456],
+  [76,509,861,532],
+  [73,584,863,608],
+  [75,660,863,661]
+];
+var FRAMEWORK_CONFIG={
+  'business':{ img:'Business_Strategy.png',  cap:'ビジネス戦略',   sample:'report_business.png' },
+  'review':  { img:'review_Flamework.png',    cap:'提案・企画強化', sample:'report_review.png'   },
+  'career':  { img:'career_Flamework.png',    cap:'キャリア・転職', sample:'report_career.png'   },
+  'human':   { img:'Human_Flamework.png',     cap:'人間関係・交渉', sample:'report_human.png'    },
+  'study':   { img:'Study_Flamework.png',     cap:'学習・創作',     sample:'report_study.png'    }
+};
+var currentFramework=null;
+var modalState='strategy';
 function resizeMap(imgId,mapId,origW,origH,areas){
   var img=document.getElementById(imgId);
   if(!img||!img.offsetWidth) return;
@@ -548,17 +567,37 @@ function openStrategyModal(){
 function closeStrategyAndOpenBusiness(){
   openBusinessModal();
 }
-function openBusinessModal(){
-  var mImg=document.getElementById("mImg");
-  mImg.src="/static/images/report_examples/Business_Strategy.png";
-  mImg.removeAttribute("usemap");
-  document.getElementById("mCap").textContent="ビジネス戦略";
-  document.getElementById("modal").classList.add("open");
-  document.body.style.overflow="hidden";
-  document.getElementById("modal-back-btn").style.display="inline-block";
-  var sampleBtn=document.getElementById("modal-sample-btn");
-  if(sampleBtn) sampleBtn.style.display="inline-block";
+function openFrameworkModal(key){
+  var cfg=FRAMEWORK_CONFIG[key];
+  currentFramework=key;
+  modalState='framework';
+  var mImg=document.getElementById('mImg');
+  mImg.src='/static/images/report_examples/'+cfg.img;
+  mImg.removeAttribute('usemap');
+  document.getElementById('mCap').textContent=cfg.cap;
+  document.getElementById('modal').classList.add('open');
+  document.body.style.overflow='hidden';
+  document.getElementById('modal-back-btn').style.display='inline-block';
+  var sampleBtn=document.getElementById('modal-sample-btn');
+  if(sampleBtn) sampleBtn.style.display='inline-block';
 }
+function openSampleModal(){
+  if(!currentFramework) return;
+  var cfg=FRAMEWORK_CONFIG[currentFramework];
+  modalState='sample';
+  var mImg=document.getElementById('mImg');
+  mImg.src='/static/images/report_examples/'+cfg.sample;
+  mImg.removeAttribute('usemap');
+  document.getElementById('mCap').textContent=cfg.cap+' レポートサンプル';
+  document.getElementById('modal-back-btn').style.display='inline-block';
+  var sampleBtn=document.getElementById('modal-sample-btn');
+  if(sampleBtn) sampleBtn.style.display='none';
+}
+function modalGoBack(){
+  if(modalState==='sample') openFrameworkModal(currentFramework);
+  else openStrategyModal();
+}
+function openBusinessModal(){ openFrameworkModal('business'); }
 
 window.addEventListener("load",function(){
   resizeAiMeetingMap();
