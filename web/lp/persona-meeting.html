@@ -510,11 +510,11 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
   <area id="area-fw-sample" shape="rect" coords="0,0,0,0" href="javascript:void(0)" onclick="event.stopPropagation();openSampleModal()" alt="レポートのサンプルを見る" title="レポートのサンプルを見る">
 </map>
 <map name="strategy-map" id="strategy-map">
-  <area id="area-biz"    shape="rect" coords="44,310,900,360" href="javascript:void(0)" onclick="event.stopPropagation();openFrameworkModal('business')" alt="ビジネス戦略"   title="ビジネス戦略を見る">
-  <area id="area-review" shape="rect" coords="44,381,900,456" href="javascript:void(0)" onclick="event.stopPropagation();openFrameworkModal('review')"   alt="提案・企画強化" title="提案・企画強化を見る">
-  <area id="area-career" shape="rect" coords="44,509,900,532" href="javascript:void(0)" onclick="event.stopPropagation();openFrameworkModal('career')"   alt="キャリア・転職" title="キャリア・転職を見る">
-  <area id="area-human"  shape="rect" coords="44,584,900,608" href="javascript:void(0)" onclick="event.stopPropagation();openFrameworkModal('human')"    alt="人間関係・交渉" title="人間関係・交渉を見る">
-  <area id="area-study"  shape="rect" coords="44,660,900,661" href="javascript:void(0)" onclick="event.stopPropagation();openFrameworkModal('study')"    alt="学習・創作"     title="学習・創作を見る">
+  <area id="area-biz"    shape="rect" coords="72,304,860,359" href="javascript:void(0)" onclick="event.stopPropagation();openFrameworkModal('business')" alt="ビジネス戦略"   title="ビジネス戦略を見る">
+  <area id="area-review" shape="rect" coords="76,380,857,456" href="javascript:void(0)" onclick="event.stopPropagation();openFrameworkModal('review')"   alt="提案・企画強化" title="提案・企画強化を見る">
+  <area id="area-career" shape="rect" coords="72,508,863,532" href="javascript:void(0)" onclick="event.stopPropagation();openFrameworkModal('career')"   alt="キャリア・転職" title="キャリア・転職を見る">
+  <area id="area-human"  shape="rect" coords="72,584,863,609" href="javascript:void(0)" onclick="event.stopPropagation();openFrameworkModal('human')"    alt="人間関係・交渉" title="人間関係・交渉を見る">
+  <area id="area-study"  shape="rect" coords="74,611,863,661" href="javascript:void(0)" onclick="event.stopPropagation();openFrameworkModal('study')"    alt="学習・創作"     title="学習・創作を見る">
 </map>
 <script>
 var aiMeetingAreas=[[400,330,605,400]];
@@ -576,9 +576,6 @@ function openStrategyModal(){
   document.getElementById("mCap").textContent="";
   document.getElementById("modal").classList.add("open");
   document.body.style.overflow="hidden";
-  mImg.onload=function(){ resizeStrategyMapOnModal(); };
-  setTimeout(function(){ resizeStrategyMapOnModal(); },100);
-  setTimeout(function(){ resizeStrategyMapOnModal(); },500);
 }
 function closeStrategyAndOpenBusiness(){
   openBusinessModal();
