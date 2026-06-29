@@ -167,8 +167,10 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
     <img src="/static/images/report_examples/AI-meeting.png" alt="AI-PERSONA会議室 利用イメージ" style="width:100%;display:block;cursor:pointer;" id="ai-meeting-img" usemap="#ai-meeting-map">
     <map name="ai-meeting-map" id="ai-meeting-map">
       <area id="area-strategy" shape="rect" coords="400,330,605,400" href="javascript:void(0)" onclick="event.stopPropagation();openStrategyModal()" alt="戦略フレームワーク" title="戦略フレームワークを見る" style="cursor:pointer;">
+      <area id="area-wisdom" shape="rect" coords="469,338,710,444" href="javascript:void(0)" onclick="event.stopPropagation();openDiscussionModal('ai-meeting')" alt="賢人からの智慧" title="賢人からの智慧を見る" style="cursor:pointer;">
     </map>
-    <p style="font-size:13px;color:#B8CCDE;margin-top:12px;padding:0 16px;">＊戦略フレームワークとは、特定の課題解決や目標達成のための「思考の枠組み」です。<br>詳しくは、<a href="javascript:void(0)" onclick="event.stopPropagation();openStrategyModal()" style="color:#00C8E8;text-decoration:underline;">こちら</a>をご覧ください。</p>
+    <p style="font-size:13px;color:#B8CCDE;margin-top:12px;padding:0 16px;">＊賢人からの智慧とは、歴史上の偉人や専門家の知識を学習したペルソナが、多角的な視点で質問し、あなたのお悩みを明らかにしながら、より実践的な解決策を提案します。<br>詳しくは、<a href="javascript:void(0)" onclick="event.stopPropagation();openDiscussionModal('text')" style="color:#00C8E8;text-decoration:underline;">こちら</a>をご覧ください。</p>
+    <p style="font-size:13px;color:#B8CCDE;margin-top:4px;padding:0 16px;">＊戦略フレームワークとは、特定の課題解決や目標達成のための「思考の枠組み」です。<br>詳しくは、<a href="javascript:void(0)" onclick="event.stopPropagation();openStrategyModal()" style="color:#00C8E8;text-decoration:underline;">こちら</a>をご覧ください。</p>
     <p style="text-align:center;font-size:12px;color:#9AB0C8;margin-top:8px;">🔍 画像をクリック・タップすると拡大できます</p>
     </div>
   </div>
@@ -188,7 +190,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
           <li>自分だけのカスタムペルソナを作成（Standardプラン以上）</li>
           <li>ファシリテータが議論を構造化</li>
         </ul>
-        <button class="screen-btn" onclick="openModal('/static/images/report_examples/discussion.png','実際のAI-PERSONA会議室の会議画面')">🔍 実際の会議模様を見る</button>
+        <button class="screen-btn" onclick="openDiscussionModal('close')">🔍 実際の会議模様を見る</button>
       </div>
 
       <div class="feat">
@@ -256,7 +258,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
         <div class="step-n">2</div>
         <div class="step-t">複数ペルソナと議論する</div>
         <p class="step-d">ファシリテータが議論を仕切り、複数のペルソナが本気で議論。あなたも発言に参加できます。音声モードで声で参加することも可能です。</p>
-        <button class="screen-btn" onclick="openModal('/static/images/report_examples/discussion.png','実際のAI-PERSONA会議室の会議画面')">🔍 実際の会議模様を表示</button>
+        <button class="screen-btn" onclick="openDiscussionModal('close')">🔍 実際の会議模様を表示</button>
       </div>
       <div class="step">
         <div class="step-n">3</div>
@@ -517,7 +519,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
   <area id="area-study"  shape="rect" coords="74,611,863,661" href="javascript:void(0)" onclick="event.stopPropagation();openFrameworkModal('study')"    alt="学習・創作"     title="学習・創作を見る">
 </map>
 <script>
-var aiMeetingAreas=[[400,330,605,400]];
+var aiMeetingAreas=[[400,330,605,400],[469,338,710,444]];
 var strategyAreas=[
   [72,304,860,359],
   [76,380,857,456],
@@ -548,7 +550,19 @@ function resizeMap(imgId,mapId,origW,origH,areas){
     areaEls[i].coords=[Math.round(o[0]*scaleX),Math.round(o[1]*scaleY),Math.round(o[2]*scaleX),Math.round(o[3]*scaleY)].join(",");
   }
 }
-function resizeAiMeetingMap(){ resizeMap("ai-meeting-img","ai-meeting-map",1002,441,aiMeetingAreas); }
+function resizeAiMeetingMap(){
+  var img=document.getElementById("ai-meeting-img");
+  if(!img||!img.offsetWidth||!img.naturalWidth) return;
+  var scaleX=img.offsetWidth/img.naturalWidth;
+  var scaleY=img.offsetHeight/img.naturalHeight;
+  var ids=["area-strategy","area-wisdom"];
+  for(var i=0;i<ids.length;i++){
+    var el=document.getElementById(ids[i]);
+    var o=aiMeetingAreas[i];
+    if(!el||!o) continue;
+    el.coords=[Math.round(o[0]*scaleX),Math.round(o[1]*scaleY),Math.round(o[2]*scaleX),Math.round(o[3]*scaleY)].join(",");
+  }
+}
 function resizeStrategyMap(){ resizeMap("strategy-img","strategy-map",952,728,strategyAreas); }
 function resizeStrategyMapOnModal(){
   var img=document.getElementById("mImg");
@@ -625,6 +639,37 @@ function openSampleModal(){
 function modalGoBack(){
   if(modalState==='sample') openFrameworkModal(currentFramework);
   else openStrategyModal();
+}
+function openDiscussionModal(from){
+  var mImg=document.getElementById('mImg');
+  mImg.src='/static/images/report_examples/discussion.png';
+  mImg.removeAttribute('usemap');
+  document.getElementById('mCap').textContent='賢人からの智慧';
+  document.getElementById('modal').classList.add('open');
+  document.body.style.overflow='hidden';
+  var backBtn=document.getElementById('modal-back-btn');
+  if(from==='ai-meeting'){
+    backBtn.style.display='inline-block';
+    backBtn.onclick=function(){ openAiMeetingModal(); };
+  } else {
+    backBtn.style.display='none';
+  }
+  var sampleBtn=document.getElementById('modal-sample-btn');
+  if(sampleBtn) sampleBtn.style.display='none';
+}
+function openAiMeetingModal(){
+  var mImg=document.getElementById('mImg');
+  mImg.src='/static/images/report_examples/AI-meeting.png';
+  mImg.setAttribute('usemap','#ai-meeting-map');
+  document.getElementById('mCap').textContent='';
+  document.getElementById('modal').classList.add('open');
+  document.body.style.overflow='hidden';
+  document.getElementById('modal-back-btn').style.display='none';
+  var sampleBtn=document.getElementById('modal-sample-btn');
+  if(sampleBtn) sampleBtn.style.display='none';
+  function _ram(){ requestAnimationFrame(function(){ requestAnimationFrame(function(){ requestAnimationFrame(function(){ resizeAiMeetingMap(); }); }); }); }
+  mImg.onload=function(){ _ram(); };
+  if(mImg.complete){ _ram(); }
 }
 function openBusinessModal(){ openFrameworkModal('business'); }
 
