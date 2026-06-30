@@ -397,7 +397,7 @@ function startVoiceInput(targetInput, micButton) {
   const recognition = new SpeechRecognition();
   recognition.lang = 'ja-JP';
   recognition.interimResults = true;
-  recognition.continuous = false;
+  recognition.continuous = isIOS ? false : true;
   recognition.maxAlternatives = 1;
   State.recognition = recognition;
   State.isRecognizing = true;
@@ -534,8 +534,14 @@ async function init() {
     }
     DOM.voiceModeBtn?.addEventListener('click', toggleVoiceMode);
     DOM.stopSpeakBtn?.addEventListener('click', stopSpeaking);
-    DOM.micBtn?.addEventListener('click', () => startVoiceInput(DOM.chatInput, DOM.micBtn));
-    DOM.topicMicBtn?.addEventListener('click', () => startVoiceInput(DOM.topicInput, DOM.topicMicBtn));
+    DOM.micBtn?.addEventListener('click', () => {
+      if (State.isSpeaking) { stopSpeaking(); }
+      startVoiceInput(DOM.chatInput, DOM.micBtn);
+    });
+    DOM.topicMicBtn?.addEventListener('click', () => {
+      if (State.isSpeaking) { stopSpeaking(); }
+      startVoiceInput(DOM.topicInput, DOM.topicMicBtn);
+    });
 
     DOM.addMemberBtn?.addEventListener('click', openAddModal);
 

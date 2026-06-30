@@ -4,6 +4,7 @@ AI-PERSONA会議室 - メインサーバー（ユーザー認証対応版）
 import io
 import os
 import re
+import hashlib
 import sys
 import json
 import secrets
@@ -11,8 +12,10 @@ from datetime import timedelta, date
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from flask import Flask, Response, jsonify, request, send_from_directory, send_file, session
 from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
+
+from flask import Flask, Response, jsonify, request, send_from_directory, send_file, session
 import anthropic
 import bcrypt
 from src.email_sender import send_email_change_confirmation
@@ -31,8 +34,6 @@ from src.database import (
     set_earlybird_and_billing_anchor, count_earlybird_users,
     reset_monthly_meeting_count, set_standard_plan,
 )
-
-load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
 
 STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
 STRIPE_PUBLIC_KEY = os.environ.get('STRIPE_PUBLIC_KEY', '')
@@ -105,10 +106,17 @@ def login_required(f):
 
 @app.route("/app")
 def spa():
-    response = send_from_directory(app.static_folder, "index.html")
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Expires"] = "0"
+    appjs_path = os.path.join(app.static_folder, 'app.js')
+    with open(appjs_path, 'rb') as f:
+        hash_val = hashlib.md5(f.read()).hexdigest()[:8]
+    index_path = os.path.join(app.static_folder, 'index.html')
+    with open(index_path, 'r', encoding='utf-8') as f:
+        html = f.read()
+    html = re.sub(r'app\.js\?v=[\w]+', f'app.js?v={hash_val}', html)
+    response = Response(html, mimetype='text/html')
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
     return response
 
 
@@ -368,6 +376,7 @@ def fetch_learn_url():
     if not url:
         return jsonify({"error": "URLを入力してください"}), 400
     try:
+        import re
         import requests as req
         from bs4 import BeautifulSoup
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
