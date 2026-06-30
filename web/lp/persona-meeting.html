@@ -518,7 +518,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
   <area id="area-study"  shape="rect" coords="74,611,863,661" href="javascript:void(0)" onclick="event.stopPropagation();openFrameworkModal('study')"    alt="学習・創作"     title="学習・創作を見る">
 </map>
 <script>
-var aiMeetingAreas=[[422,394,756,465],[469,338,710,444]];
+var aiMeetingAreas=[[422,394,756,465],[469,338,710,385]];
 var strategyAreas=[
   [72,304,860,359],
   [76,380,857,456],
@@ -553,7 +553,7 @@ function resizeAiMeetingMap(){
   var img=document.getElementById("ai-meeting-img");
   if(!img||!img.offsetWidth) return;
   var scaleX=img.offsetWidth/1106;
-  var scaleY=img.offsetHeight/678;
+  var scaleY=img.offsetHeight/500;
   var ids=["area-strategy","area-wisdom"];
   for(var i=0;i<ids.length;i++){
     var el=document.getElementById(ids[i]);
