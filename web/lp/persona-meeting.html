@@ -166,8 +166,8 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
     <div style="position:relative;max-width:900px;margin:32px auto 0;background:#16034D;padding-bottom:20px;border-radius:0 0 8px 8px;" id="ai-meeting-wrap">
     <img src="/static/images/report_examples/AI-meeting.png?v=20250630001" alt="AI-PERSONA会議室 利用イメージ" style="width:100%;display:block;cursor:pointer;" id="ai-meeting-img" usemap="#ai-meeting-map">
     <map name="ai-meeting-map" id="ai-meeting-map">
-      <area id="area-strategy" shape="rect" coords="400,236,605,286" href="javascript:void(0)" onclick="event.stopPropagation();openStrategyModal('ai-meeting')" alt="戦略フレームワーク" title="戦略フレームワークを見る" style="cursor:pointer;">
-      <area id="area-wisdom" shape="rect" coords="469,241,710,317" href="javascript:void(0)" onclick="event.stopPropagation();openDiscussionModal('ai-meeting')" alt="賢人からの智慧" title="賢人からの智慧を見る" style="cursor:pointer;">
+      <area id="area-strategy" shape="rect" coords="400,330,605,400" href="javascript:void(0)" onclick="event.stopPropagation();openStrategyModal('ai-meeting')" alt="戦略フレームワーク" title="戦略フレームワークを見る" style="cursor:pointer;">
+      <area id="area-wisdom" shape="rect" coords="469,338,710,444" href="javascript:void(0)" onclick="event.stopPropagation();openDiscussionModal('ai-meeting')" alt="賢人からの智慧" title="賢人からの智慧を見る" style="cursor:pointer;">
     </map>
     <p style="font-size:13px;color:#B8CCDE;margin-top:12px;padding:0 16px;">＊賢人からの智慧とは、歴史上の偉人や専門家の知識を学習したペルソナが、多角的な視点で質問し、あなたのお悩みを明らかにしながら、より実践的な解決策を提案します。<br>　詳しくは、<a href="javascript:void(0)" onclick="event.stopPropagation();openDiscussionModal('text')" style="color:#00C8E8;text-decoration:underline;">こちら</a>をご覧ください。<br><br>＊戦略フレームワークとは、特定の課題解決や目標達成のための「思考の枠組み」です。<br>　詳しくは、<a href="javascript:void(0)" onclick="event.stopPropagation();openStrategyModal('text')" style="color:#00C8E8;text-decoration:underline;">こちら</a>をご覧ください。</p>
     <p style="text-align:center;font-size:12px;color:#9AB0C8;margin-top:8px;cursor:pointer;" onclick="openModal('/static/images/report_examples/AI-meeting.png?v=20250630001','AI-PERSONA会議室 利用イメージ')">🔍 画像をクリック・タップすると拡大できます</p>
@@ -518,7 +518,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
   <area id="area-study"  shape="rect" coords="74,611,863,661" href="javascript:void(0)" onclick="event.stopPropagation();openFrameworkModal('study')"    alt="学習・創作"     title="学習・創作を見る">
 </map>
 <script>
-var aiMeetingAreas=[[422,281,756,332],[469,241,710,317]];
+var aiMeetingAreas=[[422,394,756,465],[469,338,710,444]];
 var strategyAreas=[
   [72,304,860,359],
   [76,380,857,456],
@@ -553,7 +553,7 @@ function resizeAiMeetingMap(){
   var img=document.getElementById("ai-meeting-img");
   if(!img||!img.offsetWidth) return;
   var scaleX=img.offsetWidth/1106;
-  var scaleY=img.offsetHeight/500;
+  var scaleY=img.offsetHeight/678;
   var ids=["area-strategy","area-wisdom"];
   for(var i=0;i<ids.length;i++){
     var el=document.getElementById(ids[i]);
