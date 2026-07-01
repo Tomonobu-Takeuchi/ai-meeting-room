@@ -388,7 +388,9 @@ function stopSpeaking() {
 }
 
 function startVoiceInput(targetInput, micButton) {
+  let finalTranscript = '';
   if (State.isRecognizing) {
+    State.isRecognizing = false;
     if (State.recognition) State.recognition.stop();
     return;
   }
@@ -404,22 +406,37 @@ function startVoiceInput(targetInput, micButton) {
   micButton.classList.add('recording');
   micButton.textContent = '⏹';
   recognition.onresult = (event) => {
-    targetInput.value = Array.from(event.results).map(r => r[0].transcript).join('');
+    let interim = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      if (event.results[i].isFinal) {
+        finalTranscript += event.results[i][0].transcript;
+      } else {
+        interim += event.results[i][0].transcript;
+      }
+    }
+    targetInput.value = finalTranscript + interim;
     if (targetInput.tagName === 'TEXTAREA') {
       targetInput.style.height = 'auto';
       targetInput.style.height = Math.min(targetInput.scrollHeight, 120) + 'px';
     }
   };
   recognition.onend = () => {
+    if (State.isRecognizing && State.voiceMode) {
+      try { recognition.start(); } catch(e) {}
+      return;
+    }
+    finalTranscript = '';
     State.isRecognizing = false; State.recognition = null;
     micButton.classList.remove('recording');
     micButton.textContent = '🎤';
   };
   recognition.onerror = (e) => {
+    if (e.error === 'no-speech' || e.error === 'aborted') return;
+    finalTranscript = '';
     State.isRecognizing = false; State.recognition = null;
     micButton.classList.remove('recording');
     micButton.textContent = '🎤';
-    if (e.error !== 'aborted') showToast('音声認識エラー: ' + e.error, 'error');
+    showToast('音声認識エラー: ' + e.error, 'error');
   };
   recognition.start();
 }
@@ -453,7 +470,7 @@ function toggleVoiceMode() {
     DOM.topicMicBtn.classList.add('hidden');
     DOM.micBtn.classList.add('hidden');
     stopSpeaking();
-    if (State.isRecognizing && State.recognition) State.recognition.stop();
+    if (State.isRecognizing && State.recognition) { State.isRecognizing = false; State.recognition.stop(); }
     showToast('音声モードOFF', 'info');
   }
 }
@@ -2389,7 +2406,7 @@ async function startMeeting() {
 async function resetMeeting() {
   if (State.sessionId && !confirm('現在の会議を終了して新しい会議を始めますか？')) return;
   stopSpeaking();
-  if (State.isRecognizing && State.recognition) State.recognition.stop();
+  if (State.isRecognizing && State.recognition) { State.isRecognizing = false; State.recognition.stop(); }
   State.sessionId = null; State.topic = ''; State.selectedMemberIds = [];
   State.isStreaming = false; State.streamingMessages = {};
   DOM.chatMessages.innerHTML = '';
@@ -2417,7 +2434,7 @@ async function endMeeting() {
   if (!State.sessionId) return;
   if (!confirm('会議を終了しますか？トランスクリプトを残したまま終了します。')) return;
   stopSpeaking();
-  if (State.isRecognizing && State.recognition) State.recognition.stop();
+  if (State.isRecognizing && State.recognition) { State.isRecognizing = false; State.recognition.stop(); }
   const endSessionId = State.sessionId;
   if (endSessionId) {
     try {
@@ -2470,7 +2487,7 @@ async function sendUserMessage() {
   if (!content || !State.sessionId || State.isStreaming) return;
   clearQuestionBadge();
   State.waitingForUser = false;
-  if (State.isRecognizing && State.recognition) State.recognition.stop();
+  if (State.isRecognizing && State.recognition) { State.isRecognizing = false; State.recognition.stop(); }
   DOM.chatInput.value = ''; DOM.chatInput.style.height = 'auto';
   addMessage({ role: 'user', persona_id: 'user', content, id: 'tmp_' + Date.now() });
   try {
