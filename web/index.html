@@ -132,6 +132,9 @@
     .welcome-icon{font-size:56px;opacity:0.3;}
     .welcome-title{font-size:20px;font-weight:500;color:var(--text-secondary);}
     .welcome-sub{font-size:14px;color:var(--text-muted);text-align:center;line-height:1.8;}
+    .welcome-hints{display:flex;flex-direction:column;gap:8px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:10px;padding:14px 18px;font-size:13px;color:var(--text-secondary);}
+    .welcome-hints .guest-only{display:none;}
+    body.guest-mode .welcome-hints .guest-only{display:block;}
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(4px);}
     .modal-overlay.hidden{display:none;}
     .modal{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:28px;width:460px;max-width:92vw;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow);}
@@ -238,11 +241,14 @@
       .welcome-icon{font-size:40px;}
       .welcome-title{font-size:17px;}
       .welcome-sub{font-size:12px;}
+      .welcome-hints{font-size:12px;padding:12px 14px;}
 
       /* 入力エリア */
       .chat-input-area{padding:8px 10px calc(80px + var(--sab)) 10px;gap:6px;}
       .chat-input{font-size:14px;padding:10px 12px;min-height:42px;}
       .action-row{gap:4px;flex-wrap:wrap;}
+      #memberTriggers{flex-wrap:nowrap !important;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+      #memberTriggers::-webkit-scrollbar{display:none;}
       .action-label{display:none;}
       .member-trigger-btn{padding:7px 10px;font-size:12px;min-height:36px;}
       #allRespondBtn{padding:7px 10px;font-size:12px;min-height:36px;}
@@ -550,7 +556,13 @@
     <div class="welcome-screen" id="welcomeScreen">
       <div class="welcome-icon">🏛️</div>
       <div class="welcome-title">AI-PERSONA 会議室</div>
-      <div class="welcome-sub">複数のデジタルペルソナを参加させ、<br />多角的な視点で議論をシミュレーションします。<br /><br />議題を入力して「会議開始」をクリックしてください。</div>
+      <div class="welcome-sub">複数のデジタルペルソナを参加させ、<br />多角的な視点で議論をシミュレーションします。</div>
+      <div class="welcome-hints">
+        <div>🎙️ 音声で話しかけることもできます（右上アイコン）</div>
+        <div class="guest-only">🚀 今すぐ無料で始められます</div>
+        <div class="guest-only">🔑 アカウントをお持ちの方はログイン</div>
+      </div>
+      <div class="welcome-sub">議題を入力して「会議開始」をクリックしてください。</div>
     </div>
     <div class="chat-messages hidden" id="chatMessages"></div>
 

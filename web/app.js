@@ -63,6 +63,7 @@ const State = {
   voiceMode: false, isSpeaking: false, isRecognizing: false,
   recognition: null, jaVoices: [],
   speakEndResolve: null,
+  currentTTSAudio: null, currentTTSSource: null,
   currentUser: null,  // ログイン中ユーザー情報
   userAvatar: '👤',  // ログイン中ユーザーのアバター
   paymentStatus: null, // 課金ステータスキャッシュ
@@ -319,10 +320,12 @@ async function speakWithTTS(text, voiceId, targetEl = null) {
         source.connect(State.audioCtx.destination);
         if (targetEl) targetEl.classList.add('voice-speaking');
         State.isSpeaking = true;
+        State.currentTTSSource = source;
         const estimatedMs = Math.min(Math.max(text.length * 80 + 3000, 5000), 30000);
         const done = () => {
           clearTimeout(ttsTimer);
           State.isSpeaking = false;
+          State.currentTTSSource = null;
           if (targetEl) targetEl.classList.remove('voice-speaking');
           resolve();
         };
@@ -334,11 +337,13 @@ async function speakWithTTS(text, voiceId, targetEl = null) {
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
+    State.currentTTSAudio = audio;
     return new Promise(resolve => {
       const estimatedMs = Math.min(Math.max(text.length * 80 + 3000, 5000), 30000);
       const done = () => {
         clearTimeout(ttsTimer);
         State.isSpeaking = false;
+        State.currentTTSAudio = null;
         if (targetEl) targetEl.classList.remove('voice-speaking');
         URL.revokeObjectURL(url);
         resolve();
@@ -382,6 +387,14 @@ async function previewVoice(mode) {
 
 function stopSpeaking() {
   if (window.speechSynthesis) window.speechSynthesis.cancel();
+  if (State.currentTTSAudio) {
+    try { State.currentTTSAudio.pause(); } catch (e) {}
+    State.currentTTSAudio = null;
+  }
+  if (State.currentTTSSource) {
+    try { State.currentTTSSource.stop(); } catch (e) {}
+    State.currentTTSSource = null;
+  }
   State.isSpeaking = false;
   if (State.speakEndResolve) { State.speakEndResolve(); State.speakEndResolve = null; }
   document.querySelectorAll('.voice-speaking').forEach(el => el.classList.remove('voice-speaking'));
@@ -558,6 +571,9 @@ async function init() {
     DOM.topicMicBtn?.addEventListener('click', () => {
       if (State.isSpeaking) { stopSpeaking(); }
       startVoiceInput(DOM.topicInput, DOM.topicMicBtn);
+    });
+    DOM.chatMessages?.addEventListener('click', () => {
+      if (State.voiceMode && State.isSpeaking) { stopSpeaking(); }
     });
 
     DOM.addMemberBtn?.addEventListener('click', openAddModal);
@@ -3643,6 +3659,7 @@ async function verifyAndApplyPayment(sessionId) {
 function renderAuthArea() {
   const area = $('authArea');
   if (!area) return;
+  document.body.classList.toggle('guest-mode', !State.currentUser);
   if (State.currentUser) {
     const u = State.currentUser;
     const plan = u.plan || 'free';
