@@ -1415,6 +1415,37 @@ def test_func14_default_persona_visibility(client):
 _skipped_sections: list[str] = []
 
 
+def test_func15_header_dom_ids():
+    """v22ヘッダー改修向けデグレ検出：
+    app.js/インラインscriptが参照するヘッダー関連DOM IDが
+    web/index.htmlに実在すること、renderAuthArea()生成HTML内に
+    ログイン後専用IDが含まれることを検証する（読み取り専用・副作用なし）"""
+    base = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(base, 'web', 'index.html'), encoding='utf-8') as f:
+        html = f.read()
+    with open(os.path.join(base, 'web', 'app.js'), encoding='utf-8') as f:
+        js = f.read()
+
+    static_ids = [
+        'howToBtn', 'howToBtnLabel', 'planBtn', 'planBtnLabel', 'voiceModeBtn',
+        'authArea', 'freeStartBtn', 'loginBtnHeader',
+        'planBtnRow2', 'planBtnRow2Label',
+        'welcomeScreen', 'chatMessages', 'mobilePanelBtn',
+    ]
+    for i in static_ids:
+        check(f'id="{i}"' in html, f"index.html に id={i} が存在する")
+
+    if 'function renderAuthArea()' in js:
+        start = js.index('function renderAuthArea()')
+        nxt = js.find('\nfunction ', start + 10)
+        block = js[start:nxt] if nxt != -1 else js[start:start+3000]
+        for i in ['userBadge', 'accountSettingsBtn', 'logoutBtn', 'freeStartBtn', 'loginBtnHeader']:
+            found = (f'id="{i}"' in block) or (f"id='{i}'" in block)
+            check(found, f"renderAuthArea() 生成HTML内に id={i} が存在する")
+    else:
+        check(False, "renderAuthArea() 関数がapp.js内に見つかる")
+
+
 def safe_run(name: str, func, *args):
     """テスト関数を安全に実行。DB接続エラー等は SKIP として記録し継続。"""
     import pg8000.exceptions
@@ -1470,6 +1501,7 @@ if __name__ == '__main__':
             safe_run("機能試験13: ToS同意チェック",         test_func13_tos_check)
             safe_run("運用試験8: 新規DBカラム整合性",        test_ops8_new_columns)
             safe_run("機能試験14: デフォルトペルソナ表示",   test_func14_default_persona_visibility, client)
+            safe_run("機能試験15: ヘッダーDOM ID整合性",     test_func15_header_dom_ids)
     finally:
         cleanup()
 
