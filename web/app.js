@@ -4270,8 +4270,7 @@ function initNavTips() {
       if (pressTimer) {
         clearTimeout(pressTimer);
         pressTimer = null;
-        label.style.display = 'inline';
-        setTimeout(() => { label.style.display = 'none'; }, 3000);
+        action();
       }
     }, { passive: false });
 
