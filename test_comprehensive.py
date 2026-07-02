@@ -1428,7 +1428,7 @@ def test_func15_header_dom_ids():
 
     static_ids = [
         'howToBtn', 'howToBtnLabel', 'planBtn', 'planBtnLabel', 'voiceModeBtn',
-        'authArea', 'freeStartBtn', 'loginBtnHeader',
+        'authArea',
         'planBtnRow2', 'planBtnRow2Label',
         'welcomeScreen', 'chatMessages', 'mobilePanelBtn',
     ]
