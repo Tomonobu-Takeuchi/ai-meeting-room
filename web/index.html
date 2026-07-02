@@ -133,8 +133,11 @@
     .welcome-title{font-size:20px;font-weight:500;color:var(--text-secondary);}
     .welcome-sub{font-size:14px;color:var(--text-muted);text-align:center;line-height:1.8;}
     .welcome-hints{display:flex;flex-direction:column;gap:8px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:10px;padding:14px 18px;font-size:13px;color:var(--text-secondary);}
-    .welcome-hints .guest-only{display:none;}
-    body.guest-mode .welcome-hints .guest-only{display:block;}
+    .welcome-screen .guest-only{display:none;}
+    .welcome-screen .user-only{display:none;}
+    body.guest-mode .welcome-screen .guest-only{display:block;}
+    body:not(.guest-mode) .welcome-screen .user-only{display:block;}
+    .welcome-cta{margin:4px 0;}
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(4px);}
     .modal-overlay.hidden{display:none;}
     .modal{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:28px;width:460px;max-width:92vw;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow);}
@@ -242,6 +245,7 @@
       .welcome-title{font-size:17px;}
       .welcome-sub{font-size:12px;}
       .welcome-hints{font-size:12px;padding:12px 14px;}
+      .welcome-cta{padding:10px 18px !important;font-size:13px !important;}
 
       /* 入力エリア */
       .chat-input-area{padding:8px 10px calc(80px + var(--sab)) 10px;gap:6px;}
@@ -555,14 +559,19 @@
   <div class="chat-area">
     <div class="welcome-screen" id="welcomeScreen">
       <div class="welcome-icon">🏛️</div>
-      <div class="welcome-title">AI-PERSONA 会議室</div>
-      <div class="welcome-sub">複数のデジタルペルソナを参加させ、<br />多角的な視点で議論をシミュレーションします。</div>
+      <div class="welcome-title guest-only">AI-PERSONA 会議室</div>
+      <div class="welcome-title user-only" id="welcomeUserGreeting">おかえりなさい</div>
+      <div class="welcome-sub guest-only">偉人・専門家のAIがあなたの相談に答えます<br />（議題を入れるだけで、複数の視点から議論・レポート化）</div>
+      <button class="btn btn-green welcome-cta guest-only" onclick="startFree()" style="padding:12px 24px;font-size:14px;">🚀 登録不要・無料で今すぐ試す</button>
+      <button class="btn btn-green welcome-cta user-only" onclick="document.getElementById('topicInput')?.focus()" style="padding:12px 24px;font-size:14px;">✏️ 議題を入れて会議開始</button>
       <div class="welcome-hints">
-        <div>🎙️ 音声で話しかけることもできます（右上アイコン）</div>
-        <div class="guest-only">🚀 今すぐ無料で始められます</div>
-        <div class="guest-only">🔑 アカウントをお持ちの方はログイン</div>
+        <div class="guest-only">🔑 ログイン → 会議履歴とプランを引き継ぎ</div>
+        <div class="guest-only">🏷️ 料金プラン → ゲストは3回までお試し可能。無料登録で月3回＋ペルソナ作成・レポートが使えます</div>
+        <div>🎙️ 音声モード → 読み上げを聞いて、話すだけで返答できます</div>
+        <div class="guest-only">👥 ペルソナ設定 → 相談相手を追加・編集できます</div>
+        <div class="user-only">🏷️ カテゴリ選択 → 議題入力後、内容に合ったフレームワークを自動提案</div>
+        <div class="user-only">👥 メンバー選定 → ペルソナ設定で発言させたい相手を選ぶ・追加できます</div>
       </div>
-      <div class="welcome-sub">議題を入力して「会議開始」をクリックしてください。</div>
     </div>
     <div class="chat-messages hidden" id="chatMessages"></div>
 

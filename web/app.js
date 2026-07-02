@@ -3660,6 +3660,10 @@ function renderAuthArea() {
   const area = $('authArea');
   if (!area) return;
   document.body.classList.toggle('guest-mode', !State.currentUser);
+  const _wg = document.getElementById('welcomeUserGreeting');
+  if (_wg && State.currentUser) {
+    _wg.textContent = `おかえりなさい、${State.currentUser.name || State.currentUser.email}さん`;
+  }
   if (State.currentUser) {
     const u = State.currentUser;
     const plan = u.plan || 'free';
