@@ -133,10 +133,10 @@
     .welcome-title{font-size:20px;font-weight:500;color:var(--text-secondary);}
     .welcome-sub{font-size:14px;color:var(--text-muted);text-align:center;line-height:1.8;}
     .welcome-hints{display:flex;flex-direction:column;gap:8px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:10px;padding:14px 18px;font-size:13px;color:var(--text-secondary);}
-    .welcome-screen .guest-only{display:none;}
-    .welcome-screen .user-only{display:none;}
-    body.guest-mode .welcome-screen .guest-only{display:block;}
-    body:not(.guest-mode) .welcome-screen .user-only{display:block;}
+    .welcome-screen .guest-only, #authRow2 .guest-only{display:none;}
+    .welcome-screen .user-only, #authRow2 .user-only{display:none;}
+    body.guest-mode .welcome-screen .guest-only, body.guest-mode #authRow2 .guest-only{display:inline-flex;}
+    body:not(.guest-mode) .welcome-screen .user-only, body:not(.guest-mode) #authRow2 .user-only{display:inline-flex;}
     .welcome-cta{margin:4px 0;}
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(4px);}
     .modal-overlay.hidden{display:none;}
@@ -472,8 +472,7 @@
     #planBtnRow2{display:none;}
     @media(max-width:480px){
       /* ⚙️はuser-badge内に移動したため非表示不要 */
-      #planBtnRow2{display:block;}  /* 3段目料金プランをスマホで表示 */
-      #planBtnRow2 .nav-label{display:inline !important;}
+      /* #planBtnRow2 はスマホでは #authRow2 内の planBtnRow2User で代替 */
       #logoutBtn{display:block !important;}
       #planBtn{display:none;}  /* スマホでは3段目planBtnRow2で代替 */
       .credits-badge{display:none;}
