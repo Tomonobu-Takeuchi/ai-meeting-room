@@ -70,7 +70,7 @@ app = Flask(
 )
 app.secret_key = os.environ.get('SECRET_KEY', 'ai-persona-secret-key-2026')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
-app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('SESSION_COOKIE_SECURE', 'true').lower() != 'false'
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.json.ensure_ascii = False  # 日本語をUnicodeエスケープしない（Flask 2.2以降）
