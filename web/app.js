@@ -3664,6 +3664,16 @@ function renderAuthArea() {
   if (_wg && State.currentUser) {
     _wg.textContent = `おかえりなさい、${State.currentUser.name || State.currentUser.email}さん`;
   }
+  const _an = document.getElementById('authRow2Name');
+  if (_an) {
+    if (State.currentUser) {
+      const _u = State.currentUser;
+      const _pl = { free:'無料', standard:'スタンダード', pro:'PRO' }[_u.plan||'free'] || _u.plan;
+      _an.textContent = `👤${_u.name||_u.email} ${_pl}`;
+    } else {
+      _an.textContent = '';
+    }
+  }
   if (State.currentUser) {
     const u = State.currentUser;
     const plan = u.plan || 'free';

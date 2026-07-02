@@ -463,6 +463,12 @@
     .acct-msg.success{color:#86EFAC;}
     .acct-msg.error{color:#FCA5A5;}
     .btn-account-settings{padding:3px 8px;font-size:11px;}
+    #authRow2{display:none;}
+    #authRow2{flex-shrink:0;}
+    @media(max-width:480px){
+      #authRow2{display:flex;align-items:center;gap:6px;padding:4px 10px;border-top:1px solid var(--border-subtle);overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex-wrap:nowrap;}
+      #authRow2::-webkit-scrollbar{display:none;}
+    }
     #planBtnRow2{display:none;}
     @media(max-width:480px){
       /* ⚙️はuser-badge内に移動したため非表示不要 */
@@ -515,6 +521,17 @@
       style="color:#C4B5FD;font-size:11px;margin-left:2px;">
       料金プラン</span>
     </button>
+  </div>
+  <!-- 認証行（スマホ2段目）-->
+  <div id="authRow2">
+    <!-- 未ログイン時 -->
+    <button class="btn btn-green guest-only" id="freeStartRow2" onclick="startFree()" style="font-size:11px;padding:4px 10px;">🚀 無料で始める</button>
+    <button class="btn guest-only" id="loginBtnRow2" onclick="openAuthModal()" style="font-size:11px;padding:4px 10px;">🔑 ログイン</button>
+    <!-- ログイン後 -->
+    <span class="user-only" id="authRow2Name" style="font-size:11px;color:var(--text-secondary);white-space:nowrap;"></span>
+    <button class="nav-link user-only" id="planBtnRow2User" onclick="openPricingModal()" style="font-size:11px;">🏷️ 料金プラン</button>
+    <button class="btn btn-account-settings user-only" id="accountSettingsBtnRow2" onclick="openAccountSettingsModal()" style="font-size:11px;padding:4px 8px;">⚙️ 設定</button>
+    <button class="nav-link user-only" id="logoutBtnRow2" onclick="if(confirm('ログアウトしますか？'))logout();" style="font-size:11px;color:#FCA5A5;">🚪 ログアウト</button>
   </div>
   <!-- 第2行：会議中 -->
   <div class="header-row2 hidden" id="headerRow2In">
