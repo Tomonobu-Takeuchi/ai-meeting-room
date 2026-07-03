@@ -501,17 +501,6 @@
     <div class="header-logo">AI<span style="color:#7C3AED">-</span>PERSONA 会議室</div>
     <div class="header-user" id="authArea"></div>
   </div>
-  <!-- 第2行：会議前 -->
-  <div class="header-row2" id="headerRow2Pre">
-    <input type="text" id="topicInput" placeholder="📋 議題を入力してください" />
-    <button class="btn-mic hidden" id="topicMicBtn" title="議題を音声入力">🎤</button>
-    <label class="attach-btn" for="fileInput" title="資料添付">📎<span class="attach-text"> 資料添付</span>
-      <input type="file" id="fileInput" accept=".pdf,.docx,.doc" style="display:none" multiple />
-    </label>
-    <button class="btn btn-green" id="startMeetingBtn" style="line-height:1.4;">▶ 会議開始<br>
-      <span id="startMeetingCostInfo" style="display:none;font-size:11px;opacity:0.8;white-space:nowrap;">💳 <span id="startMeetingCostText"></span></span>
-    </button>
-  </div>
   <!-- 認証行（スマホ2段目）-->
   <div id="authRow2">
     <!-- 未ログイン時 -->
@@ -523,6 +512,17 @@
     <button class="nav-link user-only" id="planBtnRow2User" onclick="openPricingModal()" style="font-size:11px;">🏷️ 料金プラン</button>
     <button class="btn btn-account-settings user-only" id="accountSettingsBtnRow2" onclick="openAccountSettingsModal()" style="font-size:11px;padding:4px 8px;">⚙️ 設定</button>
     <button class="nav-link user-only" id="logoutBtnRow2" onclick="if(confirm('ログアウトしますか？'))logout();" style="font-size:11px;color:#FCA5A5;">🚪 ログアウト</button>
+  </div>
+  <!-- 第2行：会議前 -->
+  <div class="header-row2" id="headerRow2Pre">
+    <input type="text" id="topicInput" placeholder="📋 議題を入力してください" />
+    <button class="btn-mic hidden" id="topicMicBtn" title="議題を音声入力">🎤</button>
+    <label class="attach-btn" for="fileInput" title="資料添付">📎<span class="attach-text"> 資料添付</span>
+      <input type="file" id="fileInput" accept=".pdf,.docx,.doc" style="display:none" multiple />
+    </label>
+    <button class="btn btn-green" id="startMeetingBtn" style="line-height:1.4;">▶ 会議開始<br>
+      <span id="startMeetingCostInfo" style="display:none;font-size:11px;opacity:0.8;white-space:nowrap;">💳 <span id="startMeetingCostText"></span></span>
+    </button>
   </div>
   <!-- 第2行：会議中 -->
   <div class="header-row2 hidden" id="headerRow2In">
