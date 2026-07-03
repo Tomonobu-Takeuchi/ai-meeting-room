@@ -2373,7 +2373,7 @@ async function startMeeting() {
     DOM.welcomeScreen.classList.add('hidden');
     DOM.chatMessages.classList.remove('hidden'); DOM.chatInputArea.classList.remove('hidden');
     DOM.sessionBar.classList.remove('hidden');
-    DOM.sessionInfo.textContent = `会議ID: ${State.sessionId} ・ 議題: ${State.topic}`;
+    DOM.sessionInfo.textContent = `議題: ${State.topic}`;
     DOM.facilitatorBtn.disabled = false; DOM.autoDiscussBtn.disabled = false; DOM.summarizeBtn.disabled = false;
     DOM.endMeetingBtn.disabled = false;
     DOM.topicInput.disabled = true; DOM.startMeetingBtn.disabled = true;

@@ -274,7 +274,7 @@
       .header-logo{font-size:14px;}
       .user-badge{padding:3px 6px;gap:4px;}
       .plan-badge{display:none;}
-      .header-row1{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;height:44px;padding:0 8px;gap:4px;}
+      .header-row1{display:grid;grid-template-columns:1fr auto 1fr auto;align-items:center;height:44px;padding:0 8px;gap:4px;}
       .header-logo{position:static;transform:none;font-size:11px;text-align:center;pointer-events:auto;flex:none;}
       .header-nav{flex:none;gap:2px;}
       .header-user{flex:none;gap:2px;justify-content:flex-end;display:flex;align-items:center;}
@@ -304,9 +304,9 @@
       .modal{padding:20px;max-height:92svh;}
       .auth-modal{padding:24px;}
       .mobile-panel-btn{display:none !important;}
-      #headerRow2In{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+      #headerRow2In{flex-wrap:nowrap !important;overflow-x:auto !important;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
       #headerRow2In::-webkit-scrollbar{display:none;}
-      #headerRow2Pre{flex-wrap:nowrap;overflow-x:hidden;}
+      #headerRow2Pre{flex-wrap:nowrap;overflow-x:auto;}
     }
 
     /* ===== フィードバックモーダル ===== */
@@ -473,8 +473,8 @@
     }
     #planBtnRow2{display:none;}
     @media(max-width:480px){
-      #authArea{display:flex !important;align-items:center;justify-content:flex-end;padding:0;gap:2px;}
-      #authArea > *:not(#howToBtn){display:none !important;}
+      #authArea{display:none !important;}
+      .header-how-to{display:flex;align-items:center;justify-content:flex-end;flex:none;}
       /* ⚙️はuser-badge内に移動したため非表示不要 */
       /* #planBtnRow2 はスマホでは #authRow2 内の planBtnRow2User で代替 */
       #planBtn{display:none;}  /* スマホでは3段目planBtnRow2で代替 */
@@ -501,7 +501,8 @@
       <button class="nav-link" id="voiceModeBtn" title="音声モード">🎙️<span class="voice-text"> 音声モード</span></button>
     </nav>
     <div class="header-logo">AI<span style="color:#7C3AED">-</span>PERSONA 会議室</div>
-    <div class="header-user" id="authArea">
+    <div class="header-user" id="authArea"></div>
+    <div class="header-how-to">
       <button class="nav-link" id="howToBtn">📖<span class="nav-label" id="howToBtnLabel" style="color:#93C5FD;font-size:11px;margin-left:2px;"> 使い方ガイド</span></button>
     </div>
   </div>
