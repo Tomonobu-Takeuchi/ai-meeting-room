@@ -254,8 +254,8 @@
       #memberTriggers{flex-wrap:nowrap !important;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
       #memberTriggers::-webkit-scrollbar{display:none;}
       .action-label{display:none;}
-      .member-trigger-btn{padding:7px 10px;font-size:12px;min-height:36px;}
-      #allRespondBtn{padding:7px 10px;font-size:12px;min-height:36px;}
+      .member-trigger-btn{padding:3px 8px;font-size:11px;min-height:28px;}
+      #allRespondBtn{padding:3px 8px;font-size:11px;min-height:28px;}
       #sendBtn{padding:10px 14px;font-size:13px;min-height:42px;}
 
       /* バー類 */
@@ -277,7 +277,7 @@
       .plan-badge{display:none;}
       .header-row1{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;height:44px;padding:0 8px;gap:4px;}
       .header-logo{position:static;transform:none;font-size:11px;text-align:center;pointer-events:auto;flex:none;}
-      .header-nav{flex:none;gap:2px;}
+      .header-nav{flex:none;gap:2px;display:flex;justify-content:space-between;width:100%;}
       .header-user{flex:none;gap:2px;justify-content:flex-end;display:flex;align-items:center;}
       .nav-text{display:none;}
       .nav-link{padding:4px 6px;font-size:14px;position:relative;}
@@ -306,6 +306,8 @@
       .modal{padding:20px;max-height:92svh;}
       .auth-modal{padding:24px;}
       .mobile-panel-btn{display:none !important;}
+      #headerRow2In{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+      #headerRow2In::-webkit-scrollbar{display:none;}
     }
 
     /* ===== フィードバックモーダル ===== */
@@ -473,7 +475,6 @@
     #planBtnRow2{display:none;}
     @media(max-width:480px){
       #authArea{display:none !important;}
-      #authArea #howToBtn{display:inline-flex !important;align-items:center;}
       /* ⚙️はuser-badge内に移動したため非表示不要 */
       /* #planBtnRow2 はスマホでは #authRow2 内の planBtnRow2User で代替 */
       #planBtn{display:none;}  /* スマホでは3段目planBtnRow2で代替 */
@@ -498,10 +499,10 @@
     <nav class="header-nav">
       <button class="nav-link" id="planBtn">🏷️<span class="nav-label" id="planBtnLabel" style="color:#C4B5FD;font-size:11px;margin-left:2px;"> 料金プラン</span></button>
       <button class="nav-link" id="voiceModeBtn" title="音声モード">🎙️<span class="voice-text"> 音声モード</span></button>
+      <button class="nav-link" id="howToBtn">📖<span class="nav-label" id="howToBtnLabel" style="color:#93C5FD;font-size:11px;margin-left:2px;"> 使い方ガイド</span></button>
     </nav>
     <div class="header-logo">AI<span style="color:#7C3AED">-</span>PERSONA 会議室</div>
     <div class="header-user" id="authArea">
-      <button class="nav-link" id="howToBtn">📖<span class="nav-label" id="howToBtnLabel" style="color:#93C5FD;font-size:11px;margin-left:2px;"> 使い方ガイド</span></button>
     </div>
   </div>
   <!-- 認証行（スマホ2段目）-->
