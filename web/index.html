@@ -250,12 +250,12 @@
       /* 入力エリア */
       .chat-input-area{padding:8px 10px calc(80px + var(--sab)) 10px;gap:6px;}
       .chat-input{font-size:14px;padding:10px 12px;min-height:42px;}
-      .action-row{gap:4px;flex-wrap:nowrap;align-items:center;}
+      .action-row{gap:4px;flex-wrap:nowrap;align-items:flex-start;}
       #memberTriggers{flex-wrap:nowrap !important;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
       #memberTriggers::-webkit-scrollbar{display:none;}
       .action-label{display:none;}
-      .member-trigger-btn{padding:3px 8px;font-size:11px;min-height:28px;}
-      #allRespondBtn{padding:3px 8px;font-size:11px;min-height:28px;}
+      .member-trigger-btn{padding:3px 8px;font-size:11px;}
+      #allRespondBtn{padding:3px 8px;font-size:11px;}
       #sendBtn{padding:10px 14px;font-size:13px;min-height:42px;}
 
       /* バー類 */
@@ -304,9 +304,11 @@
       .modal{padding:20px;max-height:92svh;}
       .auth-modal{padding:24px;}
       .mobile-panel-btn{display:none !important;}
-      #headerRow2In{flex-wrap:nowrap !important;overflow-x:auto !important;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+      #headerRow2In{flex-wrap:nowrap !important;overflow-x:auto !important;-webkit-overflow-scrolling:touch;scrollbar-width:none;gap:3px !important;}
+      #headerRow2In .btn{padding:2px 4px;font-size:10px;}
       #headerRow2In::-webkit-scrollbar{display:none;}
       #headerRow2Pre{flex-wrap:nowrap;overflow-x:auto;}
+      #startMeetingBtn{padding:3px 6px;font-size:10px;}
     }
 
     /* ===== フィードバックモーダル ===== */
