@@ -262,7 +262,6 @@
       .session-bar{padding:5px 10px;font-size:11px;}
       .voice-mode-bar{padding:5px 10px;font-size:11px;}
       .voice-mode-bar span{font-size:10px;}
-      #stopSpeakBtn{padding:3px 6px;font-size:10px;}
       .minutes-bar{padding:10px;gap:8px;flex-wrap:wrap;justify-content:center;}
 
 
@@ -277,7 +276,7 @@
       .plan-badge{display:none;}
       .header-row1{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;height:44px;padding:0 8px;gap:4px;}
       .header-logo{position:static;transform:none;font-size:11px;text-align:center;pointer-events:auto;flex:none;}
-      .header-nav{flex:none;gap:2px;display:flex;justify-content:space-between;width:100%;}
+      .header-nav{flex:none;gap:2px;}
       .header-user{flex:none;gap:2px;justify-content:flex-end;display:flex;align-items:center;}
       .nav-text{display:none;}
       .nav-link{padding:4px 6px;font-size:14px;position:relative;}
@@ -302,12 +301,12 @@
       .user-badge .user-name{display:none;}
       .voice-text{display:inline;font-size:11px;}
       .nav-label{display:inline;font-size:11px;}
-      .member-trigger-btn{padding:6px 8px;font-size:11px;}
       .modal{padding:20px;max-height:92svh;}
       .auth-modal{padding:24px;}
       .mobile-panel-btn{display:none !important;}
       #headerRow2In{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
       #headerRow2In::-webkit-scrollbar{display:none;}
+      #headerRow2Pre{flex-wrap:nowrap;overflow-x:hidden;}
     }
 
     /* ===== フィードバックモーダル ===== */
@@ -474,7 +473,8 @@
     }
     #planBtnRow2{display:none;}
     @media(max-width:480px){
-      #authArea{display:none !important;}
+      #authArea{display:flex !important;align-items:center;justify-content:flex-end;padding:0;gap:2px;}
+      #authArea > *:not(#howToBtn){display:none !important;}
       /* ⚙️はuser-badge内に移動したため非表示不要 */
       /* #planBtnRow2 はスマホでは #authRow2 内の planBtnRow2User で代替 */
       #planBtn{display:none;}  /* スマホでは3段目planBtnRow2で代替 */
@@ -499,10 +499,10 @@
     <nav class="header-nav">
       <button class="nav-link" id="planBtn">🏷️<span class="nav-label" id="planBtnLabel" style="color:#C4B5FD;font-size:11px;margin-left:2px;"> 料金プラン</span></button>
       <button class="nav-link" id="voiceModeBtn" title="音声モード">🎙️<span class="voice-text"> 音声モード</span></button>
-      <button class="nav-link" id="howToBtn">📖<span class="nav-label" id="howToBtnLabel" style="color:#93C5FD;font-size:11px;margin-left:2px;"> 使い方ガイド</span></button>
     </nav>
     <div class="header-logo">AI<span style="color:#7C3AED">-</span>PERSONA 会議室</div>
     <div class="header-user" id="authArea">
+      <button class="nav-link" id="howToBtn">📖<span class="nav-label" id="howToBtnLabel" style="color:#93C5FD;font-size:11px;margin-left:2px;"> 使い方ガイド</span></button>
     </div>
   </div>
   <!-- 認証行（スマホ2段目）-->
@@ -533,7 +533,6 @@
     <span id="inMeetingTopic" class="in-meeting-topic"></span>
     <button class="btn btn-purple" id="facilitatorBtn" disabled>🎯 ファシリテータ介入</button>
     <button class="btn btn-orange" id="summarizeBtn" disabled>🤔 議論のまとめ</button>
-    <button class="btn" id="stopSpeakBtn" style="padding:3px 8px;font-size:11px;">⏹ 読み上げ停止</button>
     <button class="btn btn-primary" id="newMeetingBtn" style="display:none">＋ 新規会議</button>
     <button class="btn btn-red" id="endMeetingBtn">✕ 会議を終了</button>
   </div>
@@ -599,7 +598,7 @@
         <button class="btn btn-primary" id="sendBtn">送信</button>
       </div>
       <div class="action-row">
-        <button class="btn" id="personaSettingsBtn" onclick="document.getElementById('mobilePanelBtn').click()" style="padding:4px 8px;font-size:11px;white-space:nowrap;flex-shrink:0;">⚙ ペルソナ設定</button>
+        <button class="btn" id="personaSettingsBtn" onclick="document.getElementById('mobilePanelBtn').click()" style="padding:4px 8px;font-size:11px;white-space:nowrap;flex-shrink:0;">👥 ペルソナ設定</button>
         <div id="memberTriggers" style="display:flex;flex-wrap:nowrap;gap:4px;flex:1;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;"></div>
         <button class="btn" id="allRespondBtn" style="padding:4px 8px;font-size:11px;white-space:nowrap;flex-shrink:0;">全員</button>
       </div>
