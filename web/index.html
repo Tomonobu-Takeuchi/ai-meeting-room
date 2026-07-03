@@ -250,7 +250,7 @@
       /* 入力エリア */
       .chat-input-area{padding:8px 10px calc(80px + var(--sab)) 10px;gap:6px;}
       .chat-input{font-size:14px;padding:10px 12px;min-height:42px;}
-      .action-row{gap:4px;flex-wrap:wrap;}
+      .action-row{gap:4px;flex-wrap:nowrap;align-items:center;}
       #memberTriggers{flex-wrap:nowrap !important;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
       #memberTriggers::-webkit-scrollbar{display:none;}
       .action-label{display:none;}
@@ -525,7 +525,7 @@
     <label class="attach-btn" for="fileInput" title="資料添付">📎<span class="attach-text"> 資料添付</span>
       <input type="file" id="fileInput" accept=".pdf,.docx,.doc" style="display:none" multiple />
     </label>
-    <button class="btn btn-green" id="startMeetingBtn" style="line-height:1.4;">▶ 会議開始<br>
+    <button class="btn btn-green" id="startMeetingBtn" style="flex-shrink:0;white-space:nowrap;">▶会議開始
       <span id="startMeetingCostInfo" style="display:none;font-size:11px;opacity:0.8;white-space:nowrap;">💳 <span id="startMeetingCostText"></span></span>
     </button>
   </div>
@@ -599,9 +599,9 @@
         <button class="btn btn-primary" id="sendBtn">送信</button>
       </div>
       <div class="action-row">
-        <button class="btn" id="personaSettingsBtn" onclick="document.getElementById('mobilePanelBtn').click()" style="padding:4px 8px;font-size:11px;white-space:nowrap;flex-shrink:0;">👥 ペルソナ設定</button>
+        <button class="btn" id="personaSettingsBtn" onclick="document.getElementById('mobilePanelBtn').click()" style="padding:4px 6px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;line-height:1.2;gap:1px;"><span style="font-size:20px;line-height:1;">👥</span><span style="font-size:9px;">ペルソナ設定</span></button>
         <div id="memberTriggers" style="display:flex;flex-wrap:nowrap;gap:4px;flex:1;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;"></div>
-        <button class="btn" id="allRespondBtn" style="padding:4px 8px;font-size:11px;white-space:nowrap;flex-shrink:0;">全員</button>
+        <button class="btn btn-primary" id="allRespondBtn" style="padding:4px 8px;font-size:11px;white-space:nowrap;flex-shrink:0;">全員</button>
       </div>
     </div>
   </div>
