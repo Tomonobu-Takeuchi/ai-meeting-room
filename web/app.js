@@ -3668,8 +3668,15 @@ function renderAuthArea() {
   if (_an) {
     if (State.currentUser) {
       const _u = State.currentUser;
-      const _pl = { free:'無料', standard:'スタンダード', pro:'PRO' }[_u.plan||'free'] || _u.plan;
-      _an.textContent = `👤${_u.name||_u.email} ${_pl}`;
+      const _plan = _u.plan || 'free';
+      const _pl = { free:'無料', standard:'スタンダード', pro:'PRO' }[_plan] || _plan;
+      let _rem = '';
+      if (_plan === 'free') _rem = ` 残${Math.max(0, 3 - (_u.monthly_meeting_count||0))}/3`;
+      else if (_plan === 'standard') _rem = ` 残${Math.max(0, 15 - (_u.monthly_meeting_count||0))}/15`;
+      const _avHtml = (State.userAvatar && State.userAvatar.startsWith('data:'))
+        ? `<img src="${State.userAvatar}" style="width:18px;height:18px;border-radius:50%;vertical-align:middle;margin-right:2px;">`
+        : (State.userAvatar || '👤');
+      _an.innerHTML = `${_avHtml}${_pl}${_rem}`;
     } else {
       _an.textContent = '';
     }
