@@ -3673,9 +3673,21 @@ function renderAuthArea() {
     let _left = null;
     if (_p2 === 'free') _left = Math.max(0, 3 - (_u2.monthly_meeting_count || 0));
     else if (_p2 === 'standard') _left = Math.max(0, 15 - (_u2.monthly_meeting_count || 0));
+    // pro残日数（authRow2Nameと同一ロジック）
+    let _proText = null;
+    if (_p2 === 'pro') {
+      if (_u2.plan_expires_at) {
+        const _pdays = Math.ceil((new Date(_u2.plan_expires_at) - new Date()) / (1000*60*60*24));
+        _proText = _pdays > 0 ? `会議は使い放題です（あと${_pdays}日）` : '会議は使い放題です（無制限）';
+      } else {
+        _proText = '会議は使い放題です（無制限）';
+      }
+    }
     // 残回数表示
     if (_wr) {
-      if (_left === null) {
+      if (_proText !== null) {
+        _wr.textContent = _proText; _wr.style.display = '';
+      } else if (_left === null) {
         _wr.textContent = ''; _wr.style.display = 'none';
       } else if (_left > 0) {
         _wr.textContent = `今月あと${_left}回 会議できます`; _wr.style.display = '';

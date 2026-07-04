@@ -579,10 +579,18 @@
       <button class="btn btn-green welcome-cta guest-only" onclick="startFree()" style="padding:12px 24px;font-size:14px;">🚀 登録不要・無料で今すぐ試す</button>
       <button class="btn btn-green welcome-cta user-only" id="welcomeStartCta" onclick="document.getElementById('topicInput')?.focus()" style="padding:12px 24px;font-size:14px;">✏️ 議題を入れて会議開始</button>
       <div class="welcome-hints">
+        <div class="guest-only" style="color:var(--text-secondary);font-weight:500;">会議はかんたん3ステップ</div>
+        <div class="guest-only">① 議題を入れる</div>
+        <div class="guest-only">② カテゴリと参加メンバーを選ぶ（AIが提案）</div>
+        <div class="guest-only">③ 会議スタート → 終了後レポート自動生成</div>
         <div class="guest-only">🔑 ログイン → 会議履歴とプランを引き継ぎ</div>
         <div class="guest-only">🎙️ 音声モード → 読み上げを聞いて、話すだけで返答できます</div>
         <div class="guest-only">👥 ペルソナ設定 → 相談相手を追加・編集できます</div>
         <div class="guest-only" onclick="openPricingModal()" style="cursor:pointer;">🏷️ 料金プラン → お試し3回無料。プラン詳細はこちら</div>
+        <div class="user-only" style="color:var(--text-secondary);font-weight:500;">会議はかんたん3ステップ</div>
+        <div class="user-only">① 議題を入れる</div>
+        <div class="user-only">② カテゴリと参加メンバーを選ぶ（AIが提案）</div>
+        <div class="user-only">③ 会議スタート → 終了後レポート自動生成</div>
         <div class="user-only">📊 「議論のまとめ」または「会議を終了」を押すとレポートが生成されます</div>
         <div class="user-only" id="welcomeUpgradeHint" onclick="openPricingModal()" style="cursor:pointer;display:none;">🏷️ スタンダードなら月15回＋議論分析レポート → プランを見る</div>
       </div>
