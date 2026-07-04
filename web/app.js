@@ -3669,10 +3669,18 @@ function renderAuthArea() {
     if (State.currentUser) {
       const _u = State.currentUser;
       const _plan = _u.plan || 'free';
-      const _pl = { free:'無料', standard:'スタンダード', pro:'PRO' }[_plan] || _plan;
+      const _pl = { free:'FREE', standard:'STD', pro:'PRO' }[_plan] || _plan;
       let _rem = '';
       if (_plan === 'free') _rem = ` 残${Math.max(0, 3 - (_u.monthly_meeting_count||0))}/3`;
       else if (_plan === 'standard') _rem = ` 残${Math.max(0, 15 - (_u.monthly_meeting_count||0))}/15`;
+      else if (_plan === 'pro') {
+        if (_u.plan_expires_at) {
+          const _days = Math.ceil((new Date(_u.plan_expires_at) - new Date()) / (1000*60*60*24));
+          _rem = _days > 0 ? ` あと${_days}日` : ' 無制限';
+        } else {
+          _rem = ' 無制限';
+        }
+      }
       const _avHtml = (State.userAvatar && State.userAvatar.startsWith('data:'))
         ? `<img src="${State.userAvatar}" style="width:18px;height:18px;border-radius:50%;vertical-align:middle;margin-right:2px;">`
         : (State.userAvatar || '👤');
