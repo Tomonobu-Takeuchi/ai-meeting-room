@@ -2382,7 +2382,7 @@ async function startMeeting() {
     DOM.headerRow2Pre.classList.add('hidden'); DOM.headerRow2In.classList.remove('hidden');
     if (State.voiceMode) DOM.micBtn.classList.remove('hidden');
     renderMemberList(); renderMemberTriggers();
-    addSystemMessage(`会議を開始しました。議題：${State.topic}`);
+    addSystemMessage('💡 議論のまとめ／会議終了 でレポートが生成されます');
     if (State.currentUser?.plan === 'standard') {
       if (data.monthly_meeting_count !== undefined) {
         State.currentUser.monthly_meeting_count = data.monthly_meeting_count;
@@ -3663,6 +3663,46 @@ function renderAuthArea() {
   const _wg = document.getElementById('welcomeUserGreeting');
   if (_wg && State.currentUser) {
     _wg.textContent = `おかえりなさい、${State.currentUser.name || State.currentUser.email}さん`;
+  }
+  const _wr = document.getElementById('welcomeRemaining');
+  const _wu = document.getElementById('welcomeUpgradeHint');
+  const _wcta = document.getElementById('welcomeStartCta');
+  if (State.currentUser && (_wr || _wu || _wcta)) {
+    const _u2 = State.currentUser;
+    const _p2 = _u2.plan || 'free';
+    let _left = null;
+    if (_p2 === 'free') _left = Math.max(0, 3 - (_u2.monthly_meeting_count || 0));
+    else if (_p2 === 'standard') _left = Math.max(0, 15 - (_u2.monthly_meeting_count || 0));
+    // 残回数表示
+    if (_wr) {
+      if (_left === null) {
+        _wr.textContent = ''; _wr.style.display = 'none';
+      } else if (_left > 0) {
+        _wr.textContent = `今月あと${_left}回 会議できます`; _wr.style.display = '';
+      } else {
+        _wr.textContent = _p2 === 'free'
+          ? '今月の会議回数を使い切りました（毎月1日にリセット）'
+          : '今月の会議回数を使い切りました';
+        _wr.style.display = '';
+      }
+    }
+    // STD促進行：freeのみ表示
+    if (_wu) _wu.style.display = (_p2 === 'free') ? '' : 'none';
+    // CTA：残0時はプランを見るに切替
+    if (_wcta) {
+      if (_left === 0) {
+        _wcta.textContent = '🏷️ プランを見る';
+        _wcta.onclick = () => openPricingModal();
+      } else {
+        _wcta.textContent = '✏️ 議題を入れて会議開始';
+        _wcta.onclick = () => document.getElementById('topicInput')?.focus();
+      }
+    }
+  } else if (!State.currentUser) {
+    const _wr2 = document.getElementById('welcomeRemaining');
+    const _wu2 = document.getElementById('welcomeUpgradeHint');
+    if (_wr2) { _wr2.textContent = ''; _wr2.style.display = 'none'; }
+    if (_wu2) _wu2.style.display = 'none';
   }
   const _an = document.getElementById('authRow2Name');
   if (_an) {

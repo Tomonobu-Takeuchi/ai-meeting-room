@@ -574,16 +574,17 @@
       <div class="welcome-icon">🏛️</div>
       <div class="welcome-title guest-only">AI-PERSONA 会議室</div>
       <div class="welcome-title user-only" id="welcomeUserGreeting">おかえりなさい</div>
+      <div class="welcome-sub user-only" id="welcomeRemaining" style="display:none;"></div>
       <div class="welcome-sub guest-only">偉人・専門家のAIがあなたの相談に答えます<br />（議題を入れるだけで、複数の視点から議論・レポート化）</div>
       <button class="btn btn-green welcome-cta guest-only" onclick="startFree()" style="padding:12px 24px;font-size:14px;">🚀 登録不要・無料で今すぐ試す</button>
-      <button class="btn btn-green welcome-cta user-only" onclick="document.getElementById('topicInput')?.focus()" style="padding:12px 24px;font-size:14px;">✏️ 議題を入れて会議開始</button>
+      <button class="btn btn-green welcome-cta user-only" id="welcomeStartCta" onclick="document.getElementById('topicInput')?.focus()" style="padding:12px 24px;font-size:14px;">✏️ 議題を入れて会議開始</button>
       <div class="welcome-hints">
         <div class="guest-only">🔑 ログイン → 会議履歴とプランを引き継ぎ</div>
-        <div class="guest-only">🏷️ 料金プラン → ゲストは3回までお試し可能。無料登録で月3回＋ペルソナ作成・レポートが使えます</div>
-        <div>🎙️ 音声モード → 読み上げを聞いて、話すだけで返答できます</div>
+        <div class="guest-only">🎙️ 音声モード → 読み上げを聞いて、話すだけで返答できます</div>
         <div class="guest-only">👥 ペルソナ設定 → 相談相手を追加・編集できます</div>
-        <div class="user-only">🏷️ カテゴリ選択 → 議題入力後、内容に合ったフレームワークを自動提案</div>
-        <div class="user-only">👥 メンバー選定 → ペルソナ設定で発言させたい相手を選ぶ・追加できます</div>
+        <div class="guest-only" onclick="openPricingModal()" style="cursor:pointer;">🏷️ 料金プラン → お試し3回無料。プラン詳細はこちら</div>
+        <div class="user-only">📊 「議論のまとめ」または「会議を終了」を押すとレポートが生成されます</div>
+        <div class="user-only" id="welcomeUpgradeHint" onclick="openPricingModal()" style="cursor:pointer;display:none;">🏷️ スタンダードなら月15回＋議論分析レポート → プランを見る</div>
       </div>
     </div>
     <div class="chat-messages hidden" id="chatMessages"></div>
