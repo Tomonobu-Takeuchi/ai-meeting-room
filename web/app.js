@@ -2382,7 +2382,8 @@ async function startMeeting() {
     DOM.headerRow2Pre.classList.add('hidden'); DOM.headerRow2In.classList.remove('hidden');
     if (State.voiceMode) DOM.micBtn.classList.remove('hidden');
     renderMemberList(); renderMemberTriggers();
-    addSystemMessage('💡 議論のまとめ／会議終了 でレポートが生成されます');
+    const rhb = document.getElementById('reportHintBar');
+    if (rhb) rhb.classList.remove('hidden');
     if (State.currentUser?.plan === 'standard') {
       if (data.monthly_meeting_count !== undefined) {
         State.currentUser.monthly_meeting_count = data.monthly_meeting_count;
@@ -2427,6 +2428,7 @@ async function resetMeeting() {
   State.isStreaming = false; State.streamingMessages = {};
   DOM.chatMessages.innerHTML = '';
   DOM.chatMessages.classList.add('hidden'); DOM.chatInputArea.classList.add('hidden');
+  { const rhb = document.getElementById('reportHintBar'); if (rhb) rhb.classList.add('hidden'); }
   DOM.welcomeScreen.classList.remove('hidden'); DOM.sessionBar.classList.add('hidden');
   DOM.minutesBar.classList.add('hidden'); DOM.micBtn.classList.add('hidden');
   DOM.topicInput.disabled = false; DOM.topicInput.value = '';
@@ -2464,6 +2466,7 @@ async function endMeeting() {
   State.sessionId = null; State.isStreaming = false; State.streamingMessages = {};
   console.log('[LOG] 会議終了 newMeetingBtn.display=' + DOM.newMeetingBtn.style.display);
   DOM.chatInputArea.classList.add('hidden');
+  { const rhb = document.getElementById('reportHintBar'); if (rhb) rhb.classList.add('hidden'); }
   DOM.sessionBar.classList.add('hidden');
   DOM.minutesBar.classList.remove('hidden');
   DOM.micBtn.classList.add('hidden');
@@ -3878,6 +3881,7 @@ async function submitLogin() {
       State.isStreaming = false; State.streamingMessages = {};
       DOM.chatMessages.innerHTML = '';
       DOM.chatMessages.classList.add('hidden'); DOM.chatInputArea.classList.add('hidden');
+      { const rhb = document.getElementById('reportHintBar'); if (rhb) rhb.classList.add('hidden'); }
       DOM.welcomeScreen.classList.remove('hidden'); DOM.sessionBar.classList.add('hidden');
       DOM.minutesBar.classList.add('hidden'); DOM.micBtn.classList.add('hidden');
       DOM.topicInput.disabled = false; DOM.topicInput.value = '';
@@ -3933,6 +3937,7 @@ async function submitRegister() {
       State.isStreaming = false; State.streamingMessages = {};
       DOM.chatMessages.innerHTML = '';
       DOM.chatMessages.classList.add('hidden'); DOM.chatInputArea.classList.add('hidden');
+      { const rhb = document.getElementById('reportHintBar'); if (rhb) rhb.classList.add('hidden'); }
       DOM.welcomeScreen.classList.remove('hidden'); DOM.sessionBar.classList.add('hidden');
       DOM.minutesBar.classList.add('hidden'); DOM.micBtn.classList.add('hidden');
       DOM.topicInput.disabled = false; DOM.topicInput.value = '';
