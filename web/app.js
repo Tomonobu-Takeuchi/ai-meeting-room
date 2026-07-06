@@ -2407,6 +2407,7 @@ async function startMeeting() {
     if (DOM.mobileActionBar) { DOM.mobileActionBar.classList.add('visible'); }
     if (DOM.mobileSummarizeBtn) DOM.mobileSummarizeBtn.disabled = false;
     if (DOM.mobileFacilitatorBtn) DOM.mobileFacilitatorBtn.disabled = false;
+    State.userTurnCount = 0;
     await invokeFacilitator();
   } catch (e) {
     if (e.code === 'PLAN_LIMIT') {
@@ -2429,6 +2430,7 @@ async function resetMeeting() {
   DOM.chatMessages.innerHTML = '';
   DOM.chatMessages.classList.add('hidden'); DOM.chatInputArea.classList.add('hidden');
   { const rhb = document.getElementById('reportHintBar'); if (rhb) rhb.classList.add('hidden'); }
+  State.userTurnCount = 0;
   DOM.welcomeScreen.classList.remove('hidden'); DOM.sessionBar.classList.add('hidden');
   DOM.minutesBar.classList.add('hidden'); DOM.micBtn.classList.add('hidden');
   DOM.topicInput.disabled = false; DOM.topicInput.value = '';
@@ -2509,6 +2511,7 @@ async function sendUserMessage() {
   if (State.isRecognizing && State.recognition) { State.isRecognizing = false; State.recognition.stop(); }
   DOM.chatInput.value = ''; DOM.chatInput.style.height = 'auto';
   addMessage({ role: 'user', persona_id: 'user', content, id: 'tmp_' + Date.now() });
+  State.userTurnCount = (State.userTurnCount || 0) + 1;
   try {
     const res = await API.post(`/api/meeting/${State.sessionId}/message`, { content });
     if (res && res.crisis) {
@@ -2525,9 +2528,15 @@ async function sendUserMessage() {
       await triggerMemberResponse(activeMembers[i].id);
       if (State.waitingForUser) break;
     }
-    // 質問が出なかった場合はファシリテーターが仕切り直して指名
+    // 質問が出なかった場合はファシリテーターが仕切り直す
+    // ユーザー発言3回目以降、3の倍数ターンでは整理介入（guide）に置き換え
+    const FACILITATOR_CHECKPOINT_INTERVAL = 3;
     if (!State.waitingForUser) {
-      await invokeFacilitatorNominate();
+      if (State.userTurnCount >= 3 && State.userTurnCount % FACILITATOR_CHECKPOINT_INTERVAL === 0) {
+        await invokeFacilitator();
+      } else {
+        await invokeFacilitatorNominate();
+      }
     }
   }
   catch (e) { showToast(translateApiError(e.message, 'メッセージの送信'), 'error'); }

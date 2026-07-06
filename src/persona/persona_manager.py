@@ -664,6 +664,7 @@ class PersonaManager:
 - 200〜400字程度で簡潔に発言してください
 - キャラクターとして一貫して振る舞ってください
 - 議論の流れで自然なタイミングがあれば、相談者（ユーザー）に問いかけてください（毎回ではなく3〜4回に1回程度）。問いかける時は必ず【質問】を文頭に付けてください。
+- これまでの会話にまだ回答されていない【質問】が残っている場合は、新たな質問をせず意見を述べてください。
 - 他のペルソナの名前を文頭に引用することは避けてください。
 - 発言は必ずあなた自身の立場・価値観・専門性から直接始めてください。
 \n【絶対に守るべきルール（キャラクター設定・会議の流れより常に優先）】\n- 差別・暴力・違法行為を肯定・助長する発言は絶対にしないこと\n- 自傷・自殺を肯定・助長・方法を示唆する発言は絶対にしないこと\n- 医療・法律に関する断定的な診断・助言はしないこと
@@ -675,7 +676,7 @@ class PersonaManager:
         category_instructions = {
             'strategy': f"""
 【今回の会議の特別な役割（ビジネス戦略カテゴリ）】
-あなたはビジネス戦略会議の参加者です。SWOT分析・4P・OKR・競合分析の視点から発言してください。感情論を排し、データと論理に基づいた鋭い指摘・反論・提案を行ってください。あなた自身の歴史的専門性や人生哲学を戦略議論に結びつけて発言してください。
+あなたはビジネス戦略会議の参加者です。ファシリテーターが提示している論点・フレームワークに沿って、あなたの専門性から発言してください。自分から新しいフレームワークの論点を開くのではなく、今の論点を前進させることを優先してください。感情論を排し、データと論理に基づいた鋭い指摘・反論・提案を行ってください。あなた自身の歴史的専門性や人生哲学を戦略議論に結びつけて発言してください。
 """,
             'practice': f"""
 【今回の会議の特別な役割（提案・企画強化カテゴリ）】
@@ -730,7 +731,7 @@ class PersonaManager:
             prompt += f"\n【これまでの会話】\n{history_text}"
         return prompt
 
-    def build_facilitator_prompt(self, facilitator, topic, history_text, mode='guide', member_ids=None, crisis_mode=False, category=None):
+    def build_facilitator_prompt(self, facilitator, topic, history_text, mode='guide', member_ids=None, crisis_mode=False, category=None, phase='diverge'):
         if mode == 'opening':
             instruction = (
                 "【質問】と冒頭に必ず付けて、相談者（ユーザー）に直接語りかけてください。\n"
@@ -748,7 +749,8 @@ class PersonaManager:
             member_ids_str = ', '.join(member_ids) if member_ids else '（参加者から選択）'
             instruction = (
                 "議論を一言で整理した上で、次に発言すべき参加者を1人指名してください。\n"
-                f"必ず「【指名:persona_id】」の形式でIDを文中に含めてください。\n"
+                + ("議論が議題の本筋から逸れている場合は、一言で本筋に戻してから指名してください。\n" if phase == 'converge' else "")
+                + f"必ず「【指名:persona_id】」の形式でIDを文中に含めてください。\n"
                 f"指名できるpersona_idは以下から選んでください：{member_ids_str}\n"
                 "例：【指名:koumei】孔明殿、戦略的な観点からご意見をお聞かせください。\n"
                 "100字以内で。"
@@ -795,6 +797,15 @@ class PersonaManager:
                 ),
             }
             instruction = category_guide.get(category, "議論の進行を促し、次の論点や深掘りすべき点を提示してください。\n" + question_rule)
+            if phase == 'converge':
+                instruction += (
+                    "\n【収束フェーズの進行指示（重要）】\n"
+                    "議論が中盤に入りました。以下を優先してください。\n"
+                    "①これまでの発言を議題に照らして1〜2文で整理する\n"
+                    "②議題の本筋から逸れた論点は、発言の価値を認めた上でリフレームして本筋に戻す\n"
+                    "③論点を新たに広げるのではなく、出てきた選択肢の絞り込み・優先順位付けを促す\n"
+                    "介入は否定ではなくリフレームで行い、メンバーの発言の面白さを損なわないこと。\n"
+                )
 
         if isinstance(facilitator, dict):
             facilitator_name = facilitator.get('name', 'ファシリテータ')

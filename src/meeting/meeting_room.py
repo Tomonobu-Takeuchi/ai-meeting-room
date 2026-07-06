@@ -140,11 +140,14 @@ class MeetingRoom:
             else:
                 mode = 'guide'
         member_ids = [m['id'] for m in session.get('members', [])]
+        # フェーズ判定：ユーザー発言3回未満=発散(diverge)、3回以上=収束(converge)
+        user_msg_count = sum(1 for m in session["messages"] if m.get("role") == "user")
+        phase = 'converge' if user_msg_count >= 3 else 'diverge'
         system_prompt = self.persona_manager.build_facilitator_prompt(
             session["facilitator"], session["topic"], discussion_text,
             mode=mode, member_ids=member_ids,
             crisis_mode=session.get("crisis_flag", False),
-            category=session.get("category")
+            category=session.get("category"), phase=phase
         )
         try:
             full_response = ""
