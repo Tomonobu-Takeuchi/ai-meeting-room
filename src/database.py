@@ -17,8 +17,8 @@ def get_conn_params():
         'user': url.username,
         'password': url.password,
     }
-    # ローカル開発環境（localhost）はSSL不要
-    if url.hostname != 'localhost':
+    # ローカル開発環境（localhost/127.0.0.1）はSSL不要
+    if url.hostname not in ('localhost', '127.0.0.1'):
         params['ssl_context'] = True
     return params
 

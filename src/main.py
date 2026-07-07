@@ -2381,7 +2381,7 @@ def ratelimit_handler(e):
 
 
 _health_db_cache = {"ok": True, "checked_at": 0.0}
-_HEALTH_CACHE_TTL_SEC = 30
+_HEALTH_CACHE_TTL_SEC = 90
 
 def _refresh_health_db_cache():
     """DB疎通確認を実行し、_health_db_cacheを更新して結果(bool)を返す"""
