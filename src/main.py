@@ -3,6 +3,7 @@ AI-PERSONA会議室 - メインサーバー（ユーザー認証対応版）
 """
 import io
 import os
+import time
 import re
 import hashlib
 import sys
@@ -2379,19 +2380,28 @@ def ratelimit_handler(e):
     }), 429
 
 
+_health_db_cache = {"ok": True, "checked_at": 0.0}
+_HEALTH_CACHE_TTL_SEC = 30
+
 @app.route("/api/health")
 def health():
     user_id = get_current_user_id()
-    db_ok = True
-    try:
-        from src.database import get_connection
-        conn = get_connection()
+    now = time.time()
+    if now - _health_db_cache["checked_at"] > _HEALTH_CACHE_TTL_SEC:
+        db_ok = True
         try:
-            conn.run("SELECT 1")
-        finally:
-            conn.close()
-    except Exception:
-        db_ok = False
+            from src.database import get_connection
+            conn = get_connection()
+            try:
+                conn.run("SELECT 1")
+            finally:
+                conn.close()
+        except Exception:
+            db_ok = False
+        _health_db_cache["ok"] = db_ok
+        _health_db_cache["checked_at"] = now
+    else:
+        db_ok = _health_db_cache["ok"]
     return jsonify({
         "status": "ok" if db_ok else "db_error",
         "db": "ok" if db_ok else "error",
