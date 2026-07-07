@@ -79,7 +79,8 @@ limiter = Limiter(
     app=app,
     key_func=get_remote_address,
     storage_uri="memory://",
-    default_limits=[]
+    default_limits=[],
+    enabled=os.environ.get('DISABLE_RATE_LIMIT', '').lower() != 'true'
 )
 
 init_db()
@@ -992,6 +993,7 @@ def suggest_team():
 # ===== 会議API =====
 
 @app.route("/api/meeting/start", methods=["POST"])
+@limiter.limit("10 per hour;30 per day", exempt_when=lambda: session.get('user_id') is not None)
 def start_meeting():
     user_id = get_current_user_id()
     data = request.json
@@ -1010,6 +1012,11 @@ def start_meeting():
                 "monthly_count": status.get('monthly_meeting_count', 0)
             }), 403
     else:
+        if os.environ.get('GUEST_MODE_DISABLED', '').lower() == 'true':
+            return jsonify({
+                "error": "現在、ゲスト利用を一時停止しています。無料登録のうえご利用ください。",
+                "code": "GUEST_DISABLED"
+            }), 403
         guest_count = session.get('guest_meeting_count', 0)
         if guest_count >= 3:
             return jsonify({
@@ -2364,15 +2371,34 @@ def tokutori():
     return send_from_directory(app.static_folder, "tokutori.html")
 
 
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return jsonify({
+        "error": "アクセスが集中しています。しばらく時間をおいてお試しください。",
+        "code": "RATE_LIMIT"
+    }), 429
+
+
 @app.route("/api/health")
 def health():
     user_id = get_current_user_id()
+    db_ok = True
+    try:
+        from src.database import get_connection
+        conn = get_connection()
+        try:
+            conn.run("SELECT 1")
+        finally:
+            conn.close()
+    except Exception:
+        db_ok = False
     return jsonify({
-        "status": "ok",
+        "status": "ok" if db_ok else "db_error",
+        "db": "ok" if db_ok else "error",
         "api_key_set": bool(os.getenv("ANTHROPIC_API_KEY")),
         "user_id": user_id,
         "version": "v0.9-auth"
-    })
+    }), (200 if db_ok else 503)
 
 
 # ===== アカウント管理API =====

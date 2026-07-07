@@ -76,6 +76,16 @@ try {
     }
 
     Write-Log "SUCCESS" "backup_$stamp.zip created (${zipSize}MB, sql ${sqlSize}bytes)"
+
+    # --- デッドマンスイッチ：healthchecks.ioへ成功ping（未設定なら何もしない） ---
+    if ($cfg["HEALTHCHECK_URL"]) {
+        try {
+            Invoke-RestMethod -Uri $cfg["HEALTHCHECK_URL"] -TimeoutSec 10 | Out-Null
+            Write-Log "INFO" "healthcheck ping sent"
+        } catch {
+            Write-Log "WARNING" "healthcheck ping failed: $($_.Exception.Message)"
+        }
+    }
     exit 0
 } catch {
     Write-Log "ERROR" $_.Exception.Message
