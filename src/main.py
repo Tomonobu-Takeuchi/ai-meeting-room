@@ -2383,23 +2383,27 @@ def ratelimit_handler(e):
 _health_db_cache = {"ok": True, "checked_at": 0.0}
 _HEALTH_CACHE_TTL_SEC = 30
 
+def _refresh_health_db_cache():
+    """DB疎通確認を実行し、_health_db_cacheを更新して結果(bool)を返す"""
+    db_ok = True
+    try:
+        from src.database import get_connection
+        conn = get_connection()
+        try:
+            conn.run("SELECT 1")
+        finally:
+            conn.close()
+    except Exception:
+        db_ok = False
+    _health_db_cache["ok"] = db_ok
+    _health_db_cache["checked_at"] = time.time()
+    return db_ok
+
 @app.route("/api/health")
 def health():
     user_id = get_current_user_id()
-    now = time.time()
-    if now - _health_db_cache["checked_at"] > _HEALTH_CACHE_TTL_SEC:
-        db_ok = True
-        try:
-            from src.database import get_connection
-            conn = get_connection()
-            try:
-                conn.run("SELECT 1")
-            finally:
-                conn.close()
-        except Exception:
-            db_ok = False
-        _health_db_cache["ok"] = db_ok
-        _health_db_cache["checked_at"] = now
+    if time.time() - _health_db_cache["checked_at"] > _HEALTH_CACHE_TTL_SEC:
+        db_ok = _refresh_health_db_cache()
     else:
         db_ok = _health_db_cache["ok"]
     return jsonify({
@@ -2409,6 +2413,10 @@ def health():
         "user_id": user_id,
         "version": "v0.9-auth"
     }), (200 if db_ok else 503)
+
+# 起動時ウォームアップ：モジュール読込時（gunicorn起動時・test_comprehensive.pyのimport時の
+# 両方）に1回DBチェックを実行し、最初の/api/health呼び出しからキャッシュを有効にする
+_refresh_health_db_cache()
 
 
 # ===== アカウント管理API =====
