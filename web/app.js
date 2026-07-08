@@ -571,7 +571,7 @@ async function init() {
     DOM.voiceModeBtn?.addEventListener('click', toggleVoiceMode);
     DOM.stopSpeakBtn?.addEventListener('click', stopSpeaking);
     DOM.micBtn?.addEventListener('click', () => {
-      if (State.isSpeaking) { stopSpeaking(); }
+      stopSpeaking();
       startVoiceInput(DOM.chatInput, DOM.micBtn);
     });
     DOM.topicMicBtn?.addEventListener('click', () => {
@@ -2633,6 +2633,17 @@ async function triggerMemberResponse(personaId, trigger = null) {
   });
 }
 
+function stripMarkdownForSpeech(text) {
+  return text
+    .replace(/^#{1,6}\s*/gm, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/^-{3,}\s*$/gm, '')
+    .replace(/^\|.*\|\s*$/gm, '')
+    .replace(/^[-*]\s+/gm, '')
+    .replace(/\n{2,}/g, '\n')
+    .trim();
+}
+
 async function invokeFacilitator() {
   if (!State.sessionId || State.isStreaming) return;
   State.isStreaming = true; setStreamingButtons(true);
@@ -2652,7 +2663,7 @@ async function invokeFacilitator() {
     }, 30000);
   }
   armWatchdog();
-  evtSource.onmessage = (e) => {
+  evtSource.onmessage = async (e) => {
     armWatchdog();
     const data = JSON.parse(e.data);
     if (data.type === 'chunk') {
@@ -2667,7 +2678,7 @@ async function invokeFacilitator() {
         showQuestionBadge();
         State.waitingForUser = true;
       }
-      if (State.voiceMode && fullText) speakText(fullText.replace(/【質問】/g, '').trim(), 'facilitator', streamEl?.querySelector('.facilitator-banner'));
+      if (State.voiceMode && fullText) await speakText(stripMarkdownForSpeech(fullText.replace(/【質問】/g, '').trim()), 'facilitator', streamEl?.querySelector('.facilitator-banner'));
     } else if (data.type === 'error') {
       clearTimeout(watchdog);
       typingEl?.remove(); streamEl?.remove(); evtSource.close();

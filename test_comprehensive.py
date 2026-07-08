@@ -45,12 +45,14 @@ DB_TIMEOUT = 15  # 秒
 
 def db_conn():
     url = urlparse(os.environ.get('DATABASE_URL', ''))
-    return pg8000.native.Connection(
-        host=url.hostname, port=url.port or 5432,
-        database=url.path.lstrip('/'), user=url.username,
-        password=url.password, ssl_context=True,
-        timeout=DB_TIMEOUT,
-    )
+    params = {
+        'host': url.hostname, 'port': url.port or 5432,
+        'database': url.path.lstrip('/'), 'user': url.username,
+        'password': url.password, 'timeout': DB_TIMEOUT,
+    }
+    if url.hostname not in ('localhost', '127.0.0.1'):
+        params['ssl_context'] = True
+    return pg8000.native.Connection(**params)
 
 
 def check(ok: bool, label: str) -> bool:
