@@ -847,7 +847,7 @@ def suggest_team():
     # chatカテゴリ（カテゴリ未選択）：Haikuで議題を判定し、chatならスキップ・他カテゴリならチーム提案
     if category == 'chat':
         try:
-            haiku_client_pre = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+            haiku_client_pre = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"), timeout=120.0)
             haiku_pre_res = haiku_client_pre.messages.create(
                 model="claude-haiku-4-5",
                 max_tokens=20,
@@ -879,7 +879,7 @@ def suggest_team():
     else:
         # カテゴリ未選択時：Haikuで判定してCATEGORY_PATTERNSからペルソナを決める
         try:
-            haiku_client_pre = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+            haiku_client_pre = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"), timeout=120.0)
             haiku_pre_res = haiku_client_pre.messages.create(
                 model="claude-haiku-4-5",
                 max_tokens=20,
@@ -928,7 +928,7 @@ def suggest_team():
     opponent_label = None
     if category == 'relationship' or suggested_category == 'relationship':
         try:
-            haiku_client2 = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+            haiku_client2 = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"), timeout=120.0)
             opponent_res = haiku_client2.messages.create(
                 model="claude-haiku-4-5",
                 max_tokens=30,
@@ -1068,7 +1068,7 @@ def detect_crisis(text):
     if not any(c in text for c in CANDIDATE_WORDS):
         return False
     try:
-        _client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
+        _client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'), timeout=120.0)
         response = _client.messages.create(
             model='claude-haiku-4-5',
             max_tokens=10,
@@ -1339,7 +1339,7 @@ def get_meeting_issues(session_id):
     if not summary:
         return jsonify({"issues": []})
     try:
-        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"), timeout=120.0)
         issues = _extract_issues(client, summary["topic"])
         return jsonify({"issues": issues})
     except Exception:
@@ -1404,7 +1404,7 @@ def generate_brief(session_id):
         app.logger.info(f"[BRIEF] user_id={user_id} plan={plan} trial_layer2={trial_layer2_used} trial_layer3={trial_layer3_used}")
 
         discussion, user_messages = _build_discussion_text(summary)
-        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"), timeout=120.0)
         member_names = ", ".join([m["name"] for m in summary["members"]])
         user_context = "\n".join([f"・{m}" for m in user_messages]) if user_messages else "（なし）"
 
@@ -1491,7 +1491,7 @@ def generate_brief_layer2(session_id):
 
         discussion, _ = _build_discussion_text(summary)
         member_names = ", ".join([m["name"] for m in summary["members"]])
-        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"), timeout=120.0)
 
         l2_prompt = f"""{LAYER2_TEMPLATES['common']}
 議題：{summary['topic']}
@@ -1572,7 +1572,7 @@ def generate_brief_layer3(session_id):
 
         discussion, _ = _build_discussion_text(summary)
         member_names = ", ".join([m["name"] for m in summary["members"]])
-        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"), timeout=120.0)
 
         l3_tmpl_prompt = LAYER3_TEMPLATES.get(category, LAYER3_TEMPLATES['strategy'])
         layer3_prompt = f"""{l3_tmpl_prompt}
@@ -1664,7 +1664,7 @@ def generate_brief_pdf(session_id):
         from weasyprint import HTML
         from jinja2 import Environment, FileSystemLoader
 
-        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"), timeout=120.0)
         discussion = ""
         user_messages = []
         for msg in summary.get("messages", []):
@@ -1745,7 +1745,7 @@ def generate_brief_pdf_layer2(session_id):
         from weasyprint import HTML
         from jinja2 import Environment, FileSystemLoader
 
-        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"), timeout=120.0)
         issues = _extract_issues(client, topic)
         now = datetime.now()
 
@@ -1788,7 +1788,7 @@ def generate_brief_pdf_layer3(session_id):
         from weasyprint import HTML
         from jinja2 import Environment, FileSystemLoader
 
-        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"), timeout=120.0)
         issues = _extract_issues(client, topic)
         now = datetime.now()
 

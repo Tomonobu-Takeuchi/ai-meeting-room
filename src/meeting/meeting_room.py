@@ -27,7 +27,7 @@ class MeetingRoom:
             data_dir = os.path.join(base, "data", "meetings")
         self.data_dir = data_dir
         os.makedirs(data_dir, exist_ok=True)
-        self.client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        self.client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"), timeout=120.0)
         self.model = "claude-sonnet-4-6"
         self.sessions = {}
 
