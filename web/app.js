@@ -275,26 +275,13 @@ function speakText(text, personaId, targetEl = null) {
     const speakTimer = setTimeout(() => { done(); }, estimatedMs);
     State.currentSpeakTimer = speakTimer;
 
-    let keepAliveTimer = null;
-    if (!isIOS) {
-      keepAliveTimer = setInterval(() => {
-        if (window.speechSynthesis.speaking) {
-          window.speechSynthesis.pause();
-          window.speechSynthesis.resume();
-        }
-      }, 10000);
-      State.currentKeepAliveTimer = keepAliveTimer;
-    }
-
     utterance.onstart = () => {
       State.isSpeaking = true;
       if (targetEl) targetEl.classList.add('voice-speaking');
     };
     const done = () => {
       clearTimeout(speakTimer);
-      if (keepAliveTimer) clearInterval(keepAliveTimer);
       if (State.currentSpeakTimer === speakTimer) State.currentSpeakTimer = null;
-      if (State.currentKeepAliveTimer === keepAliveTimer) State.currentKeepAliveTimer = null;
       State.isSpeaking = false;
       if (targetEl) targetEl.classList.remove('voice-speaking');
       if (State.speakEndResolve) { State.speakEndResolve(); State.speakEndResolve = null; }
@@ -405,10 +392,6 @@ function stopSpeaking() {
   if (State.currentSpeakTimer) {
     clearTimeout(State.currentSpeakTimer);
     State.currentSpeakTimer = null;
-  }
-  if (State.currentKeepAliveTimer) {
-    clearInterval(State.currentKeepAliveTimer);
-    State.currentKeepAliveTimer = null;
   }
   if (State.currentTTSAudio) {
     try { State.currentTTSAudio.pause(); } catch (e) {}
