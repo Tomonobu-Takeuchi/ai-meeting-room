@@ -273,6 +273,7 @@ function speakText(text, personaId, targetEl = null) {
     const charCount = speakStr.length;
     const estimatedMs = Math.min(Math.max(charCount * 200 + 5000, 8000), 60000);
     const speakTimer = setTimeout(() => { done(); }, estimatedMs);
+    State.currentSpeakTimer = speakTimer;
 
     utterance.onstart = () => {
       State.isSpeaking = true;
@@ -280,6 +281,7 @@ function speakText(text, personaId, targetEl = null) {
     };
     const done = () => {
       clearTimeout(speakTimer);
+      if (State.currentSpeakTimer === speakTimer) State.currentSpeakTimer = null;
       State.isSpeaking = false;
       if (targetEl) targetEl.classList.remove('voice-speaking');
       if (State.speakEndResolve) { State.speakEndResolve(); State.speakEndResolve = null; }
@@ -387,6 +389,10 @@ async function previewVoice(mode) {
 
 function stopSpeaking() {
   if (window.speechSynthesis) window.speechSynthesis.cancel();
+  if (State.currentSpeakTimer) {
+    clearTimeout(State.currentSpeakTimer);
+    State.currentSpeakTimer = null;
+  }
   if (State.currentTTSAudio) {
     try { State.currentTTSAudio.pause(); } catch (e) {}
     State.currentTTSAudio = null;
