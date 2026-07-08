@@ -95,13 +95,13 @@ class MeetingRoom:
     def generate_member_response_stream(self, session_id, persona_id, trigger_message=None):
         session = self.sessions.get(session_id)
         if not session:
-            yield "data: [ERROR] セッションが見つかりません\n\n"
+            yield f"data: {_dumps({'type': 'error', 'message': 'セッションが見つかりません'})}\n\n"
             return
         user_id = session.get("user_id")
         persona = (self.persona_manager.get_persona(persona_id, user_id=user_id)
                    or self.persona_manager.get_persona(persona_id))
         if not persona:
-            yield "data: [ERROR] ペルソナが見つかりません\n\n"
+            yield f"data: {_dumps({'type': 'error', 'message': 'ペルソナが見つかりません'})}\n\n"
             return
         messages = self._build_conversation_history(session, persona_id, trigger_message)
         is_opponent = (session.get("opponent_persona_id") == persona_id)
@@ -127,7 +127,7 @@ class MeetingRoom:
     def generate_facilitator_response_stream(self, session_id, mode=None):
         session = self.sessions.get(session_id)
         if not session:
-            yield "data: [ERROR] セッションが見つかりません\n\n"
+            yield f"data: {_dumps({'type': 'error', 'message': 'セッションが見つかりません'})}\n\n"
             return
         discussion_text = self._format_discussion(session)
         # modeが指定されていない場合はメッセージ数で自動判定
@@ -170,7 +170,7 @@ class MeetingRoom:
     def generate_auto_discussion_stream(self, session_id, rounds=1):
         session = self.sessions.get(session_id)
         if not session:
-            yield "data: [ERROR] セッションが見つかりません\n\n"
+            yield f"data: {_dumps({'type': 'error', 'message': 'セッションが見つかりません'})}\n\n"
             return
         for member in session["members"]:
             yield f"data: {_dumps({'type': 'speaking_start', 'persona_id': member['id']})}\n\n"
