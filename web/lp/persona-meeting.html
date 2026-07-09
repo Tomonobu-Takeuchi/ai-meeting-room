@@ -134,6 +134,8 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 .plan-item::before{content:"✓";color:var(--cyan);flex-shrink:0}
 .free-c{color:#7F8C8D}.std-c{color:var(--cyan)}.pro-c{color:#E59866}
 .plan-badge{display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;border-radius:12px;background:rgba(192,48,32,0.2);color:#E59866;margin-bottom:8px}
+.plan-campaign{display:inline-block;background:#412402;color:#FAC775;font-size:12px;font-weight:500;padding:3px 10px;border-radius:20px;margin-bottom:8px;}
+.plan-p-old{color:#5F5E5A;font-size:16px;text-decoration:line-through;margin-right:8px;font-weight:400;}
 
 /* CTA */
 #cta{text-align:center;padding:90px 5%}
@@ -357,9 +359,10 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
         <div class="plan-item">Layer2/3：試用1回ずつ</div>
       </div>
       <div class="plan">
+        <div class="plan-campaign">今だけ半額キャンペーン</div>
         <div class="plan-n std-c">Standard</div>
-        <div class="plan-p">¥480<span> / 月〜</span></div>
-        <div class="plan-unit">継続課金・先着100名アーリーバード価格（終了後¥980/月）</div>
+        <div class="plan-p"><span class="plan-p-old">¥980</span>¥480<span> / 月〜</span></div>
+        <div class="plan-unit">先着100名アーリーバード価格・終了後¥980/月</div>
         <div class="plan-div"></div>
         <div class="plan-item">会議回数：月15回まで</div>
         <div class="plan-item">ペルソナ作成：無制限</div>
@@ -368,9 +371,10 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
       </div>
       <div class="plan featured">
         <div class="plan-badge">ビジネス利用向け</div>
+        <div class="plan-campaign">今だけ半額キャンペーン</div>
         <div class="plan-n pro-c">Pro</div>
-        <div class="plan-p">¥980<span> / 月</span></div>
-        <div class="plan-unit">月額制・自動更新</div>
+        <div class="plan-p"><span class="plan-p-old">¥1,980</span>¥980<span> / 月</span></div>
+        <div class="plan-unit">先着100名アーリーバード価格・終了後¥1,980/月</div>
         <div class="plan-div"></div>
         <div class="plan-item">会議回数：無制限</div>
         <div class="plan-item">ペルソナ作成：無制限</div>
