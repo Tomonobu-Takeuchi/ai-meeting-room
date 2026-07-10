@@ -143,6 +143,10 @@ def init_db():
         conn.run("ALTER TABLE users ADD COLUMN IF NOT EXISTS birth_date DATE")
     except Exception:
         pass
+    try:
+        conn.run("ALTER TABLE users ADD COLUMN IF NOT EXISTS pending_deletion_at TIMESTAMP")
+    except Exception:
+        pass
 
     # ===== persona_learnテーブル（user_id追加） =====
     conn.run("""
@@ -236,7 +240,7 @@ def get_user_by_email(email):
         SELECT id, email, name, plan, password_hash, avatar,
                credits, plan_expires_at, monthly_meeting_count,
                trial_layer2_used, trial_layer3_used,
-               is_earlybird, billing_anchor_day
+               is_earlybird, billing_anchor_day, pending_deletion_at
         FROM users WHERE email=:email
     """, email=email)
     if not rows:
@@ -245,7 +249,7 @@ def get_user_by_email(email):
     d = row_to_dict(['id','email','name','plan','password_hash','avatar',
                      'credits','plan_expires_at','monthly_meeting_count',
                      'trial_layer2_used','trial_layer3_used',
-                     'is_earlybird','billing_anchor_day'], rows[0])
+                     'is_earlybird','billing_anchor_day','pending_deletion_at'], rows[0])
     d['name'] = decrypt_value(conn, d['name'])
     conn.close()
     return d
@@ -820,6 +824,27 @@ def init_phase_tables(conn):
         )
     """)
 
+    # ===== access_logsテーブル（セキュリティ監視・障害対応用。保持期間90日でスケジューラが自動パージ） =====
+    conn.run("""
+        CREATE TABLE IF NOT EXISTS access_logs (
+            id           SERIAL PRIMARY KEY,
+            user_id      INTEGER NULL,
+            ip_address   TEXT,
+            user_agent   TEXT,
+            method       TEXT,
+            path         TEXT,
+            status_code  INTEGER,
+            created_at   TIMESTAMP DEFAULT NOW()
+        )
+    """)
+    try:
+        conn.run("""
+            CREATE INDEX IF NOT EXISTS idx_access_logs_created_at
+            ON access_logs (created_at)
+        """)
+    except Exception:
+        pass
+
     # ===== crisis_keywordsテーブル =====
     conn.run("""
         CREATE TABLE IF NOT EXISTS crisis_keywords (
@@ -1301,3 +1326,89 @@ def set_standard_plan(user_id, stripe_customer_id):
         conn.close()
         raise RuntimeError(f"set_standard_plan failed (user={user_id}): {e}") from e
     conn.close()
+
+
+# ===== account-soft-delete / access-log-feature（スケジューラから呼び出し） =====
+
+def hard_delete_user(user_id):
+    """アカウントと関連データを完全削除する（退会申請から90日経過後にスケジューラが呼び出す）"""
+    conn = get_connection()
+    try:
+        try:
+            conn.run("""
+                DELETE FROM meeting_messages
+                WHERE meeting_id IN (SELECT id FROM meetings WHERE user_id=:uid)
+            """, uid=user_id)
+        except Exception:
+            pass
+        try:
+            conn.run("DELETE FROM meetings WHERE user_id=:uid", uid=user_id)
+        except Exception:
+            pass
+        try:
+            conn.run("""
+                DELETE FROM persona_learn
+                WHERE persona_id IN (SELECT id FROM personas WHERE user_id=:uid)
+            """, uid=user_id)
+        except Exception:
+            pass
+        try:
+            conn.run("DELETE FROM persona_feedback WHERE user_id=:uid", uid=user_id)
+        except Exception:
+            pass
+        try:
+            conn.run("DELETE FROM persona_growth WHERE user_id=:uid", uid=user_id)
+        except Exception:
+            pass
+        try:
+            conn.run("DELETE FROM persona_meeting_stats WHERE user_id=:uid", uid=user_id)
+        except Exception:
+            pass
+        try:
+            conn.run("DELETE FROM personas WHERE user_id=:uid", uid=user_id)
+        except Exception:
+            pass
+        try:
+            conn.run("DELETE FROM users WHERE id=:uid", uid=user_id)
+        except Exception:
+            pass
+    finally:
+        conn.close()
+
+
+def get_users_pending_hard_delete():
+    """pending_deletion_atが現在時刻以前（＝退会申請から90日経過）のユーザーIDを返す"""
+    conn = get_connection()
+    try:
+        rows = conn.run("""
+            SELECT id FROM users
+            WHERE pending_deletion_at IS NOT NULL AND pending_deletion_at <= NOW()
+        """)
+        return [r[0] for r in rows]
+    finally:
+        conn.close()
+
+
+def purge_old_access_logs(days=90):
+    """access_logsのうち保持期間(days)を超えたレコードを削除する"""
+    conn = get_connection()
+    try:
+        conn.run(
+            "DELETE FROM access_logs WHERE created_at < NOW() - (:days || ' days')::INTERVAL",
+            days=str(int(days))
+        )
+    finally:
+        conn.close()
+
+
+def record_access_log(user_id, ip_address, user_agent, method, path, status_code):
+    """1リクエスト分のアクセスログを記録する"""
+    conn = get_connection()
+    try:
+        conn.run("""
+            INSERT INTO access_logs (user_id, ip_address, user_agent, method, path, status_code)
+            VALUES (:uid, :ip, :ua, :method, :path, :status)
+        """, uid=user_id, ip=ip_address, ua=(user_agent or '')[:500],
+             method=method, path=(path or '')[:500], status=status_code)
+    finally:
+        conn.close()

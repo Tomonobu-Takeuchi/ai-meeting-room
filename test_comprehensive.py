@@ -1458,6 +1458,125 @@ def test_func15_header_dom_ids():
         check(False, "renderAuthArea() 関数がapp.js内に見つかる")
 
 
+def test_ops9_scheduler_schema():
+    section("運用試験9: スケジューラ関連DBスキーマ整合性確認（access-log-feature/account-soft-delete）")
+    from src.database import get_connection
+
+    conn = get_connection()
+    try:
+        def _cols(table: str) -> set:
+            rows = conn.run("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name=:t AND table_schema='public'
+            """, t=table)
+            return {r[0] for r in rows}
+
+        users_cols = _cols('users')
+        check('pending_deletion_at' in users_cols, "usersテーブルにpending_deletion_atが存在する")
+
+        access_logs_cols = _cols('access_logs')
+        for c in ['user_id', 'ip_address', 'user_agent', 'method', 'path', 'status_code', 'created_at']:
+            check(c in access_logs_cols, f"access_logsテーブルに{c}が存在する")
+    finally:
+        conn.close()
+
+
+# ─── 機能試験 16: account-soft-delete（退会ソフトデリート） ──────────
+
+def test_func16_account_soft_delete():
+    """注意：本テストは専用のflask_app.test_client()を新規に開いて使う。
+    テストスイート全体で共有される client fixture のセッションを
+    register/delete操作で上書き・破壊しないようにするため（他テストへの副作用防止）。"""
+    section("機能試験16: account-soft-delete（退会即時非表示化＋90日後削除）")
+    from src.database import get_connection, hard_delete_user, get_users_pending_hard_delete
+
+    ts = str(int(time.time()))
+    email = f"softdel_{ts}@test.invalid"
+    pw = "testpass123"
+    uid = None
+
+    conn = get_connection()
+    try:
+        with flask_app.test_client() as c1:
+            r = c1.post('/api/auth/register',
+                        json={'email': email, 'password': pw, 'name': 'ソフト削除テスト',
+                              'tos_agreed': True, 'birth_date': '1990-01-01'})
+            check_code(r, 200, "退会テスト用ユーザー登録 → 200")
+            uid = (r.get_json() or {}).get('user', {}).get('id')
+
+            # DELETE /api/auth/account 実行（即時非表示化のみ、実データは残る想定）
+            r2 = c1.delete('/api/auth/account', json={'current_password': pw})
+            check_code(r2, 200, "DELETE /api/auth/account → 200")
+            msg = (r2.get_json() or {}).get('message', '')
+            check('90日' in msg, "退会レスポンスに90日後削除の説明が含まれる")
+
+        row = conn.run("SELECT pending_deletion_at FROM users WHERE id=:id", id=uid)
+        check(bool(row) and row[0][0] is not None,
+              "退会直後、usersレコードは削除されずpending_deletion_atが設定されている（即時非表示化）")
+
+        # 退会手続き中はログイン不可（さらに別の専用クライアントで確認）
+        with flask_app.test_client() as c2:
+            r3 = c2.post('/api/auth/login', json={'email': email, 'password': pw})
+            check_code(r3, 403, "退会手続き中アカウントへのログイン → 403")
+            check((r3.get_json() or {}).get('code') == 'ACCOUNT_PENDING_DELETION',
+                  "ログイン拒否のcodeがACCOUNT_PENDING_DELETION")
+
+        # pending_deletion_atを過去日時に書き換え、スケジューラの抽出対象になることを確認
+        conn.run("UPDATE users SET pending_deletion_at=NOW() - INTERVAL '1 day' WHERE id=:id", id=uid)
+        pending_ids = get_users_pending_hard_delete()
+        check(uid in pending_ids, "get_users_pending_hard_delete()が対象ユーザーを抽出する")
+
+        # hard_delete_user()実行 → usersレコードが実際に削除される
+        hard_delete_user(uid)
+        row2 = conn.run("SELECT id FROM users WHERE id=:id", id=uid)
+        check(len(row2) == 0, "hard_delete_user()実行後、usersレコードが完全に削除されている")
+    finally:
+        try:
+            if uid is not None:
+                conn.run("DELETE FROM users WHERE id=:id", id=uid)
+        except Exception:
+            pass
+        conn.close()
+
+
+# ─── 機能試験 17: access-log-feature ──────────
+
+def test_func17_access_log(client):
+    section("機能試験17: access-log-feature（記録＋90日パージ）")
+    from src.database import get_connection, purge_old_access_logs
+
+    conn = get_connection()
+    try:
+        before = conn.run("SELECT COUNT(*) FROM access_logs WHERE path=:p", p='/api/auth/me')[0][0]
+        client.get('/api/auth/me')
+        after = conn.run("SELECT COUNT(*) FROM access_logs WHERE path=:p", p='/api/auth/me')[0][0]
+        check(after > before, "GET /api/auth/me 実行後、access_logsに新規レコードが記録される")
+
+        check_res = conn.run("SELECT COUNT(*) FROM access_logs WHERE path=:p", p='/api/health')
+        # /api/healthはログ対象外のため、直近リクエストでは増加しないことを別途確認
+        h_before = conn.run("SELECT COUNT(*) FROM access_logs WHERE path=:p", p='/api/health')[0][0]
+        client.get('/api/health')
+        h_after = conn.run("SELECT COUNT(*) FROM access_logs WHERE path=:p", p='/api/health')[0][0]
+        check(h_after == h_before, "/api/healthはアクセスログ記録の対象外（除外設定が機能している）")
+
+        # 90日超過レコードを模擬作成し、purge_old_access_logs()で削除されることを確認
+        old_id_rows = conn.run("""
+            INSERT INTO access_logs (user_id, ip_address, user_agent, method, path, status_code, created_at)
+            VALUES (NULL, '127.0.0.1', 'pytest', 'GET', '/api/__purge_test__', 200, NOW() - INTERVAL '91 days')
+            RETURNING id
+        """)
+        old_id = old_id_rows[0][0]
+        purge_old_access_logs(90)
+        remain = conn.run("SELECT COUNT(*) FROM access_logs WHERE id=:id", id=old_id)[0][0]
+        check(remain == 0, "purge_old_access_logs(90)で91日前のレコードが削除される")
+    finally:
+        try:
+            conn.run("DELETE FROM access_logs WHERE path=:p", p='/api/__purge_test__')
+        except Exception:
+            pass
+        conn.close()
+
+
 def safe_run(name: str, func, *args):
     """テスト関数を安全に実行。DB接続エラー等は SKIP として記録し継続。"""
     import pg8000.exceptions
@@ -1514,6 +1633,9 @@ if __name__ == '__main__':
             safe_run("運用試験8: 新規DBカラム整合性",        test_ops8_new_columns)
             safe_run("機能試験14: デフォルトペルソナ表示",   test_func14_default_persona_visibility, client)
             safe_run("機能試験15: ヘッダーDOM ID整合性",     test_func15_header_dom_ids)
+            safe_run("運用試験9: スケジューラ関連DBスキーマ整合性", test_ops9_scheduler_schema)
+            safe_run("機能試験16: account-soft-delete",       test_func16_account_soft_delete)
+            safe_run("機能試験17: access-log-feature",        test_func17_access_log,          client)
     finally:
         cleanup()
 

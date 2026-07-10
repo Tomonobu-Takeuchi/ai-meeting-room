@@ -34,7 +34,9 @@ from src.database import (
     get_crisis_keywords,
     set_earlybird_and_billing_anchor, count_earlybird_users,
     reset_monthly_meeting_count, set_standard_plan,
+    record_access_log,
 )
+from src.scheduler import init_scheduler
 
 STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
 STRIPE_PUBLIC_KEY = os.environ.get('STRIPE_PUBLIC_KEY', '')
@@ -85,6 +87,7 @@ limiter = Limiter(
 )
 
 init_db()
+init_scheduler()
 persona_manager = PersonaManager()
 meeting_room = MeetingRoom(persona_manager)
 
@@ -92,6 +95,24 @@ meeting_room = MeetingRoom(persona_manager)
 def get_current_user_id():
     """現在ログイン中のユーザーIDを返す（未ログインはNone）"""
     return session.get('user_id')
+
+
+@app.after_request
+def _log_access(response):
+    """アクセスログ記録（/api/配下・/api/healthを除く。失敗してもレスポンスには影響させない）"""
+    try:
+        if request.path.startswith('/api/') and request.path != '/api/health':
+            record_access_log(
+                user_id=get_current_user_id(),
+                ip_address=request.headers.get('X-Forwarded-For', request.remote_addr),
+                user_agent=request.headers.get('User-Agent', ''),
+                method=request.method,
+                path=request.path,
+                status_code=response.status_code,
+            )
+    except Exception:
+        pass
+    return response
 
 def login_required(f):
     """ログイン必須デコレータ"""
@@ -207,6 +228,10 @@ def login():
 
     if not bcrypt.checkpw(password.encode('utf-8'), user['password_hash'].encode('utf-8')):
         return jsonify({"error": "メールアドレスまたはパスワードが違います"}), 401
+
+    # account-soft-delete: 退会手続き中（pending_deletion_at設定済み）のアカウントはログイン不可
+    if user.get('pending_deletion_at'):
+        return jsonify({"error": "このアカウントは退会手続き中のため、ログインできません", "code": "ACCOUNT_PENDING_DELETION"}), 403
 
     remember_me = data.get('rememberMe', True)
     session.permanent = bool(remember_me)
@@ -2591,52 +2616,19 @@ def delete_account():
                 except Exception as e:
                     return jsonify({"error": f"Stripeサブスクリプションのキャンセルに失敗しました: {e}"}), 500
 
-    # DB削除（FK制約順）
+    # account-soft-delete: 即時非表示化（ログイン不可）のみ行い、実データ削除は
+    # pending_deletion_atから90日後にスケジューラ（src/scheduler.py）が実行する
     conn = get_connection()
     try:
-        try:
-            conn.run("""
-                DELETE FROM meeting_messages
-                WHERE meeting_id IN (SELECT id FROM meetings WHERE user_id=:uid)
-            """, uid=user_id)
-        except Exception:
-            pass
-        try:
-            conn.run("DELETE FROM meetings WHERE user_id=:uid", uid=user_id)
-        except Exception:
-            pass
-        try:
-            conn.run("""
-                DELETE FROM persona_learn
-                WHERE persona_id IN (SELECT id FROM personas WHERE user_id=:uid)
-            """, uid=user_id)
-        except Exception:
-            pass
-        try:
-            conn.run("DELETE FROM persona_feedback WHERE user_id=:uid", uid=user_id)
-        except Exception:
-            pass
-        try:
-            conn.run("DELETE FROM persona_growth WHERE user_id=:uid", uid=user_id)
-        except Exception:
-            pass
-        try:
-            conn.run("DELETE FROM persona_meeting_stats WHERE user_id=:uid", uid=user_id)
-        except Exception:
-            pass
-        try:
-            conn.run("DELETE FROM personas WHERE user_id=:uid", uid=user_id)
-        except Exception:
-            pass
-        try:
-            conn.run("DELETE FROM users WHERE id=:uid", uid=user_id)
-        except Exception:
-            pass
+        conn.run(
+            "UPDATE users SET pending_deletion_at=NOW() + INTERVAL '90 days' WHERE id=:uid",
+            uid=user_id
+        )
     finally:
         conn.close()
 
     session.clear()
-    return jsonify({"message": "アカウントを削除しました"})
+    return jsonify({"message": "退会手続きを受け付けました。90日後にアカウントとデータが完全に削除されます"})
 
 
 if __name__ == "__main__":
