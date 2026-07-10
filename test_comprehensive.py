@@ -1577,6 +1577,37 @@ def test_func17_access_log(client):
         conn.close()
 
 
+def test_func18_pricing_modal_campaign():
+    """pricing-modal-design：プランを選択モーダルにLPと同じ「今だけ半額キャンペーン」表示が
+    導入されていることを確認する（読み取り専用・副作用なし）。"""
+    section("機能試験18: pricing-modal-design（プランを選択モーダルのキャンペーン表示）")
+    base = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(base, 'web', 'index.html'), encoding='utf-8') as f:
+        html = f.read()
+    with open(os.path.join(base, 'web', 'app.js'), encoding='utf-8') as f:
+        js = f.read()
+
+    for i in ['standardCampaignBadge', 'proCampaignBadge']:
+        check(f'id="{i}"' in html, f"index.html に id={i} が存在する")
+
+    check('pricing-card-price-old' in html, "index.htmlの初期HTMLに取り消し線価格クラスが存在する")
+    check(html.count('今だけ半額キャンペーン') == 2,
+          "index.htmlにキャンペーンバッジ文言が2箇所（スタンダード・プロ）存在する")
+
+    if 'async function refreshEarlybirdStatus()' in js:
+        start = js.index('async function refreshEarlybirdStatus()')
+        nxt = js.find('\nfunction ', start + 10)
+        block = js[start:nxt] if nxt != -1 else js[start:start + 3000]
+        for i in ['standardCampaignBadge', 'proCampaignBadge']:
+            check(i in block, f"refreshEarlybirdStatus() が {i} を参照している")
+        check('pricing-card-price-old' in block,
+              "refreshEarlybirdStatus() が取り消し線価格クラスを動的に設定している")
+        check("classList.add('hidden')" in block and "classList.remove('hidden')" in block,
+              "refreshEarlybirdStatus() がキャンペーンバッジの表示/非表示を切り替えている（is_full対応）")
+    else:
+        check(False, "refreshEarlybirdStatus() 関数がapp.js内に見つかる")
+
+
 def safe_run(name: str, func, *args):
     """テスト関数を安全に実行。DB接続エラー等は SKIP として記録し継続。"""
     import pg8000.exceptions
@@ -1636,6 +1667,7 @@ if __name__ == '__main__':
             safe_run("運用試験9: スケジューラ関連DBスキーマ整合性", test_ops9_scheduler_schema)
             safe_run("機能試験16: account-soft-delete",       test_func16_account_soft_delete)
             safe_run("機能試験17: access-log-feature",        test_func17_access_log,          client)
+            safe_run("機能試験18: pricing-modal-design",       test_func18_pricing_modal_campaign)
     finally:
         cleanup()
 

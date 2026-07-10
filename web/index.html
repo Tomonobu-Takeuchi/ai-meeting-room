@@ -377,6 +377,8 @@
     .pricing-card-label{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);}
     .pricing-card-price{font-size:26px;font-weight:700;color:var(--text-primary);}
     .pricing-card-price span{font-size:12px;font-weight:400;color:var(--text-secondary);}
+    .pricing-card-campaign{display:inline-block;background:rgba(245,158,11,0.15);color:var(--accent-orange);font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;margin-bottom:2px;}
+    .pricing-card-price-old{color:var(--text-muted);font-size:14px;text-decoration:line-through;margin-right:6px;font-weight:400;}
     .pricing-card-desc{font-size:12px;color:var(--text-secondary);line-height:1.6;}
     .pricing-card-features{list-style:none;display:flex;flex-direction:column;gap:5px;flex:1;}
     .pricing-card-features li{font-size:12px;color:var(--text-secondary);padding-left:16px;position:relative;}
@@ -1620,8 +1622,9 @@
       </div>
       <!-- スタンダード -->
       <div class="pricing-card">
+        <div class="pricing-card-campaign" id="standardCampaignBadge">今だけ半額キャンペーン</div>
         <div class="pricing-card-label">スタンダード</div>
-        <div class="pricing-card-price" id="standardPriceDisplay">¥480<span>/月</span></div>
+        <div class="pricing-card-price" id="standardPriceDisplay"><span class="pricing-card-price-old">¥980</span>¥480<span>/月</span></div>
         <div class="pricing-card-desc">継続課金（毎月更新・いつでも解約可）</div>
         <ul class="pricing-card-features">
           <li>月15回まで会議</li>
@@ -1635,8 +1638,9 @@
       <!-- プロ -->
       <div class="pricing-card recommended">
         <div class="badge-recommended">おすすめ</div>
+        <div class="pricing-card-campaign" id="proCampaignBadge">今だけ半額キャンペーン</div>
         <div class="pricing-card-label">プロ</div>
-        <div class="pricing-card-price" id="proPriceDisplay">¥980<span>/月</span></div>
+        <div class="pricing-card-price" id="proPriceDisplay"><span class="pricing-card-price-old">¥1,980</span>¥980<span>/月</span></div>
         <div class="pricing-card-desc">ヘビーユーザーに</div>
         <ul class="pricing-card-features">
           <li>月間会議回数無制限</li>

@@ -4193,27 +4193,35 @@ async function refreshEarlybirdStatus() {
     const counterEl = $('earlybirdCounter');
     const guideStdEl = $('guideStdPrice');
     const guideProEl = $('guideProPrice');
+    const stdCampaignEl = $('standardCampaignBadge');
+    const proCampaignEl = $('proCampaignBadge');
     if (data.is_full) {
       if (stdPriceEl) stdPriceEl.innerHTML = '¥980<span>/月</span>';
       if (proPriceEl) proPriceEl.innerHTML = '¥1,980<span>/月</span>';
       if (guideStdEl) guideStdEl.textContent = '¥980 / 月';
       if (guideProEl) guideProEl.textContent = '¥1,980 / 月';
+      // pricing-modal-design: キャンペーン終了時はバッジを非表示（正規価格のみ表示）
+      if (stdCampaignEl) stdCampaignEl.classList.add('hidden');
+      if (proCampaignEl) proCampaignEl.classList.add('hidden');
       if (counterEl) {
         counterEl.textContent = 'アーリーバード特典（先着100名）は終了しました。現在は正規価格（スタンダード¥980/月・プロ¥1,980/月）です。';
         counterEl.classList.remove('hidden');
       }
     } else {
-      if (stdPriceEl) stdPriceEl.innerHTML = '¥480<span>/月</span>';
-      if (proPriceEl) proPriceEl.innerHTML = '¥980<span>/月</span>';
+      // pricing-modal-design: LP（persona-meeting.html）と同じ「今だけ半額キャンペーン」表示に統一
+      if (stdPriceEl) stdPriceEl.innerHTML = '<span class="pricing-card-price-old">¥980</span>¥480<span>/月</span>';
+      if (proPriceEl) proPriceEl.innerHTML = '<span class="pricing-card-price-old">¥1,980</span>¥980<span>/月</span>';
       if (guideStdEl) guideStdEl.textContent = '¥480 / 月';
       if (guideProEl) guideProEl.textContent = '¥980 / 月';
+      if (stdCampaignEl) stdCampaignEl.classList.remove('hidden');
+      if (proCampaignEl) proCampaignEl.classList.remove('hidden');
       if (counterEl) {
         counterEl.textContent = `🎉 アーリーバード特典 残り${data.earlybird_remaining}枠（先着100名限定・終了後は正規価格 スタンダード¥980/月・プロ¥1,980/月）`;
         counterEl.classList.remove('hidden');
       }
     }
   } catch (e) {
-    // 取得失敗時はHTMLのデフォルト表示（アーリーバード価格）のまま
+    // 取得失敗時はHTMLのデフォルト表示（アーリーバード価格・キャンペーンバッジ表示）のまま
   }
 }
 
