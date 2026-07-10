@@ -808,6 +808,18 @@ def init_phase_tables(conn):
         )
     """)
 
+    # ===== meetingsテーブル（会議メタデータ。発言内容はJSONファイル保存のまま） =====
+    conn.run("""
+        CREATE TABLE IF NOT EXISTS meetings (
+            id          SERIAL PRIMARY KEY,
+            session_id  TEXT UNIQUE NOT NULL,
+            user_id     INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            topic       TEXT,
+            created_at  TIMESTAMP DEFAULT NOW(),
+            ended_at    TIMESTAMP
+        )
+    """)
+
     # ===== crisis_keywordsテーブル =====
     conn.run("""
         CREATE TABLE IF NOT EXISTS crisis_keywords (
@@ -879,6 +891,31 @@ def get_persona_patterns(persona_id, user_id, pattern_type=None, limit=5):
                 ORDER BY usage_count DESC LIMIT :limit
             """, persona_id=persona_id, user_id=user_id, limit=limit)
         return [{'pattern_type': r[0], 'pattern_text': r[1], 'usage_count': r[2]} for r in rows]
+    finally:
+        conn.close()
+
+
+# ===== meetingsテーブル =====
+
+def create_meeting_record(session_id, user_id, topic):
+    """会議開始時にmeetingsテーブルへ行を作成（ゲスト会議はuser_id=NULL）"""
+    conn = get_connection()
+    try:
+        conn.run("""
+            INSERT INTO meetings (session_id, user_id, topic)
+            VALUES (:session_id, :user_id, :topic)
+            ON CONFLICT (session_id) DO NOTHING
+        """, session_id=session_id, user_id=user_id, topic=topic)
+    finally:
+        conn.close()
+
+def end_meeting_record(session_id):
+    """会議終了時にended_atを記録"""
+    conn = get_connection()
+    try:
+        conn.run("""
+            UPDATE meetings SET ended_at=NOW() WHERE session_id=:session_id
+        """, session_id=session_id)
     finally:
         conn.close()
 

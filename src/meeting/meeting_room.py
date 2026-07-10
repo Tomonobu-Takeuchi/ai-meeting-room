@@ -9,6 +9,8 @@ from datetime import datetime, date
 
 import anthropic
 
+from src.database import create_meeting_record, end_meeting_record
+
 
 def _json_serial(obj):
     if isinstance(obj, (datetime, date)):
@@ -66,10 +68,20 @@ class MeetingRoom:
             "opponent_name": opponent_name,
         }
         self.sessions[session_id] = session
+        try:
+            create_meeting_record(session_id, user_id, topic)
+        except Exception as e:
+            print(f"meetings記録作成エラー: {e}")
         return session
 
     def get_session(self, session_id):
         return self.sessions.get(session_id)
+
+    def end_session(self, session_id):
+        try:
+            end_meeting_record(session_id)
+        except Exception as e:
+            print(f"meetings記録更新エラー: {e}")
 
     def set_crisis_flag(self, session_id):
         session = self.sessions.get(session_id)

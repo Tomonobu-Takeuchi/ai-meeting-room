@@ -1642,6 +1642,7 @@ def end_meeting(session_id):
         (lambda: persona_manager.extract_and_save_patterns(summary, user_id), "extract_and_save_patterns"),
         (lambda: [persona_manager.increment_persona_meeting_count(m['id'], user_id) for m in summary.get('members', [])], "increment_persona_meeting_count"),
         (lambda: persona_manager.on_conversation_end(summary, user_id), "on_conversation_end"),
+        (lambda: meeting_room.end_session(session_id), "end_session"),
     ]:
         try:
             func()
@@ -2613,6 +2614,14 @@ def delete_account():
             pass
         try:
             conn.run("DELETE FROM persona_feedback WHERE user_id=:uid", uid=user_id)
+        except Exception:
+            pass
+        try:
+            conn.run("DELETE FROM persona_growth WHERE user_id=:uid", uid=user_id)
+        except Exception:
+            pass
+        try:
+            conn.run("DELETE FROM persona_meeting_stats WHERE user_id=:uid", uid=user_id)
         except Exception:
             pass
         try:
