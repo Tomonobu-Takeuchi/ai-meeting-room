@@ -1608,6 +1608,44 @@ def test_func18_pricing_modal_campaign():
         check(False, "refreshEarlybirdStatus() 関数がapp.js内に見つかる")
 
 
+def test_ops10_edition_support_schema():
+    """派生版（海外版・カジュアル版）対応：スキーマ追加のみの回帰確認。
+    アプリロジックは今回追加していないため、カラム/テーブルの存在確認のみ行う。"""
+    section("運用試験10: 派生版対応スキーマ整合性確認（edition_subscriptions等）")
+    from src.database import get_connection
+
+    conn = get_connection()
+    try:
+        def _cols(table: str) -> set:
+            rows = conn.run("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name=:t AND table_schema='public'
+            """, t=table)
+            return {r[0] for r in rows}
+
+        meetings_cols = _cols('meetings')
+        check('edition' in meetings_cols, "meetingsテーブルにeditionが存在する")
+        check('language' in meetings_cols, "meetingsテーブルにlanguageが存在する")
+
+        personas_cols = _cols('personas')
+        check('edition' in personas_cols, "personasテーブルにeditionが存在する")
+
+        payments_cols = _cols('payments')
+        check('edition' in payments_cols, "paymentsテーブルにeditionが存在する")
+
+        es_cols = _cols('edition_subscriptions')
+        for c in ['user_id', 'edition', 'plan', 'credits', 'plan_expires_at',
+                  'monthly_meeting_count', 'stripe_customer_id', 'is_earlybird']:
+            check(c in es_cols, f"edition_subscriptionsテーブルに{c}が存在する")
+
+        # 既存usersテーブルのplan関連カラムが変更されていないこと（main版の動作に影響なきこと）
+        users_cols = _cols('users')
+        for c in ['plan', 'credits', 'monthly_meeting_count', 'stripe_customer_id']:
+            check(c in users_cols, f"usersテーブルの既存カラム{c}が変更されず残っている")
+    finally:
+        conn.close()
+
+
 def safe_run(name: str, func, *args):
     """テスト関数を安全に実行。DB接続エラー等は SKIP として記録し継続。"""
     import pg8000.exceptions
@@ -1668,6 +1706,7 @@ if __name__ == '__main__':
             safe_run("機能試験16: account-soft-delete",       test_func16_account_soft_delete)
             safe_run("機能試験17: access-log-feature",        test_func17_access_log,          client)
             safe_run("機能試験18: pricing-modal-design",       test_func18_pricing_modal_campaign)
+            safe_run("運用試験10: 派生版対応スキーマ整合性",    test_ops10_edition_support_schema)
     finally:
         cleanup()
 

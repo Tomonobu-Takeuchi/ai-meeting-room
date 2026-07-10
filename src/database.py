@@ -132,6 +132,10 @@ def init_db():
     except Exception:
         pass
     try:
+        conn.run("ALTER TABLE personas ADD COLUMN IF NOT EXISTS edition TEXT DEFAULT 'main'")
+    except Exception:
+        pass
+    try:
         conn.run("ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_layer2_used BOOLEAN DEFAULT FALSE")
     except Exception:
         pass
@@ -782,6 +786,34 @@ def init_payment_tables(conn):
             completed_at        TIMESTAMP
         )
     """)
+    try:
+        conn.run("ALTER TABLE payments ADD COLUMN IF NOT EXISTS edition TEXT DEFAULT 'main'")
+    except Exception:
+        pass
+
+    # ===== edition_subscriptions（派生版：海外版・カジュアル版の課金・プラン状態）=====
+    # usersのplan等はmain版（AI-Persona会議室）専用のまま変更しない。版ごとに別課金する方針のため分離。
+    conn.run("""
+        CREATE TABLE IF NOT EXISTS edition_subscriptions (
+            id                       SERIAL PRIMARY KEY,
+            user_id                  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            edition                  TEXT NOT NULL,
+            plan                     TEXT DEFAULT 'free',
+            credits                  INTEGER DEFAULT 0,
+            plan_expires_at          TIMESTAMP,
+            monthly_meeting_count    INTEGER DEFAULT 0,
+            monthly_reset_at         TIMESTAMP DEFAULT NOW(),
+            stripe_customer_id       TEXT,
+            is_earlybird             BOOLEAN DEFAULT FALSE,
+            billing_anchor_day       INTEGER,
+            trial_layer2_used        BOOLEAN DEFAULT FALSE,
+            trial_layer3_used        BOOLEAN DEFAULT FALSE,
+            layer3_monthly_count     INTEGER DEFAULT 0,
+            layer3_monthly_reset_at  TIMESTAMP DEFAULT NOW(),
+            created_at               TIMESTAMP DEFAULT NOW(),
+            UNIQUE(user_id, edition)
+        )
+    """)
 
 
 def init_phase_tables(conn):
@@ -823,6 +855,16 @@ def init_phase_tables(conn):
             ended_at    TIMESTAMP
         )
     """)
+
+    # ===== 派生版対応：meetingsに版・言語カラムを追加（DB共有・アプリ複製方式） =====
+    try:
+        conn.run("ALTER TABLE meetings ADD COLUMN IF NOT EXISTS edition TEXT DEFAULT 'main'")
+    except Exception:
+        pass
+    try:
+        conn.run("ALTER TABLE meetings ADD COLUMN IF NOT EXISTS language TEXT DEFAULT 'ja'")
+    except Exception:
+        pass
 
     # ===== access_logsテーブル（セキュリティ監視・障害対応用。保持期間90日でスケジューラが自動パージ） =====
     conn.run("""
