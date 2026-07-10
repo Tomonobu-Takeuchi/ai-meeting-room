@@ -158,8 +158,8 @@ def register():
         birth = date.fromisoformat(birth_date_str)
         today = date.today()
         age = today.year - birth.year - ((today.month, today.day) < (birth.month, birth.day))
-        if age < 18:
-            return jsonify({"error": "18歳未満の方はご利用いただけません", "code": "AGE_RESTRICTED"}), 400
+        if age < 14:
+            return jsonify({"error": "14歳未満の方はご利用いただけません", "code": "AGE_RESTRICTED"}), 400
     except ValueError:
         return jsonify({"error": "生年月日の形式が正しくありません（YYYY-MM-DD）"}), 400
 

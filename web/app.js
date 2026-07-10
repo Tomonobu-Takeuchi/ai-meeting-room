@@ -3945,7 +3945,7 @@ async function submitRegister() {
   const today = new Date();
   const age = today.getFullYear() - birthYear.getFullYear()
     - (today < new Date(today.getFullYear(), birthYear.getMonth(), birthYear.getDate()) ? 1 : 0);
-  if (age < 18) { errEl.textContent = '18歳未満の方はご利用いただけません'; return; }
+  if (age < 14) { errEl.textContent = '14歳未満の方はご利用いただけません'; return; }
   // T-01: 利用規約同意確認
   const tosAgreed = $('tosAgreeCheck')?.checked;
   if (!tosAgreed) { errEl.textContent = '利用規約およびプライバシーポリシーへの同意が必要です'; return; }

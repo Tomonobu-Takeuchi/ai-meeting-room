@@ -1344,15 +1344,25 @@ def test_func13_tos_check():
             else:
                 check(False, "DBのtos_agreed_atがNULLでない（ユーザー作成失敗）")
 
-            # 18歳未満登録拒否テスト
+            # 14歳未満登録拒否テスト
             with flask_app.test_client() as c_minor:
                 r_minor = c_minor.post('/api/auth/register',
                                         json={'email': f'minor_{email}', 'password': pw,
                                               'name': 'テスト未成年', 'tos_agreed': True,
-                                              'birth_date': '2015-01-01'})
-                check_code(r_minor, 400, "18歳未満登録 → 400エラー")
+                                              'birth_date': '2013-01-01'})
+                check_code(r_minor, 400, "14歳未満登録 → 400エラー")
                 minor_data = r_minor.get_json() or {}
-                check(minor_data.get('code') == 'AGE_RESTRICTED', "18歳未満エラーのcodeがAGE_RESTRICTED")
+                check(minor_data.get('code') == 'AGE_RESTRICTED', "14歳未満エラーのcodeがAGE_RESTRICTED")
+
+            # 14〜17歳登録許可テスト（14歳基準への統一確認）
+            teen_email = f'teen_{email}'
+            with flask_app.test_client() as c_teen:
+                r_teen = c_teen.post('/api/auth/register',
+                                      json={'email': teen_email, 'password': pw,
+                                            'name': 'テスト14歳', 'tos_agreed': True,
+                                            'birth_date': '2012-01-01'})
+                check_code(r_teen, 200, "14歳登録 → 200成功（旧18歳基準からの回帰防止）")
+            conn.run("DELETE FROM users WHERE email=:e", e=teen_email)
     finally:
         if uid:
             conn.run("DELETE FROM users WHERE id=:id", id=uid)
