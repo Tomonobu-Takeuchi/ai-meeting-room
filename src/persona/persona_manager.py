@@ -3,6 +3,7 @@ persona_manager.py - ペルソナ管理（ユーザー認証 + RAG対応版）
 """
 import uuid
 import os
+import random
 import threading
 from src.database import (
     get_connection, rows_to_dicts, row_to_dict,
@@ -628,20 +629,18 @@ class PersonaManager:
 
         # Phase 2: 発言パターンをプロンプトに反映
         if user_id:
-            patterns = get_persona_patterns(persona['id'], user_id, limit=6)
-            if patterns:
-                opening = [p['pattern_text'] for p in patterns if p['pattern_type'] == 'opening']
-                objection = [p['pattern_text'] for p in patterns if p['pattern_type'] == 'objection']
-                conclusion = [p['pattern_text'] for p in patterns if p['pattern_type'] == 'conclusion']
-                pattern_note = ''
-                if opening:
-                    pattern_note += '\n・発言冒頭の例：「' + opening[0][:60] + '…」'
-                if objection:
-                    pattern_note += '\n・反論時の例：「' + objection[0][:60] + '…」'
-                if conclusion:
-                    pattern_note += '\n・締めの例：「' + conclusion[0][:60] + '…」'
-                if pattern_note:
-                    prompt += '\n[あなたの発言スタイル（過去の会議から学習）]' + pattern_note + '\n'
+            opening = [p['pattern_text'] for p in get_persona_patterns(persona['id'], user_id, pattern_type='opening', limit=8)]
+            objection = [p['pattern_text'] for p in get_persona_patterns(persona['id'], user_id, pattern_type='objection', limit=8)]
+            conclusion = [p['pattern_text'] for p in get_persona_patterns(persona['id'], user_id, pattern_type='conclusion', limit=8)]
+            pattern_note = ''
+            if opening:
+                pattern_note += '\n・発言冒頭の例：「' + random.choice(opening)[:60] + '…」'
+            if objection:
+                pattern_note += '\n・反論時の例：「' + random.choice(objection)[:60] + '…」'
+            if conclusion:
+                pattern_note += '\n・締めの例：「' + random.choice(conclusion)[:60] + '…」'
+            if pattern_note:
+                prompt += '\n[あなたの発言スタイル（過去の会議から学習）]' + pattern_note + '\n'
 
         # Phase 3: 会議経験に応じた発言深度
         if user_id:

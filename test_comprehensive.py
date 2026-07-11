@@ -1646,6 +1646,58 @@ def test_ops10_edition_support_schema():
         conn.close()
 
 
+def test_ops11_pattern_randomization(client):
+    """案D：発言パターン選択のランダム化。build_system_prompt()が
+    毎回固定文言にならないこと、およびパターン0件・1件でもエラーなく動作することを確認する。"""
+    section("運用試験11: 発言パターン選択のランダム化（build_system_prompt）")
+    from src.persona.persona_manager import PersonaManager
+    from src.database import save_persona_pattern
+
+    user_id = state.get('user_id')
+    persona_id = state.get('main_persona_id')
+    if not (user_id and persona_id):
+        skip("運用試験11: テスト用ユーザー/ペルソナが未作成のためSKIP")
+        return
+
+    pm = PersonaManager()
+
+    # --- パターン0件（学習データなし）でもエラーにならないこと ---
+    try:
+        personas = pm.get_personas_by_ids([persona_id], user_id)
+        persona = personas[0]
+        prompt_empty = pm.build_system_prompt(persona, 'テスト議題（パターン0件）', user_id=user_id)
+        check(isinstance(prompt_empty, str), "パターン0件でもbuild_system_prompt()がエラーなく文字列を返す")
+    except Exception as e:
+        check(False, f"パターン0件でbuild_system_prompt()が例外: {e}")
+
+    # --- パターン1件のみでもrandom.choice()が例外にならないこと ---
+    save_persona_pattern(persona_id, user_id, 'opening', '本日はお集まりいただき感謝します、というのが私の定型です')
+    try:
+        personas = pm.get_personas_by_ids([persona_id], user_id)
+        persona = personas[0]
+        prompt_one = pm.build_system_prompt(persona, 'テスト議題（パターン1件）', user_id=user_id)
+        check('・発言冒頭の例：' in prompt_one, "パターン1件でも発言冒頭の例がプロンプトに反映される")
+    except Exception as e:
+        check(False, f"パターン1件でbuild_system_prompt()が例外: {e}")
+
+    # --- 同一pattern_typeに2件以上投入し、20回呼び出しても完全固定にならないこと ---
+    save_persona_pattern(persona_id, user_id, 'opening', '皆様、本日もよろしくお願いいたします')
+    save_persona_pattern(persona_id, user_id, 'objection', 'その点については異なる見解を持っています')
+    save_persona_pattern(persona_id, user_id, 'objection', '失礼ながら、その前提には疑問があります')
+    save_persona_pattern(persona_id, user_id, 'conclusion', '以上を踏まえ、私はこの案に賛成いたします')
+    save_persona_pattern(persona_id, user_id, 'conclusion', '結論として、慎重な再検討を提案します')
+
+    personas = pm.get_personas_by_ids([persona_id], user_id)
+    persona = personas[0]
+    generated = set()
+    for _ in range(20):
+        prompt = pm.build_system_prompt(persona, 'テスト議題（ランダム性確認）', user_id=user_id)
+        for line in prompt.split('\n'):
+            if '発言冒頭の例' in line or '反論時の例' in line or '締めの例' in line:
+                generated.add(line)
+    check(len(generated) >= 2, f"20回の呼び出しで発言パターン例が複数バリエーション生成される（観測: {len(generated)}種）")
+
+
 def safe_run(name: str, func, *args):
     """テスト関数を安全に実行。DB接続エラー等は SKIP として記録し継続。"""
     import pg8000.exceptions
@@ -1707,6 +1759,7 @@ if __name__ == '__main__':
             safe_run("機能試験17: access-log-feature",        test_func17_access_log,          client)
             safe_run("機能試験18: pricing-modal-design",       test_func18_pricing_modal_campaign)
             safe_run("運用試験10: 派生版対応スキーマ整合性",    test_ops10_edition_support_schema)
+            safe_run("運用試験11: 発言パターン選択のランダム化", test_ops11_pattern_randomization, client)
     finally:
         cleanup()
 
