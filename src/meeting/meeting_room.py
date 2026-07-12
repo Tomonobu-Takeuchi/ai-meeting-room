@@ -163,7 +163,7 @@ class MeetingRoom:
         )
         try:
             full_response = ""
-            with self._stream_with_retry(450, system_prompt, [{"role": "user", "content": "議論を整理して、次のステップを示してください。"}]) as stream:
+            with self._stream_with_retry(700, system_prompt, [{"role": "user", "content": "議論を整理して、次のステップを示してください。"}]) as stream:
                 for text in stream.text_stream:
                     full_response += text
                     yield f"data: {_dumps({'type': 'chunk', 'text': text, 'persona_id': 'facilitator'})}\n\n"
