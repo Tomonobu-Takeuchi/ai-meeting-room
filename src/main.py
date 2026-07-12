@@ -1870,8 +1870,24 @@ def text_to_speech():
 
 # ===== ストリーミングAPI =====
 
+def _check_stream_session_access(session_id):
+    """ストリーミング系ルート共通：セッション存在確認＋所有者チェック。
+    user_idが設定されたログインユーザーの会議のみ本人一致を要求する。
+    ゲスト会議（user_id=None）は既存仕様通りチェックなしで許可する。"""
+    session_obj = meeting_room.get_session(session_id)
+    if not session_obj:
+        return jsonify({"error": "セッションが見つかりません"}), 404
+    owner_id = session_obj.get("user_id")
+    if owner_id is not None and owner_id != get_current_user_id():
+        return jsonify({"error": "アクセス権限がありません"}), 403
+    return None
+
+
 @app.route("/api/stream/member/<session_id>/<persona_id>")
 def stream_member(session_id, persona_id):
+    access_error = _check_stream_session_access(session_id)
+    if access_error:
+        return access_error
     trigger = request.args.get("trigger", None)
     def generate():
         yield from meeting_room.generate_member_response_stream(session_id, persona_id, trigger)
@@ -1880,6 +1896,9 @@ def stream_member(session_id, persona_id):
 
 @app.route("/api/stream/facilitator/<session_id>")
 def stream_facilitator(session_id):
+    access_error = _check_stream_session_access(session_id)
+    if access_error:
+        return access_error
     mode = request.args.get('mode', None)
     def generate():
         yield from meeting_room.generate_facilitator_response_stream(session_id, mode=mode)
@@ -1888,6 +1907,9 @@ def stream_facilitator(session_id):
 
 @app.route("/api/stream/auto/<session_id>")
 def stream_auto(session_id):
+    access_error = _check_stream_session_access(session_id)
+    if access_error:
+        return access_error
     def generate():
         yield from meeting_room.generate_auto_discussion_stream(session_id)
     return Response(generate(), mimetype="text/event-stream",

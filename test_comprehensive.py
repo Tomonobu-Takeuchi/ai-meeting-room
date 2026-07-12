@@ -1698,6 +1698,80 @@ def test_ops11_pattern_randomization(client):
     check(len(generated) >= 2, f"20回の呼び出しで発言パターン例が複数バリエーション生成される（観測: {len(generated)}種）")
 
 
+def test_ops12_stream_access_control(client):
+    """stream-routes-missing-auth：ストリーミング3ルート（member/facilitator/auto）共通の
+    所有者チェック（_check_stream_session_access）を検証する。
+    403/404（アクセス拒否）は実HTTP経由で確認する（拒否時はgenerate()が呼ばれないためAPI課金なし）。
+    200（アクセス許可）は3ルートが共有する_check_stream_session_access()を直接呼び出して検証する
+    （facilitator/autoは許可時に実際にAnthropic APIを呼んでしまうため、実HTTP経由での200到達確認は
+    memberルートのみ・存在しないpersona_idを使う安全な経路で行う）。"""
+    section("運用試験12: ストリーミングAPIアクセス制御（stream-routes-missing-auth）")
+    from src.main import _check_stream_session_access
+    from flask import session as flask_session
+
+    user_id = state.get('user_id')
+    if not user_id:
+        skip("運用試験12: テスト用ユーザーが未作成のためSKIP")
+        return
+
+    # ゲストセッション
+    with flask_app.test_client() as guest:
+        r = guest.post('/api/meeting/start', json={'topic': 'access-control guest session'})
+        guest_sid = (r.get_json() or {}).get('session_id') if r.status_code == 200 else None
+
+    # 他人（別ユーザーC）のセッション
+    other_email = f"comp_{UNIQUE}_c@test.invalid"
+    with flask_app.test_client() as other:
+        other.post('/api/auth/register', json={
+            'email': other_email, 'password': TEST_PW, 'name': '他人テスト',
+            'tos_agreed': True, 'birth_date': '1990-01-01'})
+        other.post('/api/auth/login', json={'email': other_email, 'password': TEST_PW})
+        r3 = other.post('/api/meeting/start', json={'topic': 'access-control other-user session'})
+        other_sid = (r3.get_json() or {}).get('session_id') if r3.status_code == 200 else None
+
+    # 自分（ユーザーA＝client）のセッション
+    r4 = client.post('/api/meeting/start', json={'topic': 'access-control own session'})
+    own_sid = (r4.get_json() or {}).get('session_id') if r4.status_code == 200 else None
+
+    if not (guest_sid and other_sid and own_sid):
+        skip("運用試験12: セッション作成に失敗したためSKIP")
+        return
+
+    nonexistent_sid = 'nonexistent-' + str(uuid.uuid4())[:8]
+
+    # --- 403/404パターン：3ルートそれぞれ実HTTP経由（拒否時はAPI呼び出しなしのため安全） ---
+    for route_name, path_tmpl in [
+        ('member',      '/api/stream/member/{sid}/koumei'),
+        ('facilitator', '/api/stream/facilitator/{sid}'),
+        ('auto',        '/api/stream/auto/{sid}'),
+    ]:
+        r = client.get(path_tmpl.format(sid=other_sid))
+        check_code(r, 403, f"{route_name}: 他人のsession_idへのアクセス → 403")
+
+        r = client.get(path_tmpl.format(sid=nonexistent_sid))
+        check_code(r, 404, f"{route_name}: 存在しないsession_idへのアクセス → 404")
+
+    # --- 200（アクセス許可）パターン：3ルート共有の_check_stream_session_access()を直接検証 ---
+    with flask_app.test_request_context():
+        result = _check_stream_session_access(guest_sid)
+        check(result is None, "アクセス許可判定（3ルート共通ロジック）: ゲスト会議への無認証アクセスは許可される")
+
+    with flask_app.test_request_context():
+        flask_session['user_id'] = user_id
+        result = _check_stream_session_access(own_sid)
+        check(result is None, "アクセス許可判定（3ルート共通ロジック）: ログインユーザー本人のセッションへのアクセスは許可される")
+
+    # --- memberルートは実HTTP経由でも200到達を確認（存在しないpersona_idでAPI呼び出しを回避） ---
+    fake_pid = "stream_access_control_test_nonexistent"
+    r = client.get(f"/api/stream/member/{own_sid}/{fake_pid}")
+    check_code(r, 200, "member: 本人のセッションへの実HTTPアクセス → 200（generate()到達をエンドツーエンドで確認）")
+    check('text/event-stream' in r.headers.get('Content-Type', ''),
+          "member: 200応答のContent-Typeがtext/event-stream（アクセス制御通過後にストリーム応答が生成されている）")
+
+    r = client.get(f"/api/stream/member/{guest_sid}/{fake_pid}")
+    check_code(r, 200, "member: ゲストセッションへの実HTTPアクセス → 200（ゲスト会議の既存動作を維持）")
+
+
 def safe_run(name: str, func, *args):
     """テスト関数を安全に実行。DB接続エラー等は SKIP として記録し継続。"""
     import pg8000.exceptions
@@ -1760,6 +1834,7 @@ if __name__ == '__main__':
             safe_run("機能試験18: pricing-modal-design",       test_func18_pricing_modal_campaign)
             safe_run("運用試験10: 派生版対応スキーマ整合性",    test_ops10_edition_support_schema)
             safe_run("運用試験11: 発言パターン選択のランダム化", test_ops11_pattern_randomization, client)
+            safe_run("運用試験12: ストリーミングAPIアクセス制御", test_ops12_stream_access_control, client)
     finally:
         cleanup()
 
