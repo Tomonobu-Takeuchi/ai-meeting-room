@@ -155,6 +155,7 @@ def serve_appjs():
 # ===== ユーザー認証API =====
 
 @app.route("/api/auth/register", methods=["POST"])
+@limiter.limit("5 per hour;10 per day")
 def register():
     data = request.json
     email = data.get("email", "").strip().lower()
@@ -224,9 +225,11 @@ def login():
 
     user = get_user_by_email(email)
     if not user:
+        app.logger.warning(f"[LOGIN_FAIL] reason=no_user ip={get_remote_address()}")
         return jsonify({"error": "メールアドレスまたはパスワードが違います"}), 401
 
     if not bcrypt.checkpw(password.encode('utf-8'), user['password_hash'].encode('utf-8')):
+        app.logger.warning(f"[LOGIN_FAIL] reason=bad_password ip={get_remote_address()} user_id={user['id']}")
         return jsonify({"error": "メールアドレスまたはパスワードが違います"}), 401
 
     # account-soft-delete: 退会手続き中（pending_deletion_at設定済み）のアカウントはログイン不可
