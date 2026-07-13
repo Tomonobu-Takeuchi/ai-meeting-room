@@ -92,6 +92,7 @@ class MeetingRoom:
     def set_convergence(self, session_id, data):
         session = self.sessions.get(session_id)
         if not session:
+            print(f"[CONVERGENCE] session not found, skip save session_id={session_id}")
             return
         session["convergence"] = data
         self._save_session(session_id)

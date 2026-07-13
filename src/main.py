@@ -1388,6 +1388,7 @@ def _extract_convergence(session_summary, category):
     try:
         discussion, _ = _build_discussion_text(session_summary)
         if not discussion:
+            app.logger.warning("[CONVERGENCE] empty discussion")
             return None
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"), timeout=120.0)
         resp = client.messages.create(
@@ -1399,8 +1400,11 @@ def _extract_convergence(session_summary, category):
         text = resp.content[0].text.strip().replace("```json", "").replace("```", "").strip()
         data = json.loads(text)
         if not isinstance(data.get("decisions"), list):
+            app.logger.warning("[CONVERGENCE] decisions missing or not a list")
             return None
         data["category"] = category  # 安全弁2のための記録
+        confirmed = sum(1 for d in data["decisions"] if d.get("status") == "confirmed")
+        app.logger.warning(f"[CONVERGENCE] extracted {len(data['decisions'])} decisions ({confirmed} confirmed)")
         return data
     except Exception as e:
         app.logger.warning(f"[CONVERGENCE] extract failed: {e}")
@@ -1653,6 +1657,12 @@ def generate_brief_layer3(session_id):
 
         constraint_block = ""
         conv = (meeting_room.sessions.get(session_id) or {}).get("convergence")
+        if conv is None and meeting_room.sessions.get(session_id):
+            raw_session = meeting_room.sessions.get(session_id) or {}
+            conv = _extract_convergence(summary, raw_session.get("category", "chat"))
+            if conv:
+                meeting_room.set_convergence(session_id, conv)
+                app.logger.warning("[CONVERGENCE] lazy-extracted at layer3")
         if conv and conv.get("category") == category:  # 安全弁2
             confirmed = [d for d in conv.get("decisions", []) if d.get("status") == "confirmed"]
             tentative = [d for d in conv.get("decisions", []) if d.get("status") == "tentative"]
@@ -1738,6 +1748,15 @@ def end_meeting(session_id):
     summary = meeting_room.get_session_summary(session_id)
     if not summary:
         return jsonify({"error": "セッションが見つかりません"}), 404
+    try:
+        raw_session = meeting_room.sessions.get(session_id) or {}
+        conv = _extract_convergence(summary, raw_session.get("category", "chat"))
+        if conv:
+            meeting_room.set_convergence(session_id, conv)
+        else:
+            app.logger.warning("[CONVERGENCE] nothing to save")
+    except Exception as e:
+        app.logger.warning(f"[CONVERGENCE] skipped: {e}")
     for func, name in [
         (lambda: persona_manager.save_meeting_log(summary, user_id), "save_meeting_log"),
         (lambda: persona_manager.extract_and_save_patterns(summary, user_id), "extract_and_save_patterns"),
@@ -1750,13 +1769,6 @@ def end_meeting(session_id):
             app.logger.info(f"[END_MEETING] {name} 完了")
         except Exception as e:
             app.logger.error(f"[END_MEETING] {name} エラー: {e}")
-    try:
-        raw_session = meeting_room.sessions.get(session_id) or {}
-        conv = _extract_convergence(summary, raw_session.get("category", "chat"))
-        if conv:
-            meeting_room.set_convergence(session_id, conv)
-    except Exception as e:
-        app.logger.warning(f"[CONVERGENCE] skipped: {e}")
     return jsonify({"message": "会議終了処理完了"})
 
 

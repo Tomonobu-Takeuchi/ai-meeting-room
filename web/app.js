@@ -2462,7 +2462,7 @@ async function endMeeting() {
   const endSessionId = State.sessionId;
   if (endSessionId) {
     try {
-      await API.post(`/api/meeting/${endSessionId}/end`, {});
+      await API.post(`/api/meeting/${endSessionId}/end`, {}, 120000);
       console.log('[LOG] 会議終了API呼び出し sessionId=' + endSessionId);
     } catch(e) {
       console.error('[LOG] 会議終了APIエラー:', e);
