@@ -1359,6 +1359,53 @@ def _extract_issues(client, topic):
     except Exception:
         return []
 
+CONVERGENCE_EXTRACT_PROMPT = """以下の会議ログから、決定事項を抽出してください。
+厳守事項：
+- basis（根拠）は、ユーザー（「あなた」名義の発言者）の発言に実際に存在する内容のみ。
+- ユーザーが明言・選択したものは status を "confirmed"、ペルソナの提案にユーザーが明確に同意していないものは "tentative"。
+- 会議ログに登場しない数値・案を創作してはいけません。
+- 議論されなかった重要項目は unresolved に列挙してください。
+- decisions は重要なものから最大5件まで。basis は40字以内の1文。rejected は最大2件。
+- unresolved は最大5件。
+- 前置き・説明・補足は一切書かないこと。
+
+以下のJSON形式のみで出力してください：
+{
+  "decisions": [
+    {"item": "決定項目名（例：ターゲット市場）",
+     "value": "決定内容",
+     "status": "confirmed または tentative",
+     "basis": "根拠となるユーザー発言の要約（1文）",
+     "rejected": ["検討されたが選ばれなかった案（あれば）"],
+     "changed_from": "途中で変更された場合の旧値（なければ空文字）"}
+  ],
+  "unresolved": ["議論されなかった・決まらなかった重要項目"]
+}
+JSONのみ出力してください。"""
+
+def _extract_convergence(session_summary, category):
+    """会議終了時の決定事項抽出（第1段）。失敗時はNoneを返す。"""
+    try:
+        discussion, _ = _build_discussion_text(session_summary)
+        if not discussion:
+            return None
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"), timeout=120.0)
+        resp = client.messages.create(
+            model="claude-haiku-4-5",
+            max_tokens=1500,
+            messages=[{"role": "user", "content":
+                f"{CONVERGENCE_EXTRACT_PROMPT}\n\n議題：{session_summary['topic']}\n会議ログ：\n{discussion}"}],
+        )
+        text = resp.content[0].text.strip().replace("```json", "").replace("```", "").strip()
+        data = json.loads(text)
+        if not isinstance(data.get("decisions"), list):
+            return None
+        data["category"] = category  # 安全弁2のための記録
+        return data
+    except Exception as e:
+        app.logger.warning(f"[CONVERGENCE] extract failed: {e}")
+        return None
+
 @app.route("/api/meeting/<session_id>/issues", methods=["POST"])
 @login_required
 def get_meeting_issues(session_id):
@@ -1603,7 +1650,33 @@ def generate_brief_layer3(session_id):
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"), timeout=120.0)
 
         l3_tmpl_prompt = LAYER3_TEMPLATES.get(category, LAYER3_TEMPLATES['strategy'])
-        layer3_prompt = f"""{l3_tmpl_prompt}
+
+        constraint_block = ""
+        conv = (meeting_room.sessions.get(session_id) or {}).get("convergence")
+        if conv and conv.get("category") == category:  # 安全弁2
+            confirmed = [d for d in conv.get("decisions", []) if d.get("status") == "confirmed"]
+            tentative = [d for d in conv.get("decisions", []) if d.get("status") == "tentative"]
+            if confirmed or tentative:
+                lines = ["【この会議で決定された事項（レポートはこれに厳密に従うこと）】"]
+                for d in confirmed:
+                    lines.append(f"- {d.get('item')}：{d.get('value')}【確定】根拠：{d.get('basis','')}"
+                                 + (f"（変更前：{d['changed_from']}）" if d.get('changed_from') else ""))
+                for d in tentative:
+                    lines.append(f"- {d.get('item')}：{d.get('value')}【仮・ユーザー未確定】")
+                if conv.get("unresolved"):
+                    lines.append("【会議で未決着の項目（open_issuesに含めること）】")
+                    for u in conv["unresolved"]:
+                        lines.append(f"- {u}")
+                lines.append(
+                    "レポート作成ルール：【確定】事項を戦略の主軸とし、これと矛盾する内容を書かないこと。"
+                    "【仮】の事項を採用する場合は、reason欄に会議で挙がった案からの仮置きである旨を1文で明記すること。"
+                    "会議に登場しない数値・ターゲット・案を新たに発明しないこと。"
+                    "未決着項目はopen_issuesに必ず反映すること。")
+                constraint_block = "\n".join(lines) + "\n\n"
+
+        app.logger.warning(f"[CONVERGENCE] layer3 injection={'on' if constraint_block else 'off'}")
+
+        layer3_prompt = f"""{constraint_block}{l3_tmpl_prompt}
 議題：{summary['topic']}
 参加者：{member_names}
 議論内容：
@@ -1677,6 +1750,13 @@ def end_meeting(session_id):
             app.logger.info(f"[END_MEETING] {name} 完了")
         except Exception as e:
             app.logger.error(f"[END_MEETING] {name} エラー: {e}")
+    try:
+        raw_session = meeting_room.sessions.get(session_id) or {}
+        conv = _extract_convergence(summary, raw_session.get("category", "chat"))
+        if conv:
+            meeting_room.set_convergence(session_id, conv)
+    except Exception as e:
+        app.logger.warning(f"[CONVERGENCE] skipped: {e}")
     return jsonify({"message": "会議終了処理完了"})
 
 

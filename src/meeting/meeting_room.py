@@ -89,6 +89,13 @@ class MeetingRoom:
             session["crisis_flag"] = True
             self._save_session(session_id)
 
+    def set_convergence(self, session_id, data):
+        session = self.sessions.get(session_id)
+        if not session:
+            return
+        session["convergence"] = data
+        self._save_session(session_id)
+
     def add_message(self, session_id, role, persona_id, content):
         session = self.sessions.get(session_id)
         if not session:
