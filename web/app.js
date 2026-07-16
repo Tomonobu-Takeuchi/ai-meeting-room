@@ -2347,6 +2347,7 @@ async function startMeeting() {
   DOM.startMeetingBtn.disabled = true;
   setLoading(true);
   try {
+    if (typeof gtag === 'function') { gtag('event', 'meeting_start'); }
     const data = await API.post('/api/meeting/start', {
       topic,
       member_ids: State.selectedMemberIds,
