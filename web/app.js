@@ -61,6 +61,7 @@ const State = {
   addLearnFiles: [], editLearnFiles: [], deletePendingId: null,
   editSubmitting: false, addSubmitting: false,
   voiceMode: false, isSpeaking: false, isRecognizing: false,
+  ttsDone: null, speechInterrupted: false,
   recognition: null, jaVoices: [],
   speakEndResolve: null,
   currentTTSAudio: null, currentTTSSource: null,
@@ -324,6 +325,7 @@ async function speakWithTTS(text, voiceId, targetEl = null) {
         State.currentTTSSource = source;
         const estimatedMs = Math.min(Math.max(text.length * 80 + 3000, 5000), 30000);
         const done = () => {
+          State.ttsDone = null;
           clearTimeout(ttsTimer);
           State.isSpeaking = false;
           State.currentTTSSource = null;
@@ -332,6 +334,7 @@ async function speakWithTTS(text, voiceId, targetEl = null) {
         };
         const ttsTimer = setTimeout(done, estimatedMs);
         source.onended = done;
+        State.ttsDone = done;
         source.start(0);
       });
     }
@@ -342,6 +345,7 @@ async function speakWithTTS(text, voiceId, targetEl = null) {
     return new Promise(resolve => {
       const estimatedMs = Math.min(Math.max(text.length * 80 + 3000, 5000), 30000);
       const done = () => {
+        State.ttsDone = null;
         clearTimeout(ttsTimer);
         State.isSpeaking = false;
         State.currentTTSAudio = null;
@@ -352,6 +356,7 @@ async function speakWithTTS(text, voiceId, targetEl = null) {
       const ttsTimer = setTimeout(done, estimatedMs);
       audio.onended = done;
       audio.onerror = done;
+      State.ttsDone = done;
       audio.play().then(() => {
         State.isSpeaking = true;
       }).catch(done);
@@ -401,6 +406,7 @@ function stopSpeaking() {
     State.currentTTSSource = null;
   }
   State.isSpeaking = false;
+  if (State.ttsDone) { const d = State.ttsDone; State.ttsDone = null; d(); }
   if (State.speakEndResolve) { State.speakEndResolve(); State.speakEndResolve = null; }
   document.querySelectorAll('.voice-speaking').forEach(el => el.classList.remove('voice-speaking'));
 }
@@ -569,6 +575,7 @@ async function init() {
     }
     DOM.voiceModeBtn?.addEventListener('click', toggleVoiceMode);
     DOM.micBtn?.addEventListener('click', () => {
+      State.speechInterrupted = true;
       stopSpeaking();
       startVoiceInput(DOM.chatInput, DOM.micBtn);
     });
@@ -577,7 +584,7 @@ async function init() {
       startVoiceInput(DOM.topicInput, DOM.topicMicBtn);
     });
     DOM.chatMessages?.addEventListener('click', () => {
-      if (State.voiceMode) { stopSpeaking(); }
+      if (State.voiceMode && State.isSpeaking) { State.speechInterrupted = true; stopSpeaking(); }
     });
 
     DOM.addMemberBtn?.addEventListener('click', openAddModal);
@@ -2548,6 +2555,7 @@ async function sendUserMessage() {
 }
 
 async function triggerMemberResponse(personaId, trigger = null) {
+  if (State.isSpeaking) stopSpeaking();
   if (!State.sessionId || State.isStreaming) return;
   State.isStreaming = true; setStreamingButtons(true);
   const persona = State.members.find(m => m.id === personaId); if (!persona) return;
@@ -2592,6 +2600,8 @@ async function triggerMemberResponse(personaId, trigger = null) {
         streamEl?.querySelector('.msg-bubble')?.classList.remove('streaming');
         evtSource.close();
         setMemberSpeaking(personaId, false); scrollToBottom();
+        State.isStreaming = false;
+        setStreamingButtons(false);
         if (State.voiceMode && fullText) {
           if (persona.voice_id) {
             await speakWithTTS(fullText, persona.voice_id, streamEl?.querySelector('.msg-bubble'));
@@ -2599,8 +2609,6 @@ async function triggerMemberResponse(personaId, trigger = null) {
             await speakText(fullText, personaId, streamEl?.querySelector('.msg-bubble'));
           }
         }
-        State.isStreaming = false;
-        setStreamingButtons(false);
         resolve();
       } else if (data.type === 'error') {
         clearTimeout(watchdog);
@@ -2693,20 +2701,20 @@ async function invokeFacilitator() {
 
 async function allRespond() {
   if (!State.sessionId || State.isStreaming) return;
-  State.waitingForUser = false;
+  State.waitingForUser = false; State.speechInterrupted = false;
   for (const member of State.members.filter(m => State.selectedMemberIds.includes(m.id))) {
     await triggerMemberResponse(member.id);
-    if (State.waitingForUser) break;  // 質問が出たらループ中断
+    if (State.waitingForUser || State.speechInterrupted) break;  // 質問または停止操作で中断
   }
 }
 
 async function autoDiscuss() {
   if (!State.sessionId || State.isStreaming) return;
-  State.waitingForUser = false;
+  State.waitingForUser = false; State.speechInterrupted = false;
   for (const member of State.members.filter(m => State.selectedMemberIds.includes(m.id))) {
     await triggerMemberResponse(member.id);
     await waitForSpeechEnd();
-    if (State.waitingForUser) break;  // 質問が出たらループ中断
+    if (State.waitingForUser || State.speechInterrupted) break;  // 質問または停止操作で中断
   }
 }
 
