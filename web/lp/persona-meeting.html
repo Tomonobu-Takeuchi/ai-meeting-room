@@ -137,6 +137,14 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 .plan-campaign{display:inline-block;background:#412402;color:#FAC775;font-size:12px;font-weight:500;padding:3px 10px;border-radius:20px;margin-bottom:8px;}
 .plan-p-old{color:#5F5E5A;font-size:16px;text-decoration:line-through;margin-right:8px;font-weight:400;}
 
+/* QUOTES (L-8) */
+.quotes{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:28px}
+.quote-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:22px 18px}
+.quote-text{font-size:15px;font-weight:700;line-height:1.7;color:var(--white)}
+.quote-name{margin-top:12px;font-size:12px;color:var(--gray)}
+.quote-note{text-align:center;font-size:11px;color:var(--gray);margin-top:18px}
+@media(max-width:768px){.quotes{grid-template-columns:1fr}}
+
 /* CTA */
 #cta{text-align:center;padding:90px 5%}
 .cta-title{font-size:clamp(22px,4vw,38px);font-weight:900;margin-bottom:14px}
@@ -401,6 +409,20 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
         <div class="plan-item">Layer3：月30回まで</div>
       </div>
     </div>
+  </div>
+</section>
+
+<!-- QUOTES (L-8) -->
+<section class="sec">
+  <div class="sec-inner">
+    <p class="label">Voices</p>
+    <h2 class="title">会議で実際に飛び出した、賢人たちの言葉</h2>
+    <div class="quotes">
+      <div class="quote-card"><p class="quote-text">「二兎を追えば、戦略の鋭さが失われます」</p><p class="quote-name">── 諸葛亮孔明</p></div>
+      <div class="quote-card"><p class="quote-text">「経営者が求めるのは答えではなく、問いの質を上げる対話」</p><p class="quote-name">── 空海</p></div>
+      <div class="quote-card"><p class="quote-text">「あれこれ考えすぎて動けぬのが一番の失策じゃ」</p><p class="quote-name">── 豊臣秀吉</p></div>
+    </div>
+    <p class="quote-note">※AIペルソナが実際の会議シミュレーションで生成した発言を、そのまま掲載しています</p>
   </div>
 </section>
 
