@@ -1760,11 +1760,14 @@ def end_meeting(session_id):
         return jsonify({"error": "セッションが見つかりません"}), 404
     try:
         raw_session = meeting_room.sessions.get(session_id) or {}
-        conv = _extract_convergence(summary, raw_session.get("category", "chat"))
-        if conv:
-            meeting_room.set_convergence(session_id, conv)
+        if raw_session.get("convergence"):
+            app.logger.warning("[CONVERGENCE] already extracted, skip re-extraction at /end")
         else:
-            app.logger.warning("[CONVERGENCE] nothing to save")
+            conv = _extract_convergence(summary, raw_session.get("category", "chat"))
+            if conv:
+                meeting_room.set_convergence(session_id, conv)
+            else:
+                app.logger.warning("[CONVERGENCE] nothing to save")
     except Exception as e:
         app.logger.warning(f"[CONVERGENCE] skipped: {e}")
     for func, name in [

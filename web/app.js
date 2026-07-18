@@ -3092,6 +3092,7 @@ function setStreamingButtons(isStreaming) {
   DOM.sendBtn.disabled = isStreaming; DOM.allRespondBtn.disabled = isStreaming;
   DOM.autoDiscussBtn.disabled = isStreaming; DOM.facilitatorBtn.disabled = isStreaming;
   DOM.endMeetingBtn.disabled = isStreaming;
+  DOM.endMeetingBtn.title = isStreaming ? '発言が終わると押せるようになります' : '';
   DOM.memberTriggers.querySelectorAll('.member-trigger-btn').forEach(btn => btn.disabled = isStreaming);
   // モバイルボタンも連動
   if (DOM.mobileSummarizeBtn) DOM.mobileSummarizeBtn.disabled = isStreaming || !State.sessionId;
