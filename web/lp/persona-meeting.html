@@ -74,6 +74,14 @@ function closeModal(e){
     document.body.style.overflow='';
   }
 }
+function togglePersonaList(){
+  var g=document.getElementById('pAllGrid');
+  var b=document.getElementById('pAllBtn');
+  var open=g.style.display==='none';
+  g.style.display=open?'grid':'none';
+  b.textContent=open?'▲ 一覧を閉じる':'👥 全30体のペルソナを見る';
+  if(open&&typeof gtag==='function'){gtag('event','persona_list_open');}
+}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 </script>
 
@@ -108,6 +116,12 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 .p-role{font-size:11px;color:var(--gray)}
 .p-lv{display:inline-block;font-size:9px;font-weight:700;color:var(--cyan);border:1px solid rgba(0,200,232,0.35);padding:2px 8px;border-radius:10px;margin-top:6px}
 .p-more{text-align:center;margin-top:14px;font-size:13px;color:var(--gray)}
+
+/* P-ALL (L-9) */
+.p-all-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px;margin-top:18px}
+.p-mini{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 6px;text-align:center}
+.p-mini img{width:56px;height:56px;border-radius:50%;object-fit:cover}
+.p-mini-name{font-size:11px;font-weight:700;margin-top:6px;line-height:1.3}
 
 /* LAYERS */
 .layers{display:flex;flex-direction:column;gap:12px;margin-top:28px}
@@ -330,7 +344,40 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 </div>
     </div>
     <div style="text-align:center;margin-top:24px;"><button class="screen-btn" onclick="openModal('/static/images/report_examples/persona_settei.png','ペルソナ育成・設定画面')">🌱 ペルソナを育てる</button></div>
-        <p class="p-more">他 27体以上のデフォルトペルソナ ／ カスタムペルソナは無制限作成可能（Standardプラン以上）</p>
+        <div style="text-align:center;margin-top:14px;"><button class="screen-btn" id="pAllBtn" onclick="togglePersonaList()">👥 全30体のペルソナを見る</button></div>
+        <div id="pAllGrid" class="p-all-grid" style="display:none;">
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/koumei.jpg" alt="諸葛亮孔明"><div class="p-mini-name">諸葛亮孔明</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/hideyoshi.jpg" alt="豊臣秀吉"><div class="p-mini-name">豊臣秀吉</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/ryoma.jpg" alt="坂本龍馬"><div class="p-mini-name">坂本龍馬</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/shibusawa.jpg" alt="渋沢栄一"><div class="p-mini-name">渋沢栄一</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/kukai.jpg" alt="空海（弘法大師）"><div class="p-mini-name">空海（弘法大師）</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/elizabeth1.jpg" alt="エリザベス一世"><div class="p-mini-name">エリザベス一世</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/churchill.jpg" alt="ウィンストン・チャーチル"><div class="p-mini-name">ウィンストン・チャーチル</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/einstein.jpg" alt="アルベルト・アインシュタイン"><div class="p-mini-name">アルベルト・アインシュタイン</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/curie.jpg" alt="マリー・キュリー"><div class="p-mini-name">マリー・キュリー</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/davinci.jpg" alt="レオナルド・ダ・ヴィンチ"><div class="p-mini-name">レオナルド・ダ・ヴィンチ</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/edison.jpg" alt="トーマス・エジソン"><div class="p-mini-name">トーマス・エジソン</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/turing.jpg" alt="アラン・チューリング"><div class="p-mini-name">アラン・チューリング</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/nightingale.jpg" alt="フローレンス・ナイチンゲール"><div class="p-mini-name">フローレンス・ナイチンゲール</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/fukuzawa.jpg" alt="福沢諭吉"><div class="p-mini-name">福沢諭吉</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/iwasaki.jpg" alt="岩崎弥太郎"><div class="p-mini-name">岩崎弥太郎</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/tsuda.jpg" alt="津田梅子"><div class="p-mini-name">津田梅子</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/murasaki.jpg" alt="紫式部"><div class="p-mini-name">紫式部</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/ichiyo.jpg" alt="樋口一葉"><div class="p-mini-name">樋口一葉</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/consultant.jpg" alt="戦略コンサルタント"><div class="p-mini-name">戦略コンサルタント</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/investor.jpg" alt="辣腕投資家"><div class="p-mini-name">辣腕投資家</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/marketer.jpg" alt="デジタルマーケター"><div class="p-mini-name">デジタルマーケター</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/professor.jpg" alt="教授"><div class="p-mini-name">教授</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/career.jpg" alt="キャリアウーマン"><div class="p-mini-name">キャリアウーマン</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/critic.jpg" alt="社会批評家"><div class="p-mini-name">社会批評家</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/amanojaku.jpg" alt="天邪鬼な懐疑論者"><div class="p-mini-name">天邪鬼な懐疑論者</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/shisho.jpg" alt="職人の師匠"><div class="p-mini-name">職人の師匠</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/ojii.jpg" alt="経験豊かなおじいさん"><div class="p-mini-name">経験豊かなおじいさん</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/obaa.jpg" alt="知恵者のおばあさん"><div class="p-mini-name">知恵者のおばあさん</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/onesan.jpg" alt="面倒見のいいお姉さん"><div class="p-mini-name">面倒見のいいお姉さん</div></div>
+          <div class="p-mini"><img loading="lazy" src="/static/images/persona/yako.jpg" alt="野心家の若手起業家"><div class="p-mini-name">野心家の若手起業家</div></div>
+        </div>
+        <p class="p-more">全30体のデフォルトペルソナ＋進行役ファシリテーター ／ カスタムペルソナは無制限作成可能（Standardプラン以上）</p>
   </div>
 </section>
 
