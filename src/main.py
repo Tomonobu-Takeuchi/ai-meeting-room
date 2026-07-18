@@ -76,6 +76,16 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 app.config['SESSION_COOKIE_SECURE'] = os.environ.get('SESSION_COOKIE_SECURE', 'true').lower() != 'false'
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
+
+import logging as _logging
+if os.environ.get('GUNICORN_LOGLEVEL') or 'gunicorn' in os.environ.get('SERVER_SOFTWARE', ''):
+    _gunicorn_logger = _logging.getLogger('gunicorn.error')
+    app.logger.handlers = _gunicorn_logger.handlers
+    app.logger.setLevel(_gunicorn_logger.level or _logging.INFO)
+else:
+    _logging.basicConfig(level=_logging.INFO)
+    app.logger.setLevel(_logging.INFO)
+
 app.json.ensure_ascii = False  # 日本語をUnicodeエスケープしない（Flask 2.2以降）
 
 limiter = Limiter(
