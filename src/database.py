@@ -604,40 +604,42 @@ def get_user_by_stripe_customer(stripe_customer_id):
 def save_learn_data(persona_id, user_id, content, source, embedding_vector=None):
     conn = get_connection()
     existing = conn.run("""
-        SELECT 1 FROM persona_learn
+        SELECT id FROM persona_learn
         WHERE persona_id=:pid AND user_id IS NOT DISTINCT FROM :uid AND content=:content
         LIMIT 1
     """, pid=persona_id, uid=user_id, content=content)
     if existing:
         conn.close()
-        return
+        return existing[0][0]
     enc_content = encrypt_value(conn, content)
     enc_source = encrypt_value(conn, source)
     if embedding_vector:
         vec_str = '[' + ','.join(str(v) for v in embedding_vector) + ']'
-        conn.run("""
+        rows = conn.run("""
             INSERT INTO persona_learn (persona_id, user_id, content, source, embedding)
             VALUES (:persona_id, :user_id, :content, :source, :embedding::vector)
+            RETURNING id
         """, persona_id=persona_id, user_id=user_id, content=enc_content,
             source=enc_source, embedding=vec_str)
     else:
-        conn.run("""
+        rows = conn.run("""
             INSERT INTO persona_learn (persona_id, user_id, content, source)
             VALUES (:persona_id, :user_id, :content, :source)
+            RETURNING id
         """, persona_id=persona_id, user_id=user_id, content=enc_content, source=enc_source)
+    new_id = rows[0][0] if rows else None
     conn.close()
+    return new_id
 
-def update_learn_data_embedding(persona_id, user_id, content, embedding_vector):
-    """バックグラウンドスレッドから呼ばれる: 既存レコードのembeddingを更新"""
+def update_learn_data_embedding(learn_id, embedding_vector):
+    """バックグラウンドスレッドから呼ばれる: 指定idのレコードのembeddingを更新（BUG-EMB1修正:
+    contentの平文一致では暗号化列（非決定的暗号化）と一致しないため、idで直接指定する）"""
     conn = get_connection()
     vec_str = '[' + ','.join(str(v) for v in embedding_vector) + ']'
     conn.run("""
         UPDATE persona_learn SET embedding = :emb::vector
-        WHERE persona_id = :pid
-          AND user_id IS NOT DISTINCT FROM :uid
-          AND content = :content
-          AND embedding IS NULL
-    """, emb=vec_str, pid=persona_id, uid=user_id, content=content)
+        WHERE id = :learn_id AND embedding IS NULL
+    """, emb=vec_str, learn_id=learn_id)
     conn.close()
 
 def search_learn_data(persona_id, user_id, query_embedding, limit=3):

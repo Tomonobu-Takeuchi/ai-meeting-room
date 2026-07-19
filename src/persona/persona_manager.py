@@ -570,13 +570,13 @@ class PersonaManager:
     # ===== RAG学習データ =====
 
     def add_learn_data(self, persona_id, content, source='', user_id=None):
-        # テキストをDBに即時保存（embedding=NULL）
-        save_learn_data(persona_id, user_id, content, source, embedding_vector=None)
+        # テキストをDBに即時保存（embedding=NULL）、挿入した行のidを受け取る（BUG-EMB1）
+        new_id = save_learn_data(persona_id, user_id, content, source, embedding_vector=None)
 
         # Embedding生成はバックグラウンドスレッドで非同期実行
         openai_key = os.environ.get('OPENAI_API_KEY', '')
-        if openai_key:
-            def _generate_embedding(pid, uid, text, src):
+        if openai_key and new_id is not None:
+            def _generate_embedding(learn_id, text):
                 try:
                     import openai
                     client = openai.OpenAI(api_key=openai_key, timeout=30.0)
@@ -584,13 +584,13 @@ class PersonaManager:
                         model="text-embedding-3-small",
                         input=text[:8000],
                     )
-                    update_learn_data_embedding(pid, uid, text, res.data[0].embedding)
+                    update_learn_data_embedding(learn_id, res.data[0].embedding)
                 except Exception as e:
                     print(f"Embedding非同期生成失敗（テキストは保存済）: {e}")
 
             t = threading.Thread(
                 target=_generate_embedding,
-                args=(persona_id, user_id, content, source),
+                args=(new_id, content),
                 daemon=True,
             )
             t.start()
