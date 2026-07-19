@@ -641,8 +641,12 @@ def update_learn_data_embedding(persona_id, user_id, content, embedding_vector):
     conn.close()
 
 def search_learn_data(persona_id, user_id, query_embedding, limit=3):
+    """CONT-1③-B: 類似度上位のみだと資料由来・会議ログ由来のどちらかに偏る可能性があるため、
+    類似度上位の候補を多めに取得し、両方の由来が最低1件ずつ入るよう調整してから返す。
+    一方の由来が存在しない場合は従来通り類似度順のみで埋める。"""
     conn = get_connection()
     vec_str = '[' + ','.join(str(v) for v in query_embedding) + ']'
+    fetch_limit = max(limit * 3, 10)
     rows = conn.run("""
         SELECT content, source,
                1 - (embedding <=> :query_vec::vector) AS similarity
@@ -651,17 +655,32 @@ def search_learn_data(persona_id, user_id, query_embedding, limit=3):
           AND (user_id = :user_id OR user_id IS NULL)
           AND embedding IS NOT NULL
         ORDER BY embedding <=> :query_vec::vector
-        LIMIT :limit
-    """, persona_id=persona_id, user_id=user_id, query_vec=vec_str, limit=limit)
-    result = []
+        LIMIT :fetch_limit
+    """, persona_id=persona_id, user_id=user_id, query_vec=vec_str, fetch_limit=fetch_limit)
+    candidates = []
     for r in rows:
-        result.append({
+        candidates.append({
             'content': decrypt_value(conn, r[0]),
             'source': decrypt_value(conn, r[1]),
             'similarity': float(r[2])
         })
     conn.close()
-    return result
+
+    meeting_log = [c for c in candidates if c['source'] and c['source'].startswith('会議ログ_')]
+    resource = [c for c in candidates if not (c['source'] and c['source'].startswith('会議ログ_'))]
+
+    per_bucket = max(1, limit // 2)
+    picked = resource[:per_bucket] + meeting_log[:per_bucket]
+    picked_ids = {id(c) for c in picked}
+    for c in candidates:
+        if len(picked) >= limit:
+            break
+        if id(c) not in picked_ids:
+            picked.append(c)
+            picked_ids.add(id(c))
+
+    picked.sort(key=lambda c: c['similarity'], reverse=True)
+    return picked[:limit]
 
 def get_learn_data_simple(persona_id, user_id, limit=5):
     conn = get_connection()
@@ -754,6 +773,28 @@ def delete_learn_data(persona_id, user_id, learn_id):
         WHERE id=:id AND persona_id=:persona_id AND user_id=:user_id
     """, id=learn_id, persona_id=persona_id, user_id=user_id)
     conn.close()
+
+
+def delete_oldest_meeting_log(persona_id, user_id):
+    """CONT-1①: FIFOローテーション用。source='会議ログ_...'の最古の1件のみを削除する。
+    ユーザーが手動登録した学習データ（source≠会議ログ_）はここでは削除対象にならない。
+    sourceは暗号化保存されておりSQLのLIKEでは判定できないため、created_at昇順で
+    候補を取得しPython側で復号して判定する。"""
+    conn = get_connection()
+    try:
+        rows = conn.run("""
+            SELECT id, source FROM persona_learn
+            WHERE persona_id=:persona_id AND (user_id=:user_id OR user_id IS NULL)
+            ORDER BY created_at ASC
+        """, persona_id=persona_id, user_id=user_id)
+        for row_id, enc_source in rows:
+            source = decrypt_value(conn, enc_source)
+            if source and source.startswith('会議ログ_'):
+                conn.run("DELETE FROM persona_learn WHERE id=:id", id=row_id)
+                return True
+        return False
+    finally:
+        conn.close()
 
 
 # ===== Phase 2: 発言パターンテーブル =====
@@ -938,26 +979,32 @@ def save_persona_pattern(persona_id, user_id, pattern_type, pattern_text, topic_
     finally:
         conn.close()
 
-def get_persona_patterns(persona_id, user_id, pattern_type=None, limit=5):
+def get_persona_patterns(persona_id, user_id, pattern_type=None, limit=5, topic_category=None):
+    """CONT-1③-C: topic_categoryを渡すと同カテゴリのパターンに絞り込む。
+    該当カテゴリのパターンが1件もない場合は、従来通りカテゴリ無条件で取得する（フォールバック）。"""
     conn = get_connection()
     try:
-        if pattern_type:
-            rows = conn.run("""
+        def _query(use_category):
+            sql = """
                 SELECT pattern_type, pattern_text, usage_count
                 FROM persona_patterns
                 WHERE persona_id=:persona_id AND user_id=:user_id
-                  AND pattern_type=:pattern_type
-                ORDER BY usage_count DESC LIMIT :limit
-            """, persona_id=persona_id, user_id=user_id,
-                pattern_type=pattern_type, limit=limit)
-        else:
-            rows = conn.run("""
-                SELECT pattern_type, pattern_text, usage_count
-                FROM persona_patterns
-                WHERE persona_id=:persona_id AND user_id=:user_id
-                ORDER BY usage_count DESC LIMIT :limit
-            """, persona_id=persona_id, user_id=user_id, limit=limit)
-        return [{'pattern_type': r[0], 'pattern_text': r[1], 'usage_count': r[2]} for r in rows]
+            """
+            params = {'persona_id': persona_id, 'user_id': user_id, 'limit': limit}
+            if pattern_type:
+                sql += " AND pattern_type=:pattern_type"
+                params['pattern_type'] = pattern_type
+            if use_category:
+                sql += " AND topic_category=:topic_category"
+                params['topic_category'] = topic_category
+            sql += " ORDER BY usage_count DESC LIMIT :limit"
+            rows = conn.run(sql, **params)
+            return [{'pattern_type': r[0], 'pattern_text': r[1], 'usage_count': r[2]} for r in rows]
+
+        results = _query(use_category=True) if topic_category else []
+        if not results:
+            results = _query(use_category=False)
+        return results
     finally:
         conn.close()
 

@@ -1772,6 +1772,159 @@ def test_ops12_stream_access_control(client):
     check_code(r, 200, "member: ゲストセッションへの実HTTPアクセス → 200（ゲスト会議の既存動作を維持）")
 
 
+def test_ops13_conv_reextraction_skip(client):
+    """CONV-3：/api/meeting/<session_id>/end で、convergenceが既に保存済みの場合は
+    _extract_convergence()を再度呼ばないこと（無駄なAnthropic API呼び出し防止）を確認する。
+    _extract_convergence()はモック化し、呼び出し回数と保存結果のみを検証する（本体ロジックの
+    検証自体にDBアクセスは不要。会議開始が無料プラン月次上限に達していないよう、直前にproへ
+    引き上げるDB操作のみ行う）。"""
+    section("運用試験13: convergence再抽出スキップ確認（CONV-3）")
+    from unittest.mock import patch
+    from src.main import meeting_room
+
+    # 直前のテストで無料プラン月次上限（3回）に達している場合があるため、
+    # 会議開始が確実に成功するようproプランへ引き上げる
+    _set_user_plan(state.get('user_id'), 'pro', credits=0, monthly_count=0)
+
+    # --- ケース1: convergence保存済みのセッションで/endを呼ぶ ---
+    r = client.post('/api/meeting/start', json={'topic': 'CONV-3再抽出スキップテスト1'})
+    sid1 = (r.get_json() or {}).get('session_id') if r.status_code == 200 else None
+    if not sid1:
+        skip("運用試験13: セッション作成に失敗したためSKIP")
+        return
+
+    existing_conv = {'summary': '既存の収束データ', 'source': 'pre-existing'}
+    meeting_room.sessions[sid1]['convergence'] = existing_conv
+
+    with patch('src.main._extract_convergence') as mock_extract1:
+        r_end1 = client.post(f'/api/meeting/{sid1}/end')
+        check_code(r_end1, 200, "ケース1: convergence保存済みセッションで/end → 200")
+        check(mock_extract1.call_count == 0,
+              f"ケース1: convergence保存済みの場合は_extract_convergenceが呼ばれない (call_count={mock_extract1.call_count})")
+        check(meeting_room.sessions.get(sid1, {}).get('convergence') == existing_conv,
+              "ケース1: 既存のconvergence値が上書きされていない")
+
+    # --- ケース2: convergence未設定のセッションで/endを呼ぶ（回帰なし確認） ---
+    r2 = client.post('/api/meeting/start', json={'topic': 'CONV-3再抽出スキップテスト2'})
+    sid2 = (r2.get_json() or {}).get('session_id') if r2.status_code == 200 else None
+    if not sid2:
+        skip("運用試験13: セッション2作成に失敗したためSKIP")
+        return
+
+    check('convergence' not in meeting_room.sessions.get(sid2, {}),
+          "ケース2前提: 新規セッションにconvergenceキーが存在しない")
+
+    new_conv = {'summary': '新規抽出された収束データ'}
+    with patch('src.main._extract_convergence', return_value=new_conv) as mock_extract2:
+        r_end2 = client.post(f'/api/meeting/{sid2}/end')
+        check_code(r_end2, 200, "ケース2: convergence未設定セッションで/end → 200")
+        check(mock_extract2.call_count == 1,
+              f"ケース2: convergence未設定の場合は_extract_convergenceが1回呼ばれる (call_count={mock_extract2.call_count})")
+        check(meeting_room.sessions.get(sid2, {}).get('convergence') == new_conv,
+              "ケース2: 抽出結果が正しくsessions[sid]['convergence']に保存される")
+
+
+def test_ops14_cont1_log_summary_and_fifo(client):
+    """CONT-1：①FIFOローテーション（100件キャップ到達時に会議ログ由来の最古1件のみを
+    削除し、手動登録データは保護する）と②発言ログの1会議1件要約保存を検証する。
+    ③（検索多様性・カテゴリ絞り込み）のうちOpenAI Embeddings APIに依存しない
+    get_persona_patternsのtopic_categoryフィルタ/フォールバックのみ併せて確認する。"""
+    section("運用試験14: CONT-1 会議ログ要約保存・FIFOローテーション")
+    from src.database import (
+        get_connection, decrypt_value, save_learn_data,
+        delete_oldest_meeting_log, get_learn_data_count, get_persona_patterns,
+        save_persona_pattern,
+    )
+    from src.persona.persona_manager import PersonaManager, classify_topic_category
+
+    user_id = state.get('user_id')
+    persona_id = state.get('main_persona_id')
+    if not (user_id and persona_id):
+        skip("運用試験14: テスト用ユーザー/ペルソナが未作成のためSKIP")
+        return
+
+    pm = PersonaManager()
+
+    # --- ①: FIFOローテーション（他テストの残留データの影響を避けるため、まず
+    #         このペルソナの会議ログ由来レコードを一旦すべて排出してから検証する） ---
+    while delete_oldest_meeting_log(persona_id, user_id):
+        pass
+
+    protect_content = 'FIFO_TEST_MANUAL_PROTECT_MARKER_' + str(uuid.uuid4())[:8]
+    save_learn_data(persona_id, user_id, protect_content, source='manual_protect_test')
+
+    oldest_content = 'FIFO_TEST_OLDEST_MEETING_LOG_' + str(uuid.uuid4())[:8]
+    save_learn_data(persona_id, user_id, oldest_content, source='会議ログ_fifoテスト最古')
+
+    newer_content = 'FIFO_TEST_NEWER_MEETING_LOG_' + str(uuid.uuid4())[:8]
+    save_learn_data(persona_id, user_id, newer_content, source='会議ログ_fifoテスト新しい')
+
+    deleted = delete_oldest_meeting_log(persona_id, user_id)
+    check(deleted is True, "delete_oldest_meeting_logが削除実行(True)を返す")
+
+    conn = get_connection()
+    try:
+        rows = conn.run("""
+            SELECT content FROM persona_learn WHERE persona_id=:pid AND user_id=:uid
+        """, pid=persona_id, uid=user_id)
+        remaining = [decrypt_value(conn, r[0]) for r in rows]
+    finally:
+        conn.close()
+    check(not any(oldest_content in c for c in remaining),
+          "会議ログ由来の最古1件が削除されている")
+    check(any(protect_content in c for c in remaining),
+          "手動登録データ（source≠会議ログ_）は削除されず残っている")
+    check(any(newer_content in c for c in remaining),
+          "会議ログ由来でもより新しい行は削除されず残っている（最古の1件のみ削除）")
+
+    # --- ②: 発言1件=1行ではなく、ペルソナごとに1会議1件の要約として保存されること ---
+    before_count = get_learn_data_count(persona_id, user_id)
+    fake_summary = {
+        'topic': 'CONT-1要約テスト議題',
+        'messages': [
+            {'persona_id': persona_id, 'content': 'これはCONT-1テスト用の発言その1です（30字以上の本文）'},
+            {'persona_id': persona_id, 'content': 'これはCONT-1テスト用の発言その2です（30字以上の本文）'},
+            {'persona_id': persona_id, 'content': 'これはCONT-1テスト用の発言その3です（30字以上の本文）'},
+            {'persona_id': 'user', 'content': 'ユーザーの発言は対象外のはず（30字以上のダミー文字列です）'},
+        ],
+    }
+    saved = pm.save_meeting_log(fake_summary, user_id)
+    check(saved == 1, f"1ペルソナ・3発言でもsave_meeting_logの保存件数は1件 (got {saved})")
+    after_count = get_learn_data_count(persona_id, user_id)
+    check(after_count == before_count + 1,
+          f"persona_learnの件数増加が発言数(3)ではなく1件のみ (before={before_count}, after={after_count})")
+
+    conn = get_connection()
+    try:
+        rows = conn.run("""
+            SELECT content FROM persona_learn
+            WHERE persona_id=:pid AND user_id=:uid
+            ORDER BY created_at DESC LIMIT 1
+        """, pid=persona_id, uid=user_id)
+        latest_content = decrypt_value(conn, rows[0][0]) if rows else ''
+    finally:
+        conn.close()
+    check('[発言要約]' in latest_content, "保存内容に[発言要約]マーカーが含まれる（1件要約形式）")
+    check(latest_content.count('これはCONT-1テスト用の発言') == 3,
+          "3件の発言がすべて1件の要約ログ内に結合されている")
+
+    # --- ③-C: get_persona_patternsのtopic_categoryフィルタとフォールバック ---
+    biz_text = 'CONT-1テスト：業務カテゴリのopeningパターンです'
+    save_persona_pattern(persona_id, user_id, 'opening', biz_text, topic_category='business')
+    check(classify_topic_category('顧客の売上戦略について') == 'business',
+          "classify_topic_categoryがビジネス系キーワードで'business'と判定する")
+
+    biz_results = get_persona_patterns(persona_id, user_id, pattern_type='opening',
+                                        limit=8, topic_category='business')
+    check(any(r['pattern_text'] == biz_text for r in biz_results),
+          "topic_category='business'指定で該当カテゴリのパターンが取得できる")
+
+    fallback_results = get_persona_patterns(persona_id, user_id, pattern_type='opening',
+                                             limit=8, topic_category='study_travel_unused_category')
+    check(any(r['pattern_text'] == biz_text for r in fallback_results),
+          "該当カテゴリのパターンが0件の場合、カテゴリ無条件へフォールバックする")
+
+
 def safe_run(name: str, func, *args):
     """テスト関数を安全に実行。DB接続エラー等は SKIP として記録し継続。"""
     import pg8000.exceptions
@@ -1835,6 +1988,8 @@ if __name__ == '__main__':
             safe_run("運用試験10: 派生版対応スキーマ整合性",    test_ops10_edition_support_schema)
             safe_run("運用試験11: 発言パターン選択のランダム化", test_ops11_pattern_randomization, client)
             safe_run("運用試験12: ストリーミングAPIアクセス制御", test_ops12_stream_access_control, client)
+            safe_run("運用試験13: convergence再抽出スキップ確認", test_ops13_conv_reextraction_skip, client)
+            safe_run("運用試験14: CONT-1会議ログ要約・FIFO", test_ops14_cont1_log_summary_and_fifo, client)
     finally:
         cleanup()
 

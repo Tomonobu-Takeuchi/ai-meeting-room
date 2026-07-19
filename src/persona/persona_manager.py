@@ -11,12 +11,25 @@ from src.database import (
     save_learn_data, update_learn_data_embedding,
     search_learn_data, get_learn_data_simple,
     get_learn_data_count, get_learn_data_counts_batch, get_all_learn_data, delete_learn_data,
+    delete_oldest_meeting_log,
     save_persona_pattern, get_persona_patterns,
     increment_meeting_count, get_meeting_count,
     ensure_growth_record, update_growth_conversation,
     update_growth_knowledge, calculate_and_save_maturity,
     get_growth_record, save_feedback_record, update_growth_c_axis
 )
+
+_BUSINESS_KEYWORDS = ['ビジネス', '事業', '経営', '戦略', '市場', '売上', '顧客']
+_SOCIAL_KEYWORDS = ['少子化', '人口', '社会', '政策', '環境', '教育']
+
+
+def classify_topic_category(topic):
+    """議題文からPhase2パターンのtopic_category（business/social/general）を判定する"""
+    if any(k in topic for k in _BUSINESS_KEYWORDS):
+        return 'business'
+    if any(k in topic for k in _SOCIAL_KEYWORDS):
+        return 'social'
+    return 'general'
 
 COLUMNS = ['id','user_id','name','avatar','description','personality',
            'speaking_style','background','color','role','is_default','created_at','voice_id',
@@ -372,12 +385,19 @@ class PersonaManager:
     # ===== Phase 1: 会話ログ自動学習 =====
 
     def save_meeting_log(self, session_summary, user_id):
-        """Phase 1: 会議ログを各ペルソナの学習データとして保存"""
-        # ゲスト（user_id=None）はNULLのまま保存（外部キー制約のため0は使えない）
+        """Phase 1: 会議ログを各ペルソナの学習データとして保存。
+        CONT-1②(A案): 発言1件=1行ではなく、ペルソナごとにその会議での発言をまとめた
+        1件の要約ログとして保存する（先頭からSUMMARY_MAX_CHARSでtruncate）。
+        CONT-1①: 上限（MAX_LOGS_PER_PERSONA件）に達している場合は、会議ログ由来
+        （source='会議ログ_...'）の最古の1件をFIFOで削除してから新規保存する。
+        ユーザーが手動登録した学習データ（source≠会議ログ_）は削除対象にならない。
+        ゲスト（user_id=None）はNULLのまま保存（外部キー制約のため0は使えない）。"""
         topic = session_summary.get('topic', '')
         messages = session_summary.get('messages', [])
-        saved_count = 0
         MAX_LOGS_PER_PERSONA = 100
+        SUMMARY_MAX_CHARS = 500
+
+        speeches_by_persona = {}
         for msg in messages:
             persona_id = msg.get('persona_id', '')
             if persona_id in ['user', 'facilitator', '']:
@@ -385,10 +405,14 @@ class PersonaManager:
             content_text = msg.get('content', '').strip()
             if len(content_text) < 30:
                 continue
-            current_count = get_learn_data_count(persona_id, user_id)
-            if current_count >= MAX_LOGS_PER_PERSONA:
-                continue
-            log_content = "[議題]" + topic + "\n[発言]" + content_text + "\n[出典]会議ログ"
+            speeches_by_persona.setdefault(persona_id, []).append(content_text)
+
+        saved_count = 0
+        for persona_id, speeches in speeches_by_persona.items():
+            summary_text = '\n'.join(speeches)[:SUMMARY_MAX_CHARS]
+            log_content = "[議題]" + topic + "\n[発言要約]" + summary_text + "\n[出典]会議ログ"
+            if get_learn_data_count(persona_id, user_id) >= MAX_LOGS_PER_PERSONA:
+                delete_oldest_meeting_log(persona_id, user_id)
             self.add_learn_data(
                 persona_id, log_content,
                 source="会議ログ_" + topic[:20],
@@ -404,9 +428,7 @@ class PersonaManager:
         """Phase 2: 発言パターンを抽出して保存"""
         topic = session_summary.get('topic', '')
         messages = session_summary.get('messages', [])
-        business_kw = ['ビジネス', '事業', '経営', '戦略', '市場', '売上', '顧客']
-        social_kw = ['少子化', '人口', '社会', '政策', '環境', '教育']
-        topic_category = 'business' if any(k in topic for k in business_kw)                         else 'social' if any(k in topic for k in social_kw)                         else 'general'
+        topic_category = classify_topic_category(topic)
         for msg in messages:
             persona_id = msg.get('persona_id', '')
             if persona_id in ['user', 'facilitator', '']:
@@ -585,7 +607,7 @@ class PersonaManager:
                     model="text-embedding-3-small",
                     input=topic
                 )
-                results = search_learn_data(persona_id, user_id, res.data[0].embedding, limit=3)
+                results = search_learn_data(persona_id, user_id, res.data[0].embedding, limit=5)
                 if results:
                     return '\n\n'.join([r['content'] for r in results])
             except Exception as e:
@@ -624,14 +646,15 @@ class PersonaManager:
 {persona.get('background', '')}
 """
         if combined_learn:
-            prompt += f"\n【この人物に関する学習データ・参考情報】\n{combined_learn[:3000]}\n"
+            prompt += f"\n【この人物に関する学習データ・参考情報】\n{combined_learn[:4500]}\n"
             prompt += "\n※上記の学習データをもとに、この人物らしく発言してください。\n"
 
         # Phase 2: 発言パターンをプロンプトに反映
         if user_id:
-            opening = [p['pattern_text'] for p in get_persona_patterns(persona['id'], user_id, pattern_type='opening', limit=8)]
-            objection = [p['pattern_text'] for p in get_persona_patterns(persona['id'], user_id, pattern_type='objection', limit=8)]
-            conclusion = [p['pattern_text'] for p in get_persona_patterns(persona['id'], user_id, pattern_type='conclusion', limit=8)]
+            topic_category = classify_topic_category(topic)
+            opening = [p['pattern_text'] for p in get_persona_patterns(persona['id'], user_id, pattern_type='opening', limit=8, topic_category=topic_category)]
+            objection = [p['pattern_text'] for p in get_persona_patterns(persona['id'], user_id, pattern_type='objection', limit=8, topic_category=topic_category)]
+            conclusion = [p['pattern_text'] for p in get_persona_patterns(persona['id'], user_id, pattern_type='conclusion', limit=8, topic_category=topic_category)]
             pattern_note = ''
             if opening:
                 pattern_note += '\n・発言冒頭の例：「' + random.choice(opening)[:60] + '…」'
