@@ -7,7 +7,7 @@ import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.database import get_connection, decrypt_value, update_learn_data_embedding
+from src.database import get_connection, decrypt_value, update_learn_data_embedding, truncate_to_tokens
 
 
 def backfill():
@@ -27,7 +27,7 @@ def backfill():
     success, failed = 0, 0
     for learn_id, plaintext in targets:
         try:
-            res = client.embeddings.create(model="text-embedding-3-small", input=plaintext[:8000])
+            res = client.embeddings.create(model="text-embedding-3-small", input=truncate_to_tokens(plaintext))
             update_learn_data_embedding(learn_id, res.data[0].embedding)
             success += 1
         except Exception as e:

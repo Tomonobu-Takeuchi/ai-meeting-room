@@ -1,12 +1,25 @@
 """
 database.py - PostgreSQL接続・テーブル初期化（ユーザー認証 + pgvector RAG対応版）
 """
+import hashlib
 import os
 import pg8000.native
+import tiktoken
 from urllib.parse import urlparse
 
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 SECRET_MODE_KEY = os.environ.get('SECRET_MODE_KEY', '')
+
+_TOKEN_ENCODER = tiktoken.get_encoding("cl100k_base")
+
+
+def truncate_to_tokens(text, max_tokens=8000):
+    """embedding API入力用に、トークン数ベースで安全に切り詰める（文字数ベースのtext[:8000]は
+    日本語で8192トークン上限を超過することがあるため、TRUNC-TOK対応で導入）"""
+    tokens = _TOKEN_ENCODER.encode(text)
+    if len(tokens) <= max_tokens:
+        return text
+    return _TOKEN_ENCODER.decode(tokens[:max_tokens])
 
 def get_conn_params():
     url = urlparse(DATABASE_URL)
@@ -601,13 +614,18 @@ def get_user_by_stripe_customer(stripe_customer_id):
 
 # ===== RAG関連 =====
 
+def _content_hash(content):
+    return hashlib.sha256(content.encode('utf-8')).hexdigest()
+
+
 def save_learn_data(persona_id, user_id, content, source, embedding_vector=None):
     conn = get_connection()
+    h = _content_hash(content)
     existing = conn.run("""
         SELECT id FROM persona_learn
-        WHERE persona_id=:pid AND user_id IS NOT DISTINCT FROM :uid AND content=:content
+        WHERE persona_id=:pid AND user_id IS NOT DISTINCT FROM :uid AND content_hash=:hash
         LIMIT 1
-    """, pid=persona_id, uid=user_id, content=content)
+    """, pid=persona_id, uid=user_id, hash=h)
     if existing:
         conn.close()
         return existing[0][0]
@@ -616,17 +634,17 @@ def save_learn_data(persona_id, user_id, content, source, embedding_vector=None)
     if embedding_vector:
         vec_str = '[' + ','.join(str(v) for v in embedding_vector) + ']'
         rows = conn.run("""
-            INSERT INTO persona_learn (persona_id, user_id, content, source, embedding)
-            VALUES (:persona_id, :user_id, :content, :source, :embedding::vector)
+            INSERT INTO persona_learn (persona_id, user_id, content, content_hash, source, embedding)
+            VALUES (:persona_id, :user_id, :content, :hash, :source, :embedding::vector)
             RETURNING id
         """, persona_id=persona_id, user_id=user_id, content=enc_content,
-            source=enc_source, embedding=vec_str)
+            hash=h, source=enc_source, embedding=vec_str)
     else:
         rows = conn.run("""
-            INSERT INTO persona_learn (persona_id, user_id, content, source)
-            VALUES (:persona_id, :user_id, :content, :source)
+            INSERT INTO persona_learn (persona_id, user_id, content, content_hash, source)
+            VALUES (:persona_id, :user_id, :content, :hash, :source)
             RETURNING id
-        """, persona_id=persona_id, user_id=user_id, content=enc_content, source=enc_source)
+        """, persona_id=persona_id, user_id=user_id, content=enc_content, hash=h, source=enc_source)
     new_id = rows[0][0] if rows else None
     conn.close()
     return new_id

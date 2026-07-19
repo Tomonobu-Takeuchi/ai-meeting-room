@@ -8,7 +8,7 @@ import threading
 from src.database import (
     get_connection, rows_to_dicts, row_to_dict,
     encrypt_value, decrypt_value,
-    save_learn_data, update_learn_data_embedding,
+    save_learn_data, update_learn_data_embedding, truncate_to_tokens,
     search_learn_data, get_learn_data_simple,
     get_learn_data_count, get_learn_data_counts_batch, get_all_learn_data, delete_learn_data,
     delete_oldest_meeting_log,
@@ -582,7 +582,7 @@ class PersonaManager:
                     client = openai.OpenAI(api_key=openai_key, timeout=30.0)
                     res = client.embeddings.create(
                         model="text-embedding-3-small",
-                        input=text[:8000],
+                        input=truncate_to_tokens(text),
                     )
                     update_learn_data_embedding(learn_id, res.data[0].embedding)
                 except Exception as e:
