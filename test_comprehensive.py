@@ -1692,6 +1692,21 @@ def test_func21_study_layer3_json_parse_mock():
         check(False, f"JSONパースに失敗: {e}")
 
 
+def test_func22_study_pdf_continuity_block():
+    """PDF Layer3テンプレートのstudy分岐にcontinuityブロックの描画コードが
+    存在することを確認する（過去に欠落していたため再発防止として追加）。"""
+    section("機能試験22: PDF study continuityブロック描画確認")
+    base = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(base, "src", "templates", "pdf_layer3.html"), encoding="utf-8") as f:
+        tmpl = f.read()
+    study_start = tmpl.find("{% elif cat == 'study' %}")
+    study_end = tmpl.find("{% elif cat == 'consulting' %}")
+    study_block = tmpl[study_start:study_end] if study_start >= 0 and study_end > study_start else ""
+    check(bool(study_block), "study分岐のテンプレート範囲を特定できる")
+    check("l3.continuity" in study_block,
+          "study分岐にcontinuityの描画コードが存在する（過去の欠落バグの再発防止）")
+
+
 def test_ops10_edition_support_schema():
     """派生版（海外版・カジュアル版）対応：スキーマ追加のみの回帰確認。
     アプリロジックは今回追加していないため、カラム/テーブルの存在確認のみ行う。"""
@@ -2072,6 +2087,7 @@ if __name__ == '__main__':
             safe_run("機能試験19: study SRL/ARCS/if-then プロンプト構成", test_func19_study_srl_prompt_content)
             safe_run("機能試験20: study Layer3スキーマ構成",   test_func20_study_layer3_schema_content)
             safe_run("機能試験21: study Layer3 JSONパース処理（モック）", test_func21_study_layer3_json_parse_mock)
+            safe_run("機能試験22: PDF study continuityブロック描画確認", test_func22_study_pdf_continuity_block)
             safe_run("運用試験10: 派生版対応スキーマ整合性",    test_ops10_edition_support_schema)
             safe_run("運用試験11: 発言パターン選択のランダム化", test_ops11_pattern_randomization, client)
             safe_run("運用試験12: ストリーミングAPIアクセス制御", test_ops12_stream_access_control, client)
