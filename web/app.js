@@ -1520,6 +1520,15 @@ function buildLayer3HTML(l3, cat, topic, issues) {
       });
     }
   } else if (cat === 'study') {
+    const md = l3.motivation_diagnosis || {};
+    if (md.type || md.need_gap || md.arcs_focus) {
+      html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">🧭 あなたの動機タイプ</div>`;
+      html += `<div style="padding:10px 14px;border-left:3px solid var(--accent-blue);background:rgba(37,99,235,0.06);border-radius:0 8px 8px 0;font-size:13px;line-height:1.7;margin-bottom:14px;">`;
+      if (md.type) { html += `<div>${md.type}</div>`; }
+      if (md.need_gap) { html += `<div style="margin-top:4px;font-size:12px;color:var(--text-secondary);">🔎 ${md.need_gap}</div>`; }
+      if (md.arcs_focus) { html += `<div style="margin-top:4px;font-size:12px;color:var(--text-secondary);">🎯 ${md.arcs_focus}</div>`; }
+      html += `</div>`;
+    }
     const ev = l3.expert_evaluation || {};
     if (ev.overall || ev.strengths || ev.issues) {
       html += `<div style="font-size:13px;font-weight:700;margin-bottom:8px;">🔍 賢人の評価</div>`;

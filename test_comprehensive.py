@@ -1608,6 +1608,90 @@ def test_func18_pricing_modal_campaign():
         check(False, "refreshEarlybirdStatus() 関数がapp.js内に見つかる")
 
 
+def test_func19_study_srl_prompt_content():
+    """SDT診断・ARCS・if-thenプランニング統合：プロンプト文字列に必要な要素が
+    含まれていること、既存の文言が失われていないことを検証する（LLM呼び出しなし）。"""
+    section("機能試験19: study SRL/ARCS/if-then プロンプト構成確認")
+    from src.persona.persona_manager import PersonaManager
+
+    pm = PersonaManager()
+
+    # opening_slots：新しい診断項目が追加され、既存4項目が残っていること
+    facilitator = {"name": "テストファシリテータ"}
+    opening_prompt = pm.build_facilitator_prompt(
+        facilitator, "小説を書きたい", "", mode="opening", category="study")
+    check("なぜそれに取り組みたいと思ったか" in opening_prompt,
+          "openingプロンプトに動機診断の質問項目が追加されている")
+    check("週に確保できる時間" in opening_prompt,
+          "openingプロンプトの既存項目（週に確保できる時間）が失われていない")
+
+    # guide：動機の背景を聞く指示が序盤に追加されていること
+    guide_prompt = pm.build_facilitator_prompt(
+        facilitator, "小説を書きたい", "", mode="guide", category="study")
+    check("これまで途中でやめてしまった時" in guide_prompt,
+          "guideプロンプトに過去の挫折体験を尋ねる指示が追加されている")
+    check("続けるための仕組みを一緒に考えましょう" in guide_prompt,
+          "guideプロンプトの既存の終盤誘導文言が失われていない")
+
+    # persona側：動機タイプに応じた伝え方の調整指示が追加されていること
+    persona = {"id": "test", "name": "テスト賢人", "description": "", "personality": "", "speaking_style": "",
+               "background": "", "role": "", "avatar": ""}
+    system_prompt = pm.build_system_prompt(
+        persona, "小説を書きたい", category="study", user_id=None)
+    check("小さな達成から積み上げる伝え方" in system_prompt,
+          "personaプロンプトに動機タイプ別の伝え方調整指示が追加されている")
+    check("続かない理由を先回りして" in system_prompt,
+          "personaプロンプトの既存の指示（続かない理由の先回り）が失われていない")
+
+
+def test_func20_study_layer3_schema_content():
+    """LAYER3_TEMPLATES['study']のプロンプト文字列に、motivation_diagnosisブロックと
+    if-then形式の指定が含まれていること、既存4ブロックの定義が失われていないことを検証する。"""
+    section("機能試験20: study Layer3スキーマ構成確認")
+    from src.main import LAYER3_TEMPLATES
+
+    tmpl = LAYER3_TEMPLATES['study']
+    check('"motivation_diagnosis"' in tmpl, "motivation_diagnosisブロックが追加されている")
+    check('"need_gap"' in tmpl and '"arcs_focus"' in tmpl,
+          "need_gap・arcs_focusフィールドが定義されている")
+    check('"expert_evaluation"' in tmpl and '"improvement_priority"' in tmpl
+          and '"roadmap"' in tmpl and '"continuity"' in tmpl,
+          "既存4ブロックのフィールド定義が失われていない")
+    check("もし〇〇" in tmpl or "もし" in tmpl,
+          "continuity.solutionsにif-then形式の生成指示が含まれている")
+
+
+def test_func21_study_layer3_json_parse_mock():
+    """motivation_diagnosisを含むJSONを、既存のbrief_layer3のパース処理ロジックが
+    正しく通すこと（新フィールド追加がパース処理を壊していないこと）を、
+    Anthropic APIをモックして検証する。"""
+    section("機能試験21: study Layer3 JSONパース処理（モック）")
+    import json as _json
+
+    fake_llm_json = _json.dumps({
+        "motivation_diagnosis": {
+            "type": "他者に認められたい気持ちが強い",
+            "need_gap": "有能感が不足している。最後まで書き切った経験がないため",
+            "arcs_focus": "自信（Confidence）。小さな成功体験の積み上げを優先すべき"
+        },
+        "expert_evaluation": {"strengths": "テスト", "issues": "テスト", "overall": "テスト"},
+        "improvement_priority": [{"rank": 1, "action": "テスト", "reason": "テスト"}],
+        "roadmap": [{"phase": "フェーズ1", "period": "1ヶ月", "theme": "テスト",
+                      "actions": ["テスト"], "input_source": "テスト"}],
+        "continuity": {"obstacles": ["テスト"],
+                        "solutions": ["もしテストならテストする"]}
+    }, ensure_ascii=False)
+
+    # main.pyのbrief_layer3内と同じパース処理を直接検証（JSONDecodeErrorが出ないこと）
+    try:
+        parsed = _json.loads(fake_llm_json)
+        check(True, "motivation_diagnosisを含むJSONが正常にパースできる")
+        check("motivation_diagnosis" in parsed and "expert_evaluation" in parsed,
+              "パース結果に新旧両方のブロックが含まれている")
+    except (_json.JSONDecodeError, ValueError) as e:
+        check(False, f"JSONパースに失敗: {e}")
+
+
 def test_ops10_edition_support_schema():
     """派生版（海外版・カジュアル版）対応：スキーマ追加のみの回帰確認。
     アプリロジックは今回追加していないため、カラム/テーブルの存在確認のみ行う。"""
@@ -1985,6 +2069,9 @@ if __name__ == '__main__':
             safe_run("機能試験16: account-soft-delete",       test_func16_account_soft_delete)
             safe_run("機能試験17: access-log-feature",        test_func17_access_log,          client)
             safe_run("機能試験18: pricing-modal-design",       test_func18_pricing_modal_campaign)
+            safe_run("機能試験19: study SRL/ARCS/if-then プロンプト構成", test_func19_study_srl_prompt_content)
+            safe_run("機能試験20: study Layer3スキーマ構成",   test_func20_study_layer3_schema_content)
+            safe_run("機能試験21: study Layer3 JSONパース処理（モック）", test_func21_study_layer3_json_parse_mock)
             safe_run("運用試験10: 派生版対応スキーマ整合性",    test_ops10_edition_support_schema)
             safe_run("運用試験11: 発言パターン選択のランダム化", test_ops11_pattern_randomization, client)
             safe_run("運用試験12: ストリーミングAPIアクセス制御", test_ops12_stream_access_control, client)

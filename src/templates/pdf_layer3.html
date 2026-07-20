@@ -149,6 +149,14 @@
 
 {# ===== study ===== #}
 {% elif cat == 'study' %}
+{% if l3.motivation_diagnosis %}
+<div class="section-title">🧭 あなたの動機タイプ</div>
+<div class="accent-left-blue" style="font-size:11pt;margin-bottom:10pt;">
+  {% if l3.motivation_diagnosis.type %}<div>{{ l3.motivation_diagnosis.type }}</div>{% endif %}
+  {% if l3.motivation_diagnosis.need_gap %}<div style="margin-top:4pt;font-size:9pt;color:#8B949E;">🔎 {{ l3.motivation_diagnosis.need_gap }}</div>{% endif %}
+  {% if l3.motivation_diagnosis.arcs_focus %}<div style="margin-top:4pt;font-size:9pt;color:#8B949E;">🎯 {{ l3.motivation_diagnosis.arcs_focus }}</div>{% endif %}
+</div>
+{% endif %}
 {% if l3.expert_evaluation %}
 <div class="section-title">🔍 賢人の評価</div>
 {% if l3.expert_evaluation.overall %}
