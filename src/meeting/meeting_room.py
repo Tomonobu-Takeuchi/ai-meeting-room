@@ -69,7 +69,7 @@ class MeetingRoom:
         }
         self.sessions[session_id] = session
         try:
-            create_meeting_record(session_id, user_id, topic)
+            create_meeting_record(session_id, user_id, topic, category=category)
         except Exception as e:
             print(f"meetings記録作成エラー: {e}")
         return session
