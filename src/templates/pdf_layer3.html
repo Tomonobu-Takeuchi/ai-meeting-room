@@ -149,6 +149,14 @@
 
 {# ===== study ===== #}
 {% elif cat == 'study' %}
+{% if l3.motivation_diagnosis %}
+<div class="section-title">🧭 あなたの動機タイプ</div>
+<div class="accent-left-blue" style="font-size:11pt;margin-bottom:10pt;">
+  {% if l3.motivation_diagnosis.type %}<div>{{ l3.motivation_diagnosis.type }}</div>{% endif %}
+  {% if l3.motivation_diagnosis.need_gap %}<div style="margin-top:4pt;font-size:9pt;color:#8B949E;">🔎 {{ l3.motivation_diagnosis.need_gap }}</div>{% endif %}
+  {% if l3.motivation_diagnosis.arcs_focus %}<div style="margin-top:4pt;font-size:9pt;color:#8B949E;">🎯 {{ l3.motivation_diagnosis.arcs_focus }}</div>{% endif %}
+</div>
+{% endif %}
 {% if l3.expert_evaluation %}
 <div class="section-title">🔍 賢人の評価</div>
 {% if l3.expert_evaluation.overall %}
@@ -189,6 +197,20 @@
   {% if r.input_source %}<div style="font-size:9pt;color:#8B949E;margin-top:3pt;">📚 {{ r.input_source }}</div>{% endif %}
 </div>
 {% endfor %}
+{% endif %}
+
+{% if l3.continuity %}
+<div class="section-title">🧱 継続の仕組み</div>
+<div class="grid-2">
+  <div style="background:rgba(220,38,38,0.08);border-radius:6pt;padding:9pt 11pt;">
+    <div style="font-size:9pt;font-weight:700;color:#F87171;margin-bottom:5pt;">続かない理由</div>
+    {% for o in l3.continuity.obstacles %}<div style="font-size:10pt;line-height:1.6;">・{{ o }}</div>{% endfor %}
+  </div>
+  <div style="background:rgba(22,163,74,0.08);border-radius:6pt;padding:9pt 11pt;">
+    <div style="font-size:9pt;font-weight:700;color:#4ADE80;margin-bottom:5pt;">仕組みで解決</div>
+    {% for s in l3.continuity.solutions %}<div style="font-size:10pt;line-height:1.6;">・{{ s }}</div>{% endfor %}
+  </div>
+</div>
 {% endif %}
 
 {# ===== consulting ===== #}
