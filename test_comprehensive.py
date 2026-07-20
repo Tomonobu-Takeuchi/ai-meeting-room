@@ -2024,6 +2024,61 @@ def test_ops14_cont1_log_summary_and_fifo(client):
           "該当カテゴリのパターンが0件の場合、カテゴリ無条件へフォールバックする")
 
 
+def test_ops15_premium_foundation_schema():
+    """プレミアム版基盤（フェーズ1）：meetings.category・meetings.parent_meeting_id・
+    layer3_reportsテーブルの存在確認。書き込みロジックはフェーズ3/4で別途実装するため、
+    ここではスキーマの存在のみを確認する。"""
+    section("運用試験15: プレミアム版基盤DBスキーマ確認")
+    from src.database import get_connection
+
+    conn = get_connection()
+    try:
+        def _cols(table: str) -> set:
+            rows = conn.run("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name=:t AND table_schema='public'
+            """, t=table)
+            return {r[0] for r in rows}
+
+        meetings_cols = _cols('meetings')
+        check('category' in meetings_cols, "meetingsテーブルにcategory列が存在する")
+        check('parent_meeting_id' in meetings_cols, "meetingsテーブルにparent_meeting_id列が存在する")
+
+        layer3_reports_cols = _cols('layer3_reports')
+        for c in ['id', 'meeting_id', 'user_id', 'category', 'report_json',
+                  'checklist_items', 'checked_flags', 'created_at']:
+            check(c in layer3_reports_cols, f"layer3_reportsテーブルに{c}が存在する")
+    finally:
+        conn.close()
+
+
+def test_func23_meeting_category_persisted():
+    """会議作成時にcategoryがDBへ正しく保存されること（従来は受け渡し漏れで
+    捨てられていた）を確認する。DB書き込み関数の直接呼び出しでAnthropic API不要。"""
+    section("機能試験23: 会議カテゴリのDB保存確認")
+    import uuid
+    from src.database import get_connection, create_meeting_record
+
+    test_session_id = 'test_cat_' + str(uuid.uuid4())[:8]
+    try:
+        create_meeting_record(test_session_id, None, 'カテゴリ保存テスト議題', category='study')
+        conn = get_connection()
+        try:
+            rows = conn.run(
+                "SELECT category FROM meetings WHERE session_id=:sid",
+                sid=test_session_id)
+            check(bool(rows) and rows[0][0] == 'study',
+                  "create_meeting_recordにcategoryを渡すとDBに正しく保存される")
+        finally:
+            conn.close()
+    finally:
+        conn2 = get_connection()
+        try:
+            conn2.run("DELETE FROM meetings WHERE session_id=:sid", sid=test_session_id)
+        finally:
+            conn2.close()
+
+
 def safe_run(name: str, func, *args):
     """テスト関数を安全に実行。DB接続エラー等は SKIP として記録し継続。"""
     import pg8000.exceptions
@@ -2093,6 +2148,8 @@ if __name__ == '__main__':
             safe_run("運用試験12: ストリーミングAPIアクセス制御", test_ops12_stream_access_control, client)
             safe_run("運用試験13: convergence再抽出スキップ確認", test_ops13_conv_reextraction_skip, client)
             safe_run("運用試験14: CONT-1会議ログ要約・FIFO", test_ops14_cont1_log_summary_and_fifo, client)
+            safe_run("運用試験15: プレミアム版基盤DBスキーマ確認", test_ops15_premium_foundation_schema)
+            safe_run("機能試験23: 会議カテゴリのDB保存確認", test_func23_meeting_category_persisted)
     finally:
         cleanup()
 

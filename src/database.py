@@ -1031,15 +1031,15 @@ def get_persona_patterns(persona_id, user_id, pattern_type=None, limit=5, topic_
 
 # ===== meetingsテーブル =====
 
-def create_meeting_record(session_id, user_id, topic):
+def create_meeting_record(session_id, user_id, topic, category=None):
     """会議開始時にmeetingsテーブルへ行を作成（ゲスト会議はuser_id=NULL）"""
     conn = get_connection()
     try:
         conn.run("""
-            INSERT INTO meetings (session_id, user_id, topic)
-            VALUES (:session_id, :user_id, :topic)
+            INSERT INTO meetings (session_id, user_id, topic, category)
+            VALUES (:session_id, :user_id, :topic, :category)
             ON CONFLICT (session_id) DO NOTHING
-        """, session_id=session_id, user_id=user_id, topic=topic)
+        """, session_id=session_id, user_id=user_id, topic=topic, category=category)
     finally:
         conn.close()
 
