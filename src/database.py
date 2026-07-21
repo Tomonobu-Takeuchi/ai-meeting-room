@@ -1563,3 +1563,85 @@ def record_access_log(user_id, ip_address, user_agent, method, path, status_code
              method=method, path=(path or '')[:500], status=status_code)
     finally:
         conn.close()
+
+
+# ===== PHASE4: 実行管理レポート（チェックリスト機能） =====
+
+def _build_checklist_items(category, report_json):
+    if category == 'practice':
+        return report_json.get('checklist', [])
+    if category == 'consulting':
+        return report_json.get('first_action', [])
+    if category == 'strategy':
+        return [o.get('issue', '') for o in report_json.get('open_issues', [])]
+    if category == 'study':
+        items = []
+        for phase in report_json.get('roadmap', []):
+            for action in phase.get('actions', []):
+                items.append(f"{phase.get('phase', '')}：{action}")
+        return items
+    return []  # relationship等、対象外カテゴリ
+
+
+def save_layer3_report(session_id, user_id, category, report_json):
+    """premiumユーザーのLayer3生成成功時、layer3_reportsへ保存する。checklist_itemsは
+    カテゴリ別マッピングに従い report_json から自動生成する。"""
+    conn = get_connection()
+    try:
+        rows = conn.run("SELECT id FROM meetings WHERE session_id=:sid", sid=session_id)
+        if not rows:
+            return
+        meeting_id = rows[0][0]
+        checklist_items = _build_checklist_items(category, report_json)
+        import json as _json
+        conn.run("""
+            INSERT INTO layer3_reports (meeting_id, user_id, category, report_json, checklist_items)
+            VALUES (:mid, :uid, :cat, :report, :items)
+        """, mid=meeting_id, uid=user_id, cat=category,
+             report=_json.dumps(report_json), items=_json.dumps(checklist_items))
+    finally:
+        conn.close()
+
+
+def get_meeting_checklist(session_id, user_id):
+    """指定した会議のチェックリスト項目・現在の進捗状態を返す。
+    レポートが存在しない会議はchecklist_itemsが空配列で返る。"""
+    conn = get_connection()
+    try:
+        rows = conn.run("""
+            SELECT lr.id, lr.checklist_items, lr.checked_flags
+            FROM layer3_reports lr
+            JOIN meetings m ON lr.meeting_id = m.id
+            WHERE m.session_id=:sid AND lr.user_id=:uid
+            ORDER BY lr.created_at DESC LIMIT 1
+        """, sid=session_id, uid=user_id)
+        if not rows:
+            return {"report_id": None, "checklist_items": [], "checked_flags": {}}
+        report_id, checklist_items, checked_flags = rows[0]
+        return {
+            "report_id": report_id,
+            "checklist_items": checklist_items or [],
+            "checked_flags": checked_flags or {},
+        }
+    finally:
+        conn.close()
+
+
+def update_layer3_checklist(report_id, user_id, index, status, note):
+    """進捗状態（3状態）・メモの更新。report_idの所有者チェックを行う。
+    status は 'done' | 'in_progress' | 'not_started' のいずれか。"""
+    conn = get_connection()
+    try:
+        rows = conn.run(
+            "SELECT checked_flags FROM layer3_reports WHERE id=:rid AND user_id=:uid",
+            rid=report_id, uid=user_id)
+        if not rows:
+            return False
+        import json as _json
+        flags = rows[0][0] or {}
+        flags[str(index)] = {"status": status, "note": note or ""}
+        conn.run("UPDATE layer3_reports SET checked_flags=:f WHERE id=:rid",
+                 f=_json.dumps(flags), rid=report_id)
+        return True
+    finally:
+        conn.close()

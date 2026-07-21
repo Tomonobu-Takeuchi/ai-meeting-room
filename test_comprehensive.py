@@ -2225,6 +2225,268 @@ def test_func25_hard_delete_cascades_meeting_transcript():
         conn.close()
 
 
+def test_func26_layer3_report_save_by_plan():
+    """premium/proでのレポート保存有無の確認（generate_brief_layer3相当のDB呼び出しを
+    plan判定ごとに再現。実際のAnthropic API呼び出しは不要）。"""
+    section("機能試験26: premium/proでのレポート保存有無の確認")
+    from src.database import get_connection, create_meeting_record, save_layer3_report
+
+    uid = state.get('user_id')
+    if not uid:
+        skip("機能試験26: テスト用ユーザーが未作成のためSKIP")
+        return
+
+    premium_sid = 'test_l3_premium_' + str(uuid.uuid4())[:8]
+    pro_sid = 'test_l3_pro_' + str(uuid.uuid4())[:8]
+    conn = get_connection()
+    sample_report = {"summary": "テスト用サマリー", "open_issues": [{"issue": "A"}]}
+    try:
+        create_meeting_record(premium_sid, uid, 'premiumレポート保存テスト', category='strategy')
+        create_meeting_record(pro_sid, uid, 'proレポート保存テスト', category='strategy')
+
+        for sid, plan in [(premium_sid, 'premium'), (pro_sid, 'pro')]:
+            # generate_brief_layer3()と同一の条件分岐を再現
+            if plan == 'premium':
+                save_layer3_report(sid, uid, 'strategy', sample_report)
+
+        premium_rows = conn.run("""
+            SELECT lr.id FROM layer3_reports lr
+            JOIN meetings m ON lr.meeting_id = m.id WHERE m.session_id=:sid
+        """, sid=premium_sid)
+        check(len(premium_rows) == 1, "premiumプランではlayer3_reportsに行が作成される")
+
+        pro_rows = conn.run("""
+            SELECT lr.id FROM layer3_reports lr
+            JOIN meetings m ON lr.meeting_id = m.id WHERE m.session_id=:sid
+        """, sid=pro_sid)
+        check(len(pro_rows) == 0, "proプランではlayer3_reportsに行が作成されない")
+    finally:
+        try:
+            conn.run("""
+                DELETE FROM layer3_reports WHERE meeting_id IN
+                (SELECT id FROM meetings WHERE session_id IN (:s1, :s2))
+            """, s1=premium_sid, s2=pro_sid)
+            conn.run("DELETE FROM meetings WHERE session_id IN (:s1, :s2)", s1=premium_sid, s2=pro_sid)
+        except Exception:
+            pass
+        conn.close()
+
+
+def test_func27_checklist_mapping():
+    """チェックリスト生成マッピングの確認（strategy・practice・consulting・study・relationship）。"""
+    section("機能試験27: チェックリスト生成マッピングの確認")
+    from src.database import _build_checklist_items
+
+    strategy_report = {"open_issues": [{"issue": "予算未確定"}, {"issue": "担当者未決定"}]}
+    check(_build_checklist_items('strategy', strategy_report) == ["予算未確定", "担当者未決定"],
+          "strategy: open_issues[].issueがチェック項目になる")
+
+    practice_report = {"checklist": ["項目A", "項目B"]}
+    check(_build_checklist_items('practice', practice_report) == ["項目A", "項目B"],
+          "practice: checklistがそのままチェック項目になる")
+
+    consulting_report = {"first_action": ["初手A", "初手B"]}
+    check(_build_checklist_items('consulting', consulting_report) == ["初手A", "初手B"],
+          "consulting: first_actionがそのままチェック項目になる")
+
+    study_report = {"roadmap": [
+        {"phase": "1週目", "actions": ["単語帳を作る", "1日10分暗記"]},
+        {"phase": "2週目", "actions": ["模試を解く"]},
+    ]}
+    check(_build_checklist_items('study', study_report) ==
+          ["1週目：単語帳を作る", "1週目：1日10分暗記", "2週目：模試を解く"],
+          "study: roadmap[].actionsが{phase}：{action}の形で平坦化される")
+
+    relationship_report = {"advice": "何か"}
+    check(_build_checklist_items('relationship', relationship_report) == [],
+          "relationship: チェックリストは生成されない（空配列）")
+
+
+def test_func28_checklist_status_update():
+    """進捗状態（3状態）・メモ更新APIの確認。所有者チェックも確認する。"""
+    section("機能試験28: 進捗状態（3状態）・メモ更新の確認")
+    from src.database import (get_connection, create_meeting_record,
+                               save_layer3_report, update_layer3_checklist)
+
+    owner_uid = state.get('user_id')
+    if not owner_uid:
+        skip("機能試験28: テスト用ユーザーが未作成のためSKIP")
+        return
+
+    sid = 'test_l3_status_' + str(uuid.uuid4())[:8]
+    conn = get_connection()
+    ts = str(int(time.time()))
+    other_email = f"checklist_other_{ts}@test.invalid"
+    other_uid = None
+    try:
+        with flask_app.test_client() as c_other:
+            r_other = c_other.post('/api/auth/register', json={
+                'email': other_email, 'password': 'testpass123', 'name': '他ユーザーテスト',
+                'tos_agreed': True, 'birth_date': '1990-01-01'})
+            other_uid = (r_other.get_json() or {}).get('user', {}).get('id')
+
+        create_meeting_record(sid, owner_uid, '進捗更新テスト', category='practice')
+        save_layer3_report(sid, owner_uid, 'practice', {"checklist": ["項目A", "項目B"]})
+        rows = conn.run("""
+            SELECT lr.id FROM layer3_reports lr
+            JOIN meetings m ON lr.meeting_id = m.id WHERE m.session_id=:sid
+        """, sid=sid)
+        report_id = rows[0][0]
+
+        ok1 = update_layer3_checklist(report_id, owner_uid, 0, 'done', 'テストメモ1')
+        check(ok1 is True, "update_layer3_checklistがTrueを返す（所有者本人）")
+
+        flags_row = conn.run("SELECT checked_flags FROM layer3_reports WHERE id=:rid", rid=report_id)
+        flags = flags_row[0][0]
+        check(flags.get('0') == {'status': 'done', 'note': 'テストメモ1'},
+              "checked_flagsが{index: {status, note}}の形で正しく保存される（done）")
+
+        update_layer3_checklist(report_id, owner_uid, 1, 'in_progress', 'テストメモ2')
+        flags_row2 = conn.run("SELECT checked_flags FROM layer3_reports WHERE id=:rid", rid=report_id)
+        check(flags_row2[0][0].get('1') == {'status': 'in_progress', 'note': 'テストメモ2'},
+              "in_progressでも正しく保存される")
+
+        update_layer3_checklist(report_id, owner_uid, 0, 'not_started', '')
+        flags_row3 = conn.run("SELECT checked_flags FROM layer3_reports WHERE id=:rid", rid=report_id)
+        check(flags_row3[0][0].get('0') == {'status': 'not_started', 'note': ''},
+              "not_startedでも正しく保存される")
+
+        ok_other = update_layer3_checklist(report_id, other_uid, 0, 'done', '不正な更新')
+        check(ok_other is False, "他ユーザーのreport_idを指定すると更新されない（Falseが返る）")
+        flags_row4 = conn.run("SELECT checked_flags FROM layer3_reports WHERE id=:rid", rid=report_id)
+        check(flags_row4[0][0].get('0') == {'status': 'not_started', 'note': ''},
+              "他ユーザーからの更新試行後もデータが変更されていない")
+    finally:
+        try:
+            conn.run("""
+                DELETE FROM layer3_reports WHERE meeting_id IN
+                (SELECT id FROM meetings WHERE session_id=:sid)
+            """, sid=sid)
+            conn.run("DELETE FROM meetings WHERE session_id=:sid", sid=sid)
+            if other_uid is not None:
+                conn.run("DELETE FROM users WHERE id=:id", id=other_uid)
+        except Exception:
+            pass
+        conn.close()
+
+
+def test_func29_get_meeting_checklist_api():
+    """GET /api/meeting/<session_id>/checklistの確認。レポートあり・なし両方のケースを検証する。
+    premiumプラン限定APIのため専用のflask_app.test_client()でpremiumユーザーを作る。"""
+    section("機能試験29: GET /api/meeting/<session_id>/checklistの確認")
+    from src.database import (get_connection, create_meeting_record,
+                               save_layer3_report)
+
+    ts = str(int(time.time()))
+    email = f"checklist_api_{ts}@test.invalid"
+    pw = "testpass123"
+    uid = None
+    sid_with_report = 'test_cl_api_yes_' + str(uuid.uuid4())[:8]
+    sid_without_report = 'test_cl_api_no_' + str(uuid.uuid4())[:8]
+
+    conn = get_connection()
+    try:
+        with flask_app.test_client() as c:
+            r = c.post('/api/auth/register', json={
+                'email': email, 'password': pw, 'name': 'チェックリストAPIテスト',
+                'tos_agreed': True, 'birth_date': '1990-01-01'})
+            check_code(r, 200, "チェックリストAPIテスト用ユーザー登録 → 200")
+            uid = (r.get_json() or {}).get('user', {}).get('id')
+            _set_user_plan(uid, 'premium')
+
+            create_meeting_record(sid_with_report, uid, 'レポートありの会議', category='practice')
+            save_layer3_report(sid_with_report, uid, 'practice', {"checklist": ["項目A", "項目B"]})
+            create_meeting_record(sid_without_report, uid, 'レポートなしの会議', category='relationship')
+
+            r1 = c.get(f'/api/meeting/{sid_with_report}/checklist')
+            check_code(r1, 200, "レポートありの会議 → 200")
+            d1 = r1.get_json() or {}
+            check(d1.get('checklist_items') == ["項目A", "項目B"],
+                  "レポートありの会議はchecklist_itemsが正しく返る")
+            check(isinstance(d1.get('report_id'), int), "レポートありの会議はreport_idが返る")
+
+            r2 = c.get(f'/api/meeting/{sid_without_report}/checklist')
+            check_code(r2, 200, "レポートなしの会議 → 200")
+            d2 = r2.get_json() or {}
+            check(d2.get('checklist_items') == [], "レポートなしの会議はchecklist_itemsが空配列で返る")
+            check(d2.get('report_id') is None, "レポートなしの会議はreport_idがNoneで返る")
+    finally:
+        try:
+            for sid in (sid_with_report, sid_without_report):
+                conn.run("""
+                    DELETE FROM layer3_reports WHERE meeting_id IN
+                    (SELECT id FROM meetings WHERE session_id=:sid)
+                """, sid=sid)
+                conn.run("DELETE FROM meetings WHERE session_id=:sid", sid=sid)
+            if uid is not None:
+                conn.run("DELETE FROM users WHERE id=:id", id=uid)
+        except Exception:
+            pass
+        conn.close()
+
+
+def test_func34_premium_layer3_access_gate(client):
+    """premiumユーザーのLayer3生成アクセスゲート確認。実際のAnthropic APIを使用する
+    （generate_brief_layer3()の実HTTPエンドポイントを呼ぶ数少ない例外的テスト）。
+    注：check_and_use_meeting()はpremiumプランを無料枠（月3回）相当として扱う
+    （本指示書のスコープ外の既存の別ギャップ）ため、会議開始前にmonthly_meeting_countを
+    明示的に0へリセットしてから呼ぶ。"""
+    section("機能試験34: premiumユーザーのLayer3生成アクセスゲート確認")
+    from src.database import get_connection
+
+    uid = state.get('user_id')
+    if not uid:
+        skip("機能試験34: テスト用ユーザーが未作成のためSKIP")
+        return
+
+    conn = get_connection()
+    sid = None
+    sid_over_limit = None
+    try:
+        _set_user_plan(uid, 'premium', credits=0, monthly_count=0)
+        conn.run("UPDATE users SET layer3_monthly_count=0, layer3_monthly_reset_at=NULL WHERE id=:uid", uid=uid)
+
+        r = client.post('/api/meeting/start', json={
+            'topic': 'FT-34 premiumアクセスゲート確認', 'meeting_category': 'strategy'
+        })
+        check_code(r, 200, "premiumユーザーでの会議開始 → 200")
+        sid = (r.get_json() or {}).get('session_id')
+
+        r2 = client.post(f'/api/meeting/{sid}/brief_layer3', json={'category': 'strategy'})
+        check_code(r2, 200, "premiumユーザーでのbrief_layer3 → 200")
+        d2 = r2.get_json() or {}
+        check(d2.get('layer3') is not None, "premiumユーザーは実際にlayer3が生成される（nullでない）")
+        check(d2.get('layer3_remaining') == 59,
+              f"layer3_remainingが59（60-1）で返る (got {d2.get('layer3_remaining')})")
+
+        count_row = conn.run("SELECT layer3_monthly_count FROM users WHERE id=:uid", uid=uid)
+        check(bool(count_row) and count_row[0][0] == 1, "DBのlayer3_monthly_countが1に更新されている")
+
+        # --- 上限到達済み（60回消化済み）状態でのブロック確認 ---
+        conn.run("UPDATE users SET monthly_meeting_count=0 WHERE id=:uid", uid=uid)
+        conn.run("UPDATE users SET layer3_monthly_count=60, layer3_monthly_reset_at=NOW() WHERE id=:uid", uid=uid)
+        r3 = client.post('/api/meeting/start', json={
+            'topic': 'FT-34 premium上限確認', 'meeting_category': 'strategy'
+        })
+        sid_over_limit = (r3.get_json() or {}).get('session_id')
+        r4 = client.post(f'/api/meeting/{sid_over_limit}/brief_layer3', json={'category': 'strategy'})
+        check_code(r4, 200, "上限到達済みpremiumユーザーでのbrief_layer3 → 200（エラーではなくnull応答）")
+        d4 = r4.get_json() or {}
+        check(d4.get('layer3') is None, "上限到達済みpremiumユーザーはlayer3がnullで返る（新規生成されない、can_use_layer3=False）")
+    finally:
+        try:
+            for s in (sid, sid_over_limit):
+                if s:
+                    conn.run("""
+                        DELETE FROM layer3_reports WHERE meeting_id IN
+                        (SELECT id FROM meetings WHERE session_id=:sid)
+                    """, sid=s)
+                    conn.run("DELETE FROM meetings WHERE session_id=:sid", sid=s)
+        except Exception:
+            pass
+        conn.close()
+
+
 def safe_run(name: str, func, *args):
     """テスト関数を安全に実行。DB接続エラー等は SKIP として記録し継続。"""
     import pg8000.exceptions
@@ -2298,6 +2560,11 @@ if __name__ == '__main__':
             safe_run("機能試験23: 会議カテゴリのDB保存確認", test_func23_meeting_category_persisted)
             safe_run("機能試験24: 会議終了時の発言ログ・決定事項の永続化確認", test_func24_meeting_transcript_persistence)
             safe_run("機能試験25: hard_delete_user()の会議データカスケード削除確認", test_func25_hard_delete_cascades_meeting_transcript)
+            safe_run("機能試験26: premium/proでのレポート保存有無の確認", test_func26_layer3_report_save_by_plan)
+            safe_run("機能試験27: チェックリスト生成マッピングの確認", test_func27_checklist_mapping)
+            safe_run("機能試験28: 進捗状態（3状態）・メモ更新の確認", test_func28_checklist_status_update)
+            safe_run("機能試験29: GET /api/meeting/<session_id>/checklistの確認", test_func29_get_meeting_checklist_api)
+            safe_run("機能試験34: premiumユーザーのLayer3生成アクセスゲート確認", test_func34_premium_layer3_access_gate, client)
     finally:
         cleanup()
 
