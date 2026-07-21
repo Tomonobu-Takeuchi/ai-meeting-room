@@ -9,7 +9,7 @@ from datetime import datetime, date
 
 import anthropic
 
-from src.database import create_meeting_record, end_meeting_record
+from src.database import create_meeting_record, end_meeting_record, persist_meeting_transcript
 
 
 def _json_serial(obj):
@@ -78,10 +78,17 @@ class MeetingRoom:
         return self.sessions.get(session_id)
 
     def end_session(self, session_id):
+        session = self.sessions.get(session_id)
         try:
             end_meeting_record(session_id)
         except Exception as e:
             print(f"meetings記録更新エラー: {e}")
+        if session:
+            try:
+                persist_meeting_transcript(
+                    session_id, session.get("messages", []), session.get("convergence"))
+            except Exception as e:
+                print(f"会議データ永続化エラー: {e}")
 
     def set_crisis_flag(self, session_id):
         session = self.sessions.get(session_id)

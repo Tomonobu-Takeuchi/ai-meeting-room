@@ -2048,6 +2048,18 @@ def test_ops15_premium_foundation_schema():
         for c in ['id', 'meeting_id', 'user_id', 'category', 'report_json',
                   'checklist_items', 'checked_flags', 'created_at']:
             check(c in layer3_reports_cols, f"layer3_reportsテーブルに{c}が存在する")
+
+        check('unresolved_issues' in meetings_cols, "meetingsテーブルにunresolved_issues列が存在する")
+
+        meeting_messages_cols = _cols('meeting_messages')
+        for c in ['id', 'meeting_id', 'message_id', 'role', 'persona_id',
+                  'content', 'sequence', 'message_created_at', 'created_at']:
+            check(c in meeting_messages_cols, f"meeting_messagesテーブルに{c}が存在する")
+
+        meeting_decisions_cols = _cols('meeting_decisions')
+        for c in ['id', 'meeting_id', 'item', 'value', 'status', 'basis',
+                  'changed_from', 'created_at']:
+            check(c in meeting_decisions_cols, f"meeting_decisionsテーブルに{c}が存在する")
     finally:
         conn.close()
 
@@ -2077,6 +2089,140 @@ def test_func23_meeting_category_persisted():
             conn2.run("DELETE FROM meetings WHERE session_id=:sid", sid=test_session_id)
         finally:
             conn2.close()
+
+
+def test_func24_meeting_transcript_persistence():
+    """会議終了時、発言ログ・決定事項・未決着論点がDBへ正しく永続化されることを確認する。
+    DB書き込み関数を直接呼ぶためAnthropic API不要。"""
+    section("機能試験24: 会議終了時の発言ログ・決定事項の永続化確認")
+    from src.database import get_connection, create_meeting_record, persist_meeting_transcript
+
+    test_session_id = 'test_transcript_' + str(uuid.uuid4())[:8]
+    conn = get_connection()
+    meeting_id = None
+    try:
+        create_meeting_record(test_session_id, None, '永続化テスト議題', category='chat')
+        rows = conn.run("SELECT id FROM meetings WHERE session_id=:sid", sid=test_session_id)
+        check(bool(rows), "テスト用meetingレコードが作成されている")
+        meeting_id = rows[0][0]
+
+        messages = [
+            {"id": "m1aaaaaa", "role": "member", "persona_id": "koumei",
+             "content": "第一発言です", "timestamp": "2026-07-21T10:00:00"},
+            {"id": "m2bbbbbb", "role": "member", "persona_id": "hideyoshi",
+             "content": "第二発言です", "timestamp": "2026-07-21T10:01:00"},
+            {"id": "m3cccccc", "role": "facilitator", "persona_id": "facilitator",
+             "content": "第三発言（進行役）です", "timestamp": "2026-07-21T10:02:00"},
+        ]
+        convergence = {
+            "decisions": [
+                {"item": "予算", "value": "10万円", "status": "confirmed",
+                 "basis": "全員合意", "changed_from": None},
+                {"item": "納期", "value": "来月末", "status": "tentative",
+                 "basis": "未確定要素あり", "changed_from": "今月末"},
+            ],
+            "unresolved": ["担当者の最終決定", "外部委託の可否"],
+        }
+
+        persist_meeting_transcript(test_session_id, messages, convergence)
+
+        msg_rows = conn.run("""
+            SELECT sequence, role, persona_id, content FROM meeting_messages
+            WHERE meeting_id=:mid ORDER BY sequence
+        """, mid=meeting_id)
+        check(len(msg_rows) == 3, "meeting_messagesに3件のレコードが保存されている")
+        check([r[0] for r in msg_rows] == [0, 1, 2], "meeting_messagesがsequence順に保存されている")
+        check(msg_rows[0][3] == "第一発言です" and msg_rows[2][2] == "facilitator",
+              "meeting_messagesの内容・persona_idが正しく保存されている")
+
+        dec_rows = conn.run("""
+            SELECT item, value, status, basis, changed_from FROM meeting_decisions
+            WHERE meeting_id=:mid ORDER BY id
+        """, mid=meeting_id)
+        check(len(dec_rows) == 2, "meeting_decisionsに2件のレコードが保存されている")
+        check(dec_rows[0][0] == '予算' and dec_rows[0][2] == 'confirmed',
+              "meeting_decisionsの内容が正しく保存されている")
+        check(dec_rows[1][4] == '今月末', "meeting_decisionsのchanged_fromが正しく保存されている")
+
+        unresolved_row = conn.run("SELECT unresolved_issues FROM meetings WHERE id=:mid", mid=meeting_id)
+        saved_unresolved = unresolved_row[0][0]
+        if isinstance(saved_unresolved, str):
+            saved_unresolved = json.loads(saved_unresolved)
+        check(saved_unresolved == convergence["unresolved"],
+              "meetings.unresolved_issuesに未決着論点が正しく保存されている")
+    finally:
+        try:
+            if meeting_id is not None:
+                conn.run("DELETE FROM meeting_messages WHERE meeting_id=:mid", mid=meeting_id)
+                conn.run("DELETE FROM meeting_decisions WHERE meeting_id=:mid", mid=meeting_id)
+            conn.run("DELETE FROM meetings WHERE session_id=:sid", sid=test_session_id)
+        except Exception:
+            pass
+        conn.close()
+
+
+def test_func25_hard_delete_cascades_meeting_transcript():
+    """hard_delete_user()実行時、対象ユーザーの会議に紐づくmeeting_messages・
+    meeting_decisions・meetingsが全て削除されることを確認する（機能試験16の拡張）。
+    専用のflask_app.test_client()を新規に開いて使う（他テストへの副作用防止）。"""
+    section("機能試験25: hard_delete_user()の会議データカスケード削除確認")
+    from src.database import get_connection, hard_delete_user, create_meeting_record, persist_meeting_transcript
+
+    ts = str(int(time.time()))
+    email = f"harddel_meeting_{ts}@test.invalid"
+    pw = "testpass123"
+    uid = None
+    test_session_id = 'test_harddel_' + str(uuid.uuid4())[:8]
+
+    conn = get_connection()
+    try:
+        with flask_app.test_client() as c1:
+            r = c1.post('/api/auth/register',
+                        json={'email': email, 'password': pw, 'name': 'カスケード削除テスト',
+                              'tos_agreed': True, 'birth_date': '1990-01-01'})
+            check_code(r, 200, "カスケード削除テスト用ユーザー登録 → 200")
+            uid = (r.get_json() or {}).get('user', {}).get('id')
+
+        create_meeting_record(test_session_id, uid, 'カスケード削除テスト議題', category='chat')
+        meeting_row = conn.run("SELECT id FROM meetings WHERE session_id=:sid", sid=test_session_id)
+        check(bool(meeting_row), "テスト用meetingレコードが作成されている")
+        meeting_id = meeting_row[0][0]
+
+        messages = [{"id": "d1aaaaaa", "role": "member", "persona_id": "koumei",
+                     "content": "削除確認用発言", "timestamp": "2026-07-21T10:00:00"}]
+        convergence = {"decisions": [{"item": "項目", "value": "値", "status": "confirmed",
+                                       "basis": "テスト", "changed_from": None}], "unresolved": []}
+        persist_meeting_transcript(test_session_id, messages, convergence)
+
+        before_msgs = conn.run("SELECT COUNT(*) FROM meeting_messages WHERE meeting_id=:mid", mid=meeting_id)[0][0]
+        before_decs = conn.run("SELECT COUNT(*) FROM meeting_decisions WHERE meeting_id=:mid", mid=meeting_id)[0][0]
+        check(before_msgs == 1 and before_decs == 1,
+              "削除前にmeeting_messages/meeting_decisionsへテストデータが投入されている")
+
+        hard_delete_user(uid)
+
+        after_msgs = conn.run("SELECT COUNT(*) FROM meeting_messages WHERE meeting_id=:mid", mid=meeting_id)[0][0]
+        after_decs = conn.run("SELECT COUNT(*) FROM meeting_decisions WHERE meeting_id=:mid", mid=meeting_id)[0][0]
+        after_meetings = conn.run("SELECT COUNT(*) FROM meetings WHERE id=:mid", mid=meeting_id)[0][0]
+        after_users = conn.run("SELECT COUNT(*) FROM users WHERE id=:uid", uid=uid)[0][0]
+        check(after_msgs == 0, "hard_delete_user()実行後、meeting_messagesが削除されている")
+        check(after_decs == 0, "hard_delete_user()実行後、meeting_decisionsが削除されている")
+        check(after_meetings == 0, "hard_delete_user()実行後、meetingsが削除されている")
+        check(after_users == 0, "hard_delete_user()実行後、usersが削除されている")
+    finally:
+        try:
+            conn.run("""DELETE FROM meeting_messages
+                        WHERE meeting_id IN (SELECT id FROM meetings WHERE session_id=:sid)""",
+                     sid=test_session_id)
+            conn.run("""DELETE FROM meeting_decisions
+                        WHERE meeting_id IN (SELECT id FROM meetings WHERE session_id=:sid)""",
+                     sid=test_session_id)
+            conn.run("DELETE FROM meetings WHERE session_id=:sid", sid=test_session_id)
+            if uid is not None:
+                conn.run("DELETE FROM users WHERE id=:uid", uid=uid)
+        except Exception:
+            pass
+        conn.close()
 
 
 def safe_run(name: str, func, *args):
@@ -2150,6 +2296,8 @@ if __name__ == '__main__':
             safe_run("運用試験14: CONT-1会議ログ要約・FIFO", test_ops14_cont1_log_summary_and_fifo, client)
             safe_run("運用試験15: プレミアム版基盤DBスキーマ確認", test_ops15_premium_foundation_schema)
             safe_run("機能試験23: 会議カテゴリのDB保存確認", test_func23_meeting_category_persisted)
+            safe_run("機能試験24: 会議終了時の発言ログ・決定事項の永続化確認", test_func24_meeting_transcript_persistence)
+            safe_run("機能試験25: hard_delete_user()の会議データカスケード削除確認", test_func25_hard_delete_cascades_meeting_transcript)
     finally:
         cleanup()
 
