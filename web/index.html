@@ -1804,5 +1804,15 @@
     </div>
   </div>
 </div>
+
+<div class="modal-overlay hidden" id="checklistModalOverlay" onclick="if(event.target===this)closeChecklistModal()">
+  <div class="modal" style="max-width:520px;">
+    <h2 style="font-size:18px;margin-bottom:14px;">📋 実行チェックリスト</h2>
+    <div id="checklistItemsContainer" style="max-height:60vh;overflow-y:auto;"></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+      <button class="btn" onclick="closeChecklistModal()">閉じる</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

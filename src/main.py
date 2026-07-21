@@ -1465,6 +1465,12 @@ def _get_brief_billing_info(user_id):
     return plan, trial_layer2_used, trial_layer3_used, layer3_monthly_count, layer3_monthly_reset_at
 
 
+def _get_current_user_plan(user_id):
+    """指定ユーザーの現在のplanのみを取得する（_get_brief_billing_infoのplan取得部分を流用）"""
+    plan, _, _, _, _ = _get_brief_billing_info(user_id)
+    return plan
+
+
 def _build_discussion_text(summary):
     """会議の全発言からdiscussion文字列とuser_messagesを組み立てる"""
     discussion = ""
@@ -1751,9 +1757,46 @@ def generate_brief_layer3(session_id):
             finally:
                 conn_l3.close()
 
+        if layer3_parse_ok and plan == 'premium' and user_id:
+            from src.database import save_layer3_report
+            try:
+                save_layer3_report(session_id, user_id, category, layer3_data)
+            except Exception as e:
+                app.logger.error(f"[LAYER3_REPORT_SAVE] エラー: {e}")
+
         return jsonify({"layer3": layer3_data, "layer3_remaining": layer3_remaining})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/meeting/<session_id>/checklist", methods=["GET"])
+@login_required
+def get_meeting_checklist_route(session_id):
+    """③の進捗入力画面用。指定した会議のチェックリスト項目・現在の進捗状態を返す。
+    レポートが存在しない会議（relationship等）はchecklist_itemsが空配列で返る。"""
+    user_id = get_current_user_id()
+    plan = _get_current_user_plan(user_id)
+    if plan != 'premium':
+        return jsonify({"error": "この機能はpremiumプランでご利用いただけます", "code": "PLAN_LIMIT"}), 403
+    from src.database import get_meeting_checklist
+    return jsonify(get_meeting_checklist(session_id, user_id))
+
+
+@app.route("/api/layer3-reports/<int:report_id>/checklist", methods=["PATCH"])
+@login_required
+def update_checklist_item(report_id):
+    """③の画面で「完了/実施中/未完了」・進捗メモを入力するたびに呼ぶ更新API。"""
+    user_id = get_current_user_id()
+    plan = _get_current_user_plan(user_id)
+    if plan != 'premium':
+        return jsonify({"error": "この機能はpremiumプランでご利用いただけます", "code": "PLAN_LIMIT"}), 403
+    data = request.json or {}
+    from src.database import update_layer3_checklist
+    ok = update_layer3_checklist(report_id, user_id, data.get('index'), data.get('status'), data.get('note', ''))
+    if not ok:
+        return jsonify({"error": "レポートが見つかりません"}), 404
+    return jsonify({"message": "更新しました"})
+
 
 @app.route("/api/meeting/<session_id>/end", methods=["POST"])
 @login_required
