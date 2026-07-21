@@ -1687,7 +1687,8 @@ def generate_brief_layer3(session_id):
         plan, _, trial_layer3_used, layer3_monthly_count, layer3_monthly_reset_at = _get_brief_billing_info(user_id)
 
         layer3_remaining = None
-        if plan == 'pro':
+        if plan in ('pro', 'premium'):
+            layer3_monthly_limit = 30 if plan == 'pro' else 60
             from datetime import datetime, timezone
             now = datetime.now(timezone.utc)
             reset_at = layer3_monthly_reset_at
@@ -1698,12 +1699,12 @@ def generate_brief_layer3(session_id):
                 (reset_at.year == now.year and reset_at.month < now.month)
             )
             current_count = 0 if needs_reset else layer3_monthly_count
-            layer3_remaining = max(0, 30 - current_count)
+            layer3_remaining = max(0, layer3_monthly_limit - current_count)
 
         is_blur_request = req_data.get('blur_preview', False)
         can_use_layer3 = (
             (category in LAYER3_TEMPLATES or is_blur_request) and (
-                (plan == 'pro' and layer3_remaining > 0) or
+                (plan in ('pro', 'premium') and layer3_remaining > 0) or
                 (plan in ('free', 'standard') and not trial_layer3_used and is_trial_request == 'layer3') or
                 (plan in ('free', 'standard') and trial_layer3_used and is_blur_request)
             )
@@ -1780,9 +1781,10 @@ def generate_brief_layer3(session_id):
             finally:
                 conn3.close()
 
-        if layer3_parse_ok and plan == 'pro' and user_id:
+        if layer3_parse_ok and plan in ('pro', 'premium') and user_id:
             from src.database import get_connection
             from datetime import datetime, timezone
+            layer3_monthly_limit = 30 if plan == 'pro' else 60
             conn_l3 = get_connection()
             try:
                 now = datetime.now(timezone.utc)
@@ -1793,16 +1795,52 @@ def generate_brief_layer3(session_id):
                 )
                 if needs_reset_now:
                     conn_l3.run("UPDATE users SET layer3_monthly_count=1, layer3_monthly_reset_at=NOW() WHERE id=:uid", uid=user_id)
-                    layer3_remaining = 29
+                    layer3_remaining = layer3_monthly_limit - 1
                 else:
                     conn_l3.run("UPDATE users SET layer3_monthly_count=layer3_monthly_count+1 WHERE id=:uid", uid=user_id)
                     layer3_remaining = max(0, layer3_remaining - 1)
             finally:
                 conn_l3.close()
 
+        if layer3_parse_ok and plan == 'premium' and user_id:
+            from src.database import save_layer3_report
+            try:
+                save_layer3_report(session_id, user_id, category, layer3_data)
+            except Exception as e:
+                app.logger.error(f"[LAYER3_REPORT_SAVE] エラー: {e}")
+
         return jsonify({"layer3": layer3_data, "layer3_remaining": layer3_remaining})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/meeting/<session_id>/checklist", methods=["GET"])
+@login_required
+def get_meeting_checklist_route(session_id):
+    """③の進捗入力画面用。指定した会議のチェックリスト項目・現在の進捗状態を返す。
+    レポートが存在しない会議（relationship等）はchecklist_itemsが空配列で返る。"""
+    user_id = get_current_user_id()
+    plan = _get_current_user_plan(user_id)
+    if plan != 'premium':
+        return jsonify({"error": "この機能はpremiumプランでご利用いただけます", "code": "PLAN_LIMIT"}), 403
+    from src.database import get_meeting_checklist
+    return jsonify(get_meeting_checklist(session_id, user_id))
+
+
+@app.route("/api/layer3-reports/<int:report_id>/checklist", methods=["PATCH"])
+@login_required
+def update_checklist_item(report_id):
+    """③の画面で「完了/実施中/未完了」・進捗メモを入力するたびに呼ぶ更新API。"""
+    user_id = get_current_user_id()
+    plan = _get_current_user_plan(user_id)
+    if plan != 'premium':
+        return jsonify({"error": "この機能はpremiumプランでご利用いただけます", "code": "PLAN_LIMIT"}), 403
+    data = request.json or {}
+    from src.database import update_layer3_checklist
+    ok = update_layer3_checklist(report_id, user_id, data.get('index'), data.get('status'), data.get('note', ''))
+    if not ok:
+        return jsonify({"error": "レポートが見つかりません"}), 404
+    return jsonify({"message": "更新しました"})
 
 
 @app.route("/api/meeting/<session_id>/end", methods=["POST"])

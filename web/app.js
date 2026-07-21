@@ -196,6 +196,21 @@ const API = {
       clearTimeout(timer);
     }
   },
+  async patch(path, body, timeoutMs = 30000) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(path, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: ctrl.signal,
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({ error: res.statusText })); throw new Error(e.error || res.statusText); }
+      return res.json();
+    } finally {
+      clearTimeout(timer);
+    }
+  },
   async delete(path, body) {
     const opts = { method: 'DELETE' };
     if (body !== undefined) { opts.headers = { 'Content-Type': 'application/json' }; opts.body = JSON.stringify(body); }
@@ -1663,9 +1678,73 @@ function buildLayer3HTML(l3, cat, topic, issues) {
   return html;
 }
 
+// ===== PHASE4: 実行管理レポート（チェックリスト） =====
+let _checklistSessionId = null;
+let _checklistReportId = null;
+let _checklistData = { items: [], flags: {} };
+
+async function showChecklistModal(sessionId) {
+  _checklistSessionId = sessionId;
+  const overlay = $('checklistModalOverlay');
+  const container = $('checklistItemsContainer');
+  if (!overlay || !container) return;
+  container.innerHTML = '<div style="color:var(--text-muted);font-size:12px;">⏳ 読み込み中...</div>';
+  overlay.classList.remove('hidden');
+  try {
+    const data = await API.get(`/api/meeting/${sessionId}/checklist`);
+    _checklistReportId = data.report_id;
+    _checklistData = { items: data.checklist_items || [], flags: data.checked_flags || {} };
+    renderChecklistItems();
+  } catch (e) {
+    container.innerHTML = `<div style="color:var(--text-muted);font-size:12px;">${escapeHtml(e.message || '取得に失敗しました')}</div>`;
+  }
+}
+
+function closeChecklistModal() {
+  const overlay = $('checklistModalOverlay');
+  if (overlay) overlay.classList.add('hidden');
+}
+
+function renderChecklistItems() {
+  const container = $('checklistItemsContainer');
+  if (!container) return;
+  const items = _checklistData.items;
+  if (!items.length) {
+    container.innerHTML = '<div style="color:var(--text-muted);font-size:13px;">このカテゴリではチェックリストは生成されません。</div>';
+    return;
+  }
+  container.innerHTML = items.map((text, i) => {
+    const flag = _checklistData.flags[String(i)] || {};
+    const status = flag.status || 'not_started';
+    const note = flag.note || '';
+    return `
+      <div class="checklist-item" style="border-bottom:1px solid var(--border);padding:10px 0;">
+        <div style="font-size:13px;margin-bottom:6px;">${escapeHtml(text)}</div>
+        <div style="display:flex;gap:6px;margin-bottom:6px;">
+          <button type="button" class="btn ${status === 'done' ? 'btn-primary' : ''}" style="font-size:11px;padding:4px 8px;" onclick="updateChecklistItem(${i},'done')">✅ 完了</button>
+          <button type="button" class="btn ${status === 'in_progress' ? 'btn-primary' : ''}" style="font-size:11px;padding:4px 8px;" onclick="updateChecklistItem(${i},'in_progress')">🔄 実施中</button>
+          <button type="button" class="btn ${status === 'not_started' ? 'btn-primary' : ''}" style="font-size:11px;padding:4px 8px;" onclick="updateChecklistItem(${i},'not_started')">⬜ 未完了</button>
+        </div>
+        <textarea data-checklist-note="${i}" placeholder="進捗メモ（任意）" style="width:100%;font-size:12px;min-height:40px;" onblur="updateChecklistItem(${i}, null, this.value)">${escapeHtml(note)}</textarea>
+      </div>`;
+  }).join('');
+}
+
+async function updateChecklistItem(index, status, note) {
+  if (_checklistReportId == null) return;
+  const current = _checklistData.flags[String(index)] || {};
+  const finalStatus = status != null ? status : (current.status || 'not_started');
+  const finalNote = note != null ? note : (current.note || '');
+  try {
+    await API.patch(`/api/layer3-reports/${_checklistReportId}/checklist`, { index, status: finalStatus, note: finalNote });
+    _checklistData.flags[String(index)] = { status: finalStatus, note: finalNote };
+    if (status != null) renderChecklistItems();
+  } catch (e) {
+    alert(e.message || '更新に失敗しました');
+  }
+}
+
 // ===== PHASE3: 継続議論スレッド（①〜④） =====
-// 注：selectContinuableMeeting()・continueFromChecklist()はPHASE4のshowChecklistModal()/
-// closeChecklistModal()を呼び出す（PHASE4実装済み・別ブランチ）。
 let _continuableMeetings = [];
 
 async function openContinuableMeetingsModal() {

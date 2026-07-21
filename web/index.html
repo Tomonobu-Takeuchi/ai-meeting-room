@@ -1813,9 +1813,17 @@
   </div>
 </div>
 
-<!-- 注：checklistModalOverlay（③進捗入力画面）はPHASE4で実装済み（別ブランチ）。
-     PHASE3マージ時、そのモーダル内に「この内容で会議開始 →」ボタン
-     （onclick="continueFromChecklist()"）を追加すること。 -->
+<div class="modal-overlay hidden" id="checklistModalOverlay" onclick="if(event.target===this)closeChecklistModal()">
+  <div class="modal" style="max-width:520px;">
+    <h2 style="font-size:18px;margin-bottom:14px;">📋 実行チェックリスト</h2>
+    <div id="checklistItemsContainer" style="max-height:60vh;overflow-y:auto;"></div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+      <button class="btn" onclick="closeChecklistModal()">閉じる</button>
+      <button class="btn btn-green" onclick="continueFromChecklist()">この内容で会議開始 →</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay hidden" id="continuableMeetingsOverlay" onclick="if(event.target===this)closeContinuableMeetingsModal()">
   <div class="modal" style="max-width:520px;">
     <h2 style="font-size:18px;margin-bottom:14px;">🔁 前回の会議の議論を継続する</h2>
