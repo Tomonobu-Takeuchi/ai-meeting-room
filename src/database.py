@@ -1054,6 +1054,41 @@ def end_meeting_record(session_id):
         conn.close()
 
 
+def persist_meeting_transcript(session_id, messages, convergence):
+    """会議終了時、発言ログ・決定事項・未決着論点を一括でDBへ永続化する。"""
+    conn = get_connection()
+    try:
+        rows = conn.run("SELECT id FROM meetings WHERE session_id=:sid", sid=session_id)
+        if not rows:
+            return
+        meeting_id = rows[0][0]
+
+        for i, msg in enumerate(messages or []):
+            conn.run("""
+                INSERT INTO meeting_messages
+                    (meeting_id, message_id, role, persona_id, content, sequence, message_created_at)
+                VALUES (:mid, :msgid, :role, :pid, :content, :seq, :ts)
+            """, mid=meeting_id, msgid=msg.get('id'), role=msg.get('role'),
+                 pid=msg.get('persona_id'), content=msg.get('content'),
+                 seq=i, ts=msg.get('timestamp'))
+
+        if convergence:
+            for d in convergence.get('decisions', []):
+                conn.run("""
+                    INSERT INTO meeting_decisions
+                        (meeting_id, item, value, status, basis, changed_from)
+                    VALUES (:mid, :item, :value, :status, :basis, :changed_from)
+                """, mid=meeting_id, item=d.get('item'), value=d.get('value'),
+                     status=d.get('status'), basis=d.get('basis'),
+                     changed_from=d.get('changed_from'))
+            if convergence.get('unresolved'):
+                import json as _json
+                conn.run("UPDATE meetings SET unresolved_issues=:u WHERE id=:mid",
+                         u=_json.dumps(convergence['unresolved']), mid=meeting_id)
+    finally:
+        conn.close()
+
+
 # ===== Phase 3: 会議統計 =====
 
 def increment_meeting_count(persona_id, user_id):
@@ -1446,6 +1481,13 @@ def hard_delete_user(user_id):
         try:
             conn.run("""
                 DELETE FROM meeting_messages
+                WHERE meeting_id IN (SELECT id FROM meetings WHERE user_id=:uid)
+            """, uid=user_id)
+        except Exception:
+            pass
+        try:
+            conn.run("""
+                DELETE FROM meeting_decisions
                 WHERE meeting_id IN (SELECT id FROM meetings WHERE user_id=:uid)
             """, uid=user_id)
         except Exception:
