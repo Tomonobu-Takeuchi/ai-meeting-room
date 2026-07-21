@@ -2425,6 +2425,68 @@ def test_func29_get_meeting_checklist_api():
         conn.close()
 
 
+def test_func34_premium_layer3_access_gate(client):
+    """premiumユーザーのLayer3生成アクセスゲート確認。実際のAnthropic APIを使用する
+    （generate_brief_layer3()の実HTTPエンドポイントを呼ぶ数少ない例外的テスト）。
+    注：check_and_use_meeting()はpremiumプランを無料枠（月3回）相当として扱う
+    （本指示書のスコープ外の既存の別ギャップ）ため、会議開始前にmonthly_meeting_countを
+    明示的に0へリセットしてから呼ぶ。"""
+    section("機能試験34: premiumユーザーのLayer3生成アクセスゲート確認")
+    from src.database import get_connection
+
+    uid = state.get('user_id')
+    if not uid:
+        skip("機能試験34: テスト用ユーザーが未作成のためSKIP")
+        return
+
+    conn = get_connection()
+    sid = None
+    sid_over_limit = None
+    try:
+        _set_user_plan(uid, 'premium', credits=0, monthly_count=0)
+        conn.run("UPDATE users SET layer3_monthly_count=0, layer3_monthly_reset_at=NULL WHERE id=:uid", uid=uid)
+
+        r = client.post('/api/meeting/start', json={
+            'topic': 'FT-34 premiumアクセスゲート確認', 'meeting_category': 'strategy'
+        })
+        check_code(r, 200, "premiumユーザーでの会議開始 → 200")
+        sid = (r.get_json() or {}).get('session_id')
+
+        r2 = client.post(f'/api/meeting/{sid}/brief_layer3', json={'category': 'strategy'})
+        check_code(r2, 200, "premiumユーザーでのbrief_layer3 → 200")
+        d2 = r2.get_json() or {}
+        check(d2.get('layer3') is not None, "premiumユーザーは実際にlayer3が生成される（nullでない）")
+        check(d2.get('layer3_remaining') == 59,
+              f"layer3_remainingが59（60-1）で返る (got {d2.get('layer3_remaining')})")
+
+        count_row = conn.run("SELECT layer3_monthly_count FROM users WHERE id=:uid", uid=uid)
+        check(bool(count_row) and count_row[0][0] == 1, "DBのlayer3_monthly_countが1に更新されている")
+
+        # --- 上限到達済み（60回消化済み）状態でのブロック確認 ---
+        conn.run("UPDATE users SET monthly_meeting_count=0 WHERE id=:uid", uid=uid)
+        conn.run("UPDATE users SET layer3_monthly_count=60, layer3_monthly_reset_at=NOW() WHERE id=:uid", uid=uid)
+        r3 = client.post('/api/meeting/start', json={
+            'topic': 'FT-34 premium上限確認', 'meeting_category': 'strategy'
+        })
+        sid_over_limit = (r3.get_json() or {}).get('session_id')
+        r4 = client.post(f'/api/meeting/{sid_over_limit}/brief_layer3', json={'category': 'strategy'})
+        check_code(r4, 200, "上限到達済みpremiumユーザーでのbrief_layer3 → 200（エラーではなくnull応答）")
+        d4 = r4.get_json() or {}
+        check(d4.get('layer3') is None, "上限到達済みpremiumユーザーはlayer3がnullで返る（新規生成されない、can_use_layer3=False）")
+    finally:
+        try:
+            for s in (sid, sid_over_limit):
+                if s:
+                    conn.run("""
+                        DELETE FROM layer3_reports WHERE meeting_id IN
+                        (SELECT id FROM meetings WHERE session_id=:sid)
+                    """, sid=s)
+                    conn.run("DELETE FROM meetings WHERE session_id=:sid", sid=s)
+        except Exception:
+            pass
+        conn.close()
+
+
 def safe_run(name: str, func, *args):
     """テスト関数を安全に実行。DB接続エラー等は SKIP として記録し継続。"""
     import pg8000.exceptions
@@ -2502,6 +2564,7 @@ if __name__ == '__main__':
             safe_run("機能試験27: チェックリスト生成マッピングの確認", test_func27_checklist_mapping)
             safe_run("機能試験28: 進捗状態（3状態）・メモ更新の確認", test_func28_checklist_status_update)
             safe_run("機能試験29: GET /api/meeting/<session_id>/checklistの確認", test_func29_get_meeting_checklist_api)
+            safe_run("機能試験34: premiumユーザーのLayer3生成アクセスゲート確認", test_func34_premium_layer3_access_gate, client)
     finally:
         cleanup()
 

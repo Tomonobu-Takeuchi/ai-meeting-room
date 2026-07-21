@@ -1644,7 +1644,8 @@ def generate_brief_layer3(session_id):
         plan, _, trial_layer3_used, layer3_monthly_count, layer3_monthly_reset_at = _get_brief_billing_info(user_id)
 
         layer3_remaining = None
-        if plan == 'pro':
+        if plan in ('pro', 'premium'):
+            layer3_monthly_limit = 30 if plan == 'pro' else 60
             from datetime import datetime, timezone
             now = datetime.now(timezone.utc)
             reset_at = layer3_monthly_reset_at
@@ -1655,12 +1656,12 @@ def generate_brief_layer3(session_id):
                 (reset_at.year == now.year and reset_at.month < now.month)
             )
             current_count = 0 if needs_reset else layer3_monthly_count
-            layer3_remaining = max(0, 30 - current_count)
+            layer3_remaining = max(0, layer3_monthly_limit - current_count)
 
         is_blur_request = req_data.get('blur_preview', False)
         can_use_layer3 = (
             (category in LAYER3_TEMPLATES or is_blur_request) and (
-                (plan == 'pro' and layer3_remaining > 0) or
+                (plan in ('pro', 'premium') and layer3_remaining > 0) or
                 (plan in ('free', 'standard') and not trial_layer3_used and is_trial_request == 'layer3') or
                 (plan in ('free', 'standard') and trial_layer3_used and is_blur_request)
             )
@@ -1737,9 +1738,10 @@ def generate_brief_layer3(session_id):
             finally:
                 conn3.close()
 
-        if layer3_parse_ok and plan == 'pro' and user_id:
+        if layer3_parse_ok and plan in ('pro', 'premium') and user_id:
             from src.database import get_connection
             from datetime import datetime, timezone
+            layer3_monthly_limit = 30 if plan == 'pro' else 60
             conn_l3 = get_connection()
             try:
                 now = datetime.now(timezone.utc)
@@ -1750,7 +1752,7 @@ def generate_brief_layer3(session_id):
                 )
                 if needs_reset_now:
                     conn_l3.run("UPDATE users SET layer3_monthly_count=1, layer3_monthly_reset_at=NOW() WHERE id=:uid", uid=user_id)
-                    layer3_remaining = 29
+                    layer3_remaining = layer3_monthly_limit - 1
                 else:
                     conn_l3.run("UPDATE users SET layer3_monthly_count=layer3_monthly_count+1 WHERE id=:uid", uid=user_id)
                     layer3_remaining = max(0, layer3_remaining - 1)
