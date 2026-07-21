@@ -1070,12 +1070,23 @@ def start_meeting():
     category = data.get("meeting_category", "chat")
     opponent_persona_id = data.get("opponent_persona_id")
     opponent_name = data.get("opponent_name")
+
+    continue_from_session_id = data.get("continue_from_session_id")
+    continuity_context = None
+    parent_meeting_id = None
+    if continue_from_session_id and user_id:
+        from src.database import get_continuity_context
+        parent_meeting_id, continuity_context = get_continuity_context(
+            continue_from_session_id, user_id, new_category=category)
+
     session_data = meeting_room.create_session(
         topic, member_ids, user_id,
         prefetched_members=prefetched_members,
         category=category,
         opponent_persona_id=opponent_persona_id,
-        opponent_name=opponent_name
+        opponent_name=opponent_name,
+        parent_meeting_id=parent_meeting_id,
+        continuity_context=continuity_context
     )
     updated_count = 0
     if user_id:
@@ -1089,6 +1100,38 @@ def start_meeting():
         "facilitator": session_data["facilitator"],
         "monthly_meeting_count": updated_count
     })
+
+
+@app.route("/api/meetings/continuable", methods=["GET"])
+@login_required
+def list_continuable_meetings():
+    """①ボタン押下後の会議一覧。premium限定。meetingsを主体にlayer3_reportsをLEFT JOINし、
+    レポート未生成の会議も含めて全premium会議を返す。"""
+    user_id = get_current_user_id()
+    plan = _get_current_user_plan(user_id)
+    if plan != 'premium':
+        return jsonify({"error": "この機能はpremiumプランでご利用いただけます", "code": "PLAN_LIMIT"}), 403
+    from src.database import get_connection
+    conn = get_connection()
+    try:
+        rows = conn.run("""
+            SELECT m.session_id, m.topic, m.category, m.created_at, r.id
+            FROM meetings m
+            LEFT JOIN layer3_reports r ON r.meeting_id = m.id
+            WHERE m.user_id = :uid
+            ORDER BY m.created_at DESC
+        """, uid=user_id)
+        meetings = [{
+            "session_id": r[0],
+            "topic": r[1],
+            "category": r[2],
+            "created_at": r[3].isoformat() if r[3] else None,
+            "report_id": r[4],
+        } for r in rows]
+        return jsonify({"meetings": meetings})
+    finally:
+        conn.close()
+
 
 @app.route("/api/meeting/<session_id>", methods=["GET"])
 def get_session(session_id):
@@ -1465,6 +1508,12 @@ def _get_brief_billing_info(user_id):
     return plan, trial_layer2_used, trial_layer3_used, layer3_monthly_count, layer3_monthly_reset_at
 
 
+def _get_current_user_plan(user_id):
+    """指定ユーザーの現在のplanのみを取得する（_get_brief_billing_infoのplan取得部分を流用）"""
+    plan, _, _, _, _ = _get_brief_billing_info(user_id)
+    return plan
+
+
 def _build_discussion_text(summary):
     """会議の全発言からdiscussion文字列とuser_messagesを組み立てる"""
     discussion = ""
@@ -1754,6 +1803,7 @@ def generate_brief_layer3(session_id):
         return jsonify({"layer3": layer3_data, "layer3_remaining": layer3_remaining})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 @app.route("/api/meeting/<session_id>/end", methods=["POST"])
 @login_required
