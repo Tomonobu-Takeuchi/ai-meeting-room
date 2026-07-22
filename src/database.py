@@ -402,6 +402,19 @@ def check_and_use_meeting(user_id):
                 conn.close()
                 return True, "ok"
 
+        # プレミアムプラン（会議回数無制限、proと同一パターン）
+        if plan == 'premium':
+            if plan_expires_at and plan_expires_at < now:
+                conn.run("UPDATE users SET plan='free', plan_expires_at=NULL WHERE id=:id", id=user_id)
+                plan = 'free'
+            else:
+                if needs_reset:
+                    conn.run("UPDATE users SET monthly_meeting_count=1, monthly_reset_at=NOW() WHERE id=:id", id=user_id)
+                else:
+                    conn.run("UPDATE users SET monthly_meeting_count=monthly_meeting_count+1 WHERE id=:id", id=user_id)
+                conn.close()
+                return True, "ok"
+
         # 無料プラン（月3回）
         FREE_LIMIT = 3
         if monthly_count >= FREE_LIMIT:
@@ -1500,11 +1513,11 @@ def set_earlybird_and_billing_anchor(user_id, is_earlybird, billing_anchor_day):
 
 
 def count_earlybird_users():
-    """先着100名判定用：現在のアーリーバード会員数（standard/pro）をカウント"""
+    """先着100名判定用：現在のアーリーバード会員数（standard/pro/premium）をカウント"""
     conn = get_connection()
     try:
         rows = conn.run(
-            "SELECT COUNT(*) FROM users WHERE is_earlybird=TRUE AND plan IN ('standard','pro')"
+            "SELECT COUNT(*) FROM users WHERE is_earlybird=TRUE AND plan IN ('standard','pro','premium')"
         )
         return rows[0][0] if rows else 0
     finally:

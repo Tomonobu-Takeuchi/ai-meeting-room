@@ -2681,6 +2681,239 @@ def test_func34_premium_layer3_access_gate(client):
         conn.close()
 
 
+def test_func35_premium_unlimited_meetings():
+    section("機能試験35: premiumユーザーのcheck_and_use_meeting()が無制限に成功することの確認")
+    from src.database import check_and_use_meeting, get_connection
+    from datetime import datetime, timedelta
+
+    uid = state.get('user_id')
+    if not uid:
+        skip("機能試験35: テスト用ユーザーが未作成のためSKIP")
+        return
+
+    conn = get_connection()
+    try:
+        expires = datetime.utcnow() + timedelta(days=30)
+        conn.run("""
+            UPDATE users SET plan='premium', plan_expires_at=:exp,
+                             monthly_meeting_count=0, monthly_reset_at=NOW()
+            WHERE id=:id
+        """, exp=expires, id=uid)
+
+        for i in range(5):
+            ok, reason = check_and_use_meeting(uid)
+            check(ok is True, f"premium {i + 1}回目のcheck_and_use_meeting() → True (reason={reason})")
+
+        row = conn.run("SELECT monthly_meeting_count FROM users WHERE id=:id", id=uid)
+        count_after = row[0][0] if row else None
+        check(count_after == 5, f"monthly_meeting_countが5回分加算される (got {count_after})")
+    finally:
+        conn.run("""
+            UPDATE users SET plan='free', monthly_meeting_count=0,
+                             monthly_reset_at=NOW(), plan_expires_at=NULL
+            WHERE id=:id
+        """, id=uid)
+        conn.close()
+
+
+def test_func36_premium_expiry_downgrade():
+    section("機能試験36: premium期限切れ時のfree降格＋降格後free制限の即時適用の確認")
+    from src.database import check_and_use_meeting, get_connection
+    from datetime import datetime, timedelta
+
+    uid = state.get('user_id')
+    if not uid:
+        skip("機能試験36: テスト用ユーザーが未作成のためSKIP")
+        return
+
+    conn = get_connection()
+    try:
+        expired = datetime.utcnow() - timedelta(days=1)
+        conn.run("""
+            UPDATE users SET plan='premium', plan_expires_at=:exp,
+                             monthly_meeting_count=2, monthly_reset_at=NOW()
+            WHERE id=:id
+        """, exp=expired, id=uid)
+
+        ok1, reason1 = check_and_use_meeting(uid)
+        check(ok1 is True, f"premium期限切れ→free降格後、free3回目としてTrueが返る (reason={reason1})")
+
+        row = conn.run("SELECT plan FROM users WHERE id=:id", id=uid)
+        plan_after = row[0][0] if row else None
+        check(plan_after == 'free', f"降格後、DBのplanが'free'になっている (got {plan_after})")
+
+        ok2, reason2 = check_and_use_meeting(uid)
+        check(ok2 is False, f"降格後free 4回目はFalseが返る（降格後free制限の即時適用） (reason={reason2})")
+    finally:
+        conn.run("""
+            UPDATE users SET plan='free', monthly_meeting_count=0,
+                             monthly_reset_at=NOW(), plan_expires_at=NULL
+            WHERE id=:id
+        """, id=uid)
+        conn.close()
+
+
+def test_func37_premium_layer2_access(client):
+    section("機能試験37: can_use_layer2()：premiumユーザーがLayer2を取得できることの確認")
+    from src.database import get_connection
+
+    uid = state.get('user_id')
+    if not uid:
+        skip("機能試験37: テスト用ユーザーが未作成のためSKIP")
+        return
+
+    conn = get_connection()
+    sid = None
+    try:
+        _set_user_plan(uid, 'premium', credits=0, monthly_count=0)
+
+        r = client.post('/api/meeting/start', json={
+            'topic': 'FT-37 premium Layer2アクセス確認', 'meeting_category': 'strategy'
+        })
+        check_code(r, 200, "premiumユーザーでの会議開始 → 200")
+        sid = (r.get_json() or {}).get('session_id')
+
+        r2 = client.post(f'/api/meeting/{sid}/brief_layer2', json={'category': 'strategy'})
+        check_code(r2, 200, "premiumユーザーでのbrief_layer2 → 200")
+        d2 = r2.get_json() or {}
+        check(d2.get('layer2') is not None, "premiumユーザーは実際にlayer2が生成される（nullでない）")
+    finally:
+        try:
+            if sid:
+                conn.run("DELETE FROM meetings WHERE session_id=:sid", sid=sid)
+        except Exception:
+            pass
+        conn.run("UPDATE users SET plan='free', monthly_meeting_count=0 WHERE id=:id", id=uid)
+        conn.close()
+
+
+def test_func38_earlybird_premium_count():
+    section("機能試験38: count_earlybird_users()：premiumがearlybirdカウントに含まれることの確認")
+    from src.database import count_earlybird_users, get_connection
+
+    uid = state.get('user_id')
+    if not uid:
+        skip("機能試験38: テスト用ユーザーが未作成のためSKIP")
+        return
+
+    conn = get_connection()
+    try:
+        conn.run("UPDATE users SET is_earlybird=FALSE, plan='free' WHERE id=:id", id=uid)
+        baseline = count_earlybird_users()
+
+        conn.run("UPDATE users SET is_earlybird=TRUE, plan='premium' WHERE id=:id", id=uid)
+        after_premium = count_earlybird_users()
+        check(after_premium == baseline + 1,
+              f"is_earlybird=TRUE, plan='premium' で+1件カウントされる (baseline={baseline}, after={after_premium})")
+
+        conn.run("UPDATE users SET is_earlybird=FALSE WHERE id=:id", id=uid)
+        after_reset = count_earlybird_users()
+        check(after_reset == baseline, f"is_earlybird=FALSEに戻すとカウントから除外される (got {after_reset})")
+    finally:
+        conn.run("UPDATE users SET is_earlybird=FALSE, plan='free' WHERE id=:id", id=uid)
+        conn.close()
+
+
+def test_func39_webhook_invoice_premium_renewal():
+    section("機能試験39: webhook _handle_invoice_payment()：premium価格IDでのplan_expires_at延長確認（モック）")
+    import src.main as main_mod
+    from src.database import get_connection
+    from datetime import datetime, timedelta
+    from types import SimpleNamespace
+
+    uid = state.get('user_id')
+    if not uid:
+        skip("機能試験39: テスト用ユーザーが未作成のためSKIP")
+        return
+
+    fake_price_id = 'price_test_premium_fake_' + str(uuid.uuid4())[:8]
+    conn = get_connection()
+    orig_early = main_mod.STRIPE_PRICE_PREMIUM_EARLY
+    orig_regular = main_mod.STRIPE_PRICE_PREMIUM_REGULAR
+    try:
+        fake_customer = 'cus_test_premium_' + str(uuid.uuid4())[:8]
+        conn.run("""
+            UPDATE users SET plan='premium', stripe_customer_id=:cid,
+                             plan_expires_at=NOW() + INTERVAL '1 day'
+            WHERE id=:id
+        """, cid=fake_customer, id=uid)
+
+        main_mod.STRIPE_PRICE_PREMIUM_EARLY = fake_price_id
+        main_mod.STRIPE_PRICE_PREMIUM_REGULAR = 'price_test_premium_fake_regular'
+
+        fake_invoice = SimpleNamespace(
+            customer=fake_customer,
+            subscription='sub_test_fake',
+            billing_reason='subscription_cycle',
+            lines=SimpleNamespace(data=[SimpleNamespace(price=SimpleNamespace(id=fake_price_id))]),
+        )
+        fake_event = SimpleNamespace(data=SimpleNamespace(object=fake_invoice))
+
+        main_mod._handle_invoice_payment(fake_event, datetime, timedelta)
+
+        row = conn.run("SELECT plan, plan_expires_at FROM users WHERE id=:id", id=uid)
+        plan_after, expires_after = row[0] if row else (None, None)
+        check(plan_after == 'premium', f"planがpremiumのまま維持される (got {plan_after})")
+        if expires_after is not None:
+            days_left = (expires_after.replace(tzinfo=None) - datetime.utcnow()).days
+            check(days_left >= 29, f"plan_expires_atが実行日+31日相当に延長される (残り{days_left}日)")
+        else:
+            check(False, "plan_expires_atがNULLのまま（更新されていない）")
+    finally:
+        main_mod.STRIPE_PRICE_PREMIUM_EARLY = orig_early
+        main_mod.STRIPE_PRICE_PREMIUM_REGULAR = orig_regular
+        conn.run("""
+            UPDATE users SET plan='free', stripe_customer_id=NULL, plan_expires_at=NULL
+            WHERE id=:id
+        """, id=uid)
+        conn.close()
+
+
+def test_func40_delete_account_premium_stripe_cancel():
+    section("機能試験40: delete_account()：premiumユーザー退会時のStripeサブスク解約呼び出し確認（モック）")
+    from unittest.mock import patch, MagicMock
+    from src.database import get_connection
+
+    ts = str(int(time.time()))
+    email = f"premdel_{ts}@test.invalid"
+    pw = "testpass123"
+    uid = None
+    conn = get_connection()
+    try:
+        with flask_app.test_client() as c1:
+            r = c1.post('/api/auth/register',
+                        json={'email': email, 'password': pw, 'name': 'premium退会テスト',
+                              'tos_agreed': True, 'birth_date': '1990-01-01'})
+            check_code(r, 200, "退会テスト用ユーザー登録 → 200")
+            uid = (r.get_json() or {}).get('user', {}).get('id')
+
+            fake_customer = 'cus_test_del_' + str(uuid.uuid4())[:8]
+            conn.run("UPDATE users SET plan='premium', stripe_customer_id=:cid WHERE id=:id",
+                      cid=fake_customer, id=uid)
+
+            mock_sub = MagicMock()
+            mock_sub.id = 'sub_test_fake_del'
+            mock_list_result = MagicMock()
+            mock_list_result.data = [mock_sub]
+
+            with patch('src.main.stripe.Subscription.list', return_value=mock_list_result) as mock_list, \
+                 patch('src.main.stripe.Subscription.cancel') as mock_cancel:
+                r2 = c1.delete('/api/auth/account', json={'current_password': pw})
+                check_code(r2, 200, "premiumユーザーのDELETE /api/auth/account → 200")
+                check(mock_list.call_count == 1, "Stripe Subscription.listが呼ばれる")
+                check(mock_cancel.call_count == 1, "Stripe Subscription.cancelが呼ばれる")
+                if mock_cancel.call_args and mock_cancel.call_args[0]:
+                    called_sub_id = mock_cancel.call_args[0][0]
+                    check(called_sub_id == 'sub_test_fake_del', f"cancelに正しいsub_idが渡される (got {called_sub_id})")
+    finally:
+        try:
+            if uid is not None:
+                conn.run("DELETE FROM users WHERE id=:id", id=uid)
+        except Exception:
+            pass
+        conn.close()
+
+
 def safe_run(name: str, func, *args):
     """テスト関数を安全に実行。DB接続エラー等は SKIP として記録し継続。"""
     import pg8000.exceptions
@@ -2763,6 +2996,12 @@ if __name__ == '__main__':
             safe_run("機能試験32: history_textが実際にプロンプトに含まれることの確認", test_func32_history_text_in_prompt)
             safe_run("機能試験33: /api/meetings/continuableのLEFT JOIN確認", test_func33_continuable_left_join, client)
             safe_run("機能試験34: premiumユーザーのLayer3生成アクセスゲート確認", test_func34_premium_layer3_access_gate, client)
+            safe_run("機能試験35: premiumユーザーの会議回数無制限確認", test_func35_premium_unlimited_meetings)
+            safe_run("機能試験36: premium期限切れ→free降格確認", test_func36_premium_expiry_downgrade)
+            safe_run("機能試験37: premiumユーザーのLayer2アクセス確認", test_func37_premium_layer2_access, client)
+            safe_run("機能試験38: count_earlybird_users()のpremium対応確認", test_func38_earlybird_premium_count)
+            safe_run("機能試験39: webhook premium価格IDでの月次更新確認", test_func39_webhook_invoice_premium_renewal)
+            safe_run("機能試験40: delete_account()のpremium Stripe解約確認", test_func40_delete_account_premium_stripe_cancel)
     finally:
         cleanup()
 
