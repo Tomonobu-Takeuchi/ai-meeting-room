@@ -2425,6 +2425,200 @@ def test_func29_get_meeting_checklist_api():
         conn.close()
 
 
+def test_func30_get_continuity_context():
+    """get_continuity_context()の確認：同一カテゴリ（制約）・異なるカテゴリ（参考情報）・
+    チェックリストが無い会議（決定事項のみ）の3パターンを検証する。"""
+    section("機能試験30: get_continuity_context()の確認")
+    from src.database import (get_connection, create_meeting_record, save_layer3_report,
+                               update_layer3_checklist, get_continuity_context)
+
+    uid = state.get('user_id')
+    if not uid:
+        skip("機能試験30: テスト用ユーザーが未作成のためSKIP")
+        return
+
+    parent_sid = 'test_cont_parent_' + str(uuid.uuid4())[:8]
+    no_checklist_sid = 'test_cont_nocl_' + str(uuid.uuid4())[:8]
+    conn = get_connection()
+    try:
+        create_meeting_record(parent_sid, uid, '継続元会議（strategy）', category='strategy')
+        parent_row = conn.run("SELECT id FROM meetings WHERE session_id=:sid", sid=parent_sid)
+        parent_meeting_id = parent_row[0][0]
+
+        conn.run("""
+            INSERT INTO meeting_decisions (meeting_id, item, value, status, basis)
+            VALUES (:mid, 'ターゲット市場', '一人社長・個人経営者', 'confirmed', '会議で全員合意')
+        """, mid=parent_meeting_id)
+        conn.run("""
+            INSERT INTO meeting_decisions (meeting_id, item, value, status, basis)
+            VALUES (:mid, '価格', '1980円', 'tentative', '仮の案として')
+        """, mid=parent_meeting_id)
+
+        save_layer3_report(parent_sid, uid, 'strategy', {
+            "open_issues": [{"issue": "アーリーバード価格の適用期間を決める"},
+                             {"issue": "競合3社の価格レンジを再調査する"}]
+        })
+        report_row = conn.run("SELECT id FROM layer3_reports WHERE meeting_id=:mid", mid=parent_meeting_id)
+        report_id = report_row[0][0]
+        update_layer3_checklist(report_id, uid, 0, 'done', 'アーリーバード期間を8月末までに設定した')
+        update_layer3_checklist(report_id, uid, 1, 'in_progress', '1社は調査済み、残り2社を今週中に')
+
+        # --- ① 同一カテゴリ（strategy → strategy）：制約 ---
+        pmid_same, ctx_same = get_continuity_context(parent_sid, uid, new_category='strategy')
+        check(pmid_same == parent_meeting_id, "同一カテゴリ: parent_meeting_idが正しく返る")
+        check('制約' in ctx_same, "同一カテゴリ: テキストに「制約」の文言が含まれる")
+        check('完了：アーリーバード価格の適用期間を決める' in ctx_same and
+              'アーリーバード期間を8月末までに設定した' in ctx_same,
+              "同一カテゴリ: 完了項目とメモが含まれる")
+        check('実施中：競合3社の価格レンジを再調査する' in ctx_same and
+              '1社は調査済み、残り2社を今週中に' in ctx_same,
+              "同一カテゴリ: 実施中項目とメモが含まれる")
+        check('ターゲット市場' in ctx_same and '価格' in ctx_same,
+              "同一カテゴリ: 決定事項の項目が含まれる")
+
+        # --- ② 異なるカテゴリ（strategy → study）：参考情報 ---
+        pmid_diff, ctx_diff = get_continuity_context(parent_sid, uid, new_category='study')
+        check(pmid_diff == parent_meeting_id, "異なるカテゴリ: parent_meeting_idが正しく返る")
+        check('参考情報' in ctx_diff, "異なるカテゴリ: テキストに「参考情報」の文言が含まれる")
+
+        # --- ③ チェックリストが無い会議（relationship等）：決定事項のみ ---
+        create_meeting_record(no_checklist_sid, uid, '継続元会議（relationship・チェックリストなし）', category='relationship')
+        nc_row = conn.run("SELECT id FROM meetings WHERE session_id=:sid", sid=no_checklist_sid)
+        nc_meeting_id = nc_row[0][0]
+        conn.run("""
+            INSERT INTO meeting_decisions (meeting_id, item, value, status, basis)
+            VALUES (:mid, '対応方針', '距離を置く', 'confirmed', '本人の希望')
+        """, mid=nc_meeting_id)
+        pmid_nc, ctx_nc = get_continuity_context(no_checklist_sid, uid, new_category='relationship')
+        check(pmid_nc == nc_meeting_id, "チェックリストなし: parent_meeting_idが正しく返る")
+        check('完了：' not in ctx_nc and '実施中：' not in ctx_nc,
+              "チェックリストなし: チェックリストのセクションが含まれない")
+        check('対応方針' in ctx_nc, "チェックリストなし: 決定事項のみのテキストになる")
+    finally:
+        try:
+            for sid in (parent_sid, no_checklist_sid):
+                conn.run("""
+                    DELETE FROM meeting_decisions WHERE meeting_id IN
+                    (SELECT id FROM meetings WHERE session_id=:sid)
+                """, sid=sid)
+                conn.run("""
+                    DELETE FROM layer3_reports WHERE meeting_id IN
+                    (SELECT id FROM meetings WHERE session_id=:sid)
+                """, sid=sid)
+                conn.run("DELETE FROM meetings WHERE session_id=:sid", sid=sid)
+        except Exception:
+            pass
+        conn.close()
+
+
+def test_func31_continue_parent_meeting_id(client):
+    """継続会議のparent_meeting_id確認：continue_from_session_id付きで/api/meeting/startを
+    呼び、新しいmeetings行のparent_meeting_idが親のmeetings.idと一致することを確認する。"""
+    section("機能試験31: 継続会議のparent_meeting_id確認")
+    from src.database import get_connection, create_meeting_record
+
+    uid = state.get('user_id')
+    if not uid:
+        skip("機能試験31: テスト用ユーザーが未作成のためSKIP")
+        return
+
+    parent_sid = 'test_cont_start_parent_' + str(uuid.uuid4())[:8]
+    conn = get_connection()
+    new_sid = None
+    try:
+        create_meeting_record(parent_sid, uid, '継続元（parent_meeting_id確認用）', category='chat')
+        parent_row = conn.run("SELECT id FROM meetings WHERE session_id=:sid", sid=parent_sid)
+        parent_meeting_id = parent_row[0][0]
+
+        _set_user_plan(uid, 'pro', credits=0, monthly_count=0)
+        r = client.post('/api/meeting/start', json={
+            'topic': '継続会議テスト',
+            'continue_from_session_id': parent_sid
+        })
+        check_code(r, 200, "continue_from_session_id付きの/api/meeting/start → 200")
+        new_sid = (r.get_json() or {}).get('session_id')
+
+        check(bool(new_sid), "新しいsession_idが返る")
+        if new_sid:
+            new_row = conn.run("SELECT parent_meeting_id FROM meetings WHERE session_id=:sid", sid=new_sid)
+            check(bool(new_row) and new_row[0][0] == parent_meeting_id,
+                  "新しいmeetings行のparent_meeting_idが親のmeetings.idと一致する")
+    finally:
+        try:
+            if new_sid:
+                conn.run("DELETE FROM meetings WHERE session_id=:sid", sid=new_sid)
+            conn.run("DELETE FROM meetings WHERE session_id=:sid", sid=parent_sid)
+        except Exception:
+            pass
+        conn.close()
+
+
+def test_func32_history_text_in_prompt():
+    """history_textが実際にプロンプトに含まれることの確認（build_system_prompt()の
+    純粋な出力確認。実際のAPI呼び出しは不要）。"""
+    section("機能試験32: history_textが実際にプロンプトに含まれることの確認")
+    from src.persona.persona_manager import PersonaManager
+
+    pm = PersonaManager()
+    persona = pm.get_persona('koumei')
+    if not persona:
+        skip("機能試験32: 検証用ペルソナ(koumei)が見つからないためSKIP")
+        return
+
+    sample_history = ("完了：予算を確定する（10万円で決定）\n\n"
+                       "（前回決定した事項——制約として厳密に従うこと）\n"
+                       "・ターゲット：個人事業主【確定】")
+    prompt = pm.build_system_prompt(persona, 'テスト議題（継続コンテキスト確認）', history_text=sample_history)
+    check('【これまでの会話】' in prompt, "history_text指定時、プロンプトに【これまでの会話】見出しが含まれる")
+    check(sample_history in prompt, "history_textの内容がそのままプロンプトに含まれる")
+
+
+def test_func33_continuable_left_join(client):
+    """/api/meetings/continuableのLEFT JOIN確認：レポートが生成された会議・
+    生成されていない会議を両方作成した状態で一覧取得し、両方とも返ってくることを確認する。"""
+    section("機能試験33: /api/meetings/continuableのLEFT JOIN確認")
+    from src.database import get_connection, create_meeting_record, save_layer3_report
+
+    uid = state.get('user_id')
+    if not uid:
+        skip("機能試験33: テスト用ユーザーが未作成のためSKIP")
+        return
+
+    sid_with_report = 'test_cont_list_yes_' + str(uuid.uuid4())[:8]
+    sid_without_report = 'test_cont_list_no_' + str(uuid.uuid4())[:8]
+    conn = get_connection()
+    try:
+        create_meeting_record(sid_with_report, uid, 'LEFT JOIN確認用（レポートあり）', category='practice')
+        save_layer3_report(sid_with_report, uid, 'practice', {"checklist": ["項目A"]})
+        create_meeting_record(sid_without_report, uid, 'LEFT JOIN確認用（レポートなし）', category='chat')
+
+        _set_user_plan(uid, 'premium', credits=0, monthly_count=0)
+        r = client.get('/api/meetings/continuable')
+        check_code(r, 200, "GET /api/meetings/continuable → 200（premiumプラン）")
+        meetings = (r.get_json() or {}).get('meetings', [])
+        sids_returned = {m.get('session_id') for m in meetings}
+        check(sid_with_report in sids_returned, "レポートが生成された会議が一覧に含まれる")
+        check(sid_without_report in sids_returned, "レポートが生成されていない会議も一覧に含まれる（LEFT JOIN）")
+
+        with_report_entry = next((m for m in meetings if m.get('session_id') == sid_with_report), None)
+        without_report_entry = next((m for m in meetings if m.get('session_id') == sid_without_report), None)
+        check(with_report_entry is not None and with_report_entry.get('report_id') is not None,
+              "レポートありの会議はreport_idが設定されている")
+        check(without_report_entry is not None and without_report_entry.get('report_id') is None,
+              "レポートなしの会議はreport_idがNoneになっている")
+    finally:
+        try:
+            for sid in (sid_with_report, sid_without_report):
+                conn.run("""
+                    DELETE FROM layer3_reports WHERE meeting_id IN
+                    (SELECT id FROM meetings WHERE session_id=:sid)
+                """, sid=sid)
+                conn.run("DELETE FROM meetings WHERE session_id=:sid", sid=sid)
+        except Exception:
+            pass
+        conn.close()
+
+
 def test_func34_premium_layer3_access_gate(client):
     """premiumユーザーのLayer3生成アクセスゲート確認。実際のAnthropic APIを使用する
     （generate_brief_layer3()の実HTTPエンドポイントを呼ぶ数少ない例外的テスト）。
@@ -2564,6 +2758,10 @@ if __name__ == '__main__':
             safe_run("機能試験27: チェックリスト生成マッピングの確認", test_func27_checklist_mapping)
             safe_run("機能試験28: 進捗状態（3状態）・メモ更新の確認", test_func28_checklist_status_update)
             safe_run("機能試験29: GET /api/meeting/<session_id>/checklistの確認", test_func29_get_meeting_checklist_api)
+            safe_run("機能試験30: get_continuity_context()の確認", test_func30_get_continuity_context)
+            safe_run("機能試験31: 継続会議のparent_meeting_id確認", test_func31_continue_parent_meeting_id, client)
+            safe_run("機能試験32: history_textが実際にプロンプトに含まれることの確認", test_func32_history_text_in_prompt)
+            safe_run("機能試験33: /api/meetings/continuableのLEFT JOIN確認", test_func33_continuable_left_join, client)
             safe_run("機能試験34: premiumユーザーのLayer3生成アクセスゲート確認", test_func34_premium_layer3_access_gate, client)
     finally:
         cleanup()

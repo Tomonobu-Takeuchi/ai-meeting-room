@@ -49,7 +49,7 @@ class MeetingRoom:
                 else:
                     raise
 
-    def create_session(self, topic, member_ids, user_id=None, prefetched_members=None, category=None, opponent_persona_id=None, opponent_name=None):
+    def create_session(self, topic, member_ids, user_id=None, prefetched_members=None, category=None, opponent_persona_id=None, opponent_name=None, parent_meeting_id=None, continuity_context=None):
         session_id = str(uuid.uuid4())[:8]
         members = prefetched_members if prefetched_members is not None else self.persona_manager.get_personas_by_ids(member_ids, user_id=user_id)
         facilitator = self.persona_manager.get_facilitator()
@@ -66,10 +66,11 @@ class MeetingRoom:
             "crisis_flag": False,
             "opponent_persona_id": opponent_persona_id,
             "opponent_name": opponent_name,
+            "continuity_context": continuity_context,
         }
         self.sessions[session_id] = session
         try:
-            create_meeting_record(session_id, user_id, topic, category=category)
+            create_meeting_record(session_id, user_id, topic, category=category, parent_meeting_id=parent_meeting_id)
         except Exception as e:
             print(f"meetings記録作成エラー: {e}")
         return session
@@ -134,7 +135,8 @@ class MeetingRoom:
         is_opponent = (session.get("opponent_persona_id") == persona_id)
         opponent_name = session.get("opponent_name") if is_opponent else None
         system_prompt = self.persona_manager.build_system_prompt(
-            persona, session["topic"], user_id=session.get("user_id"),
+            persona, session["topic"], history_text=session.get("continuity_context") or '',
+            user_id=session.get("user_id"),
             crisis_mode=session.get("crisis_flag", False),
             category=session.get("category"),
             opponent_name=opponent_name,
@@ -157,6 +159,8 @@ class MeetingRoom:
             yield f"data: {_dumps({'type': 'error', 'message': 'セッションが見つかりません'})}\n\n"
             return
         discussion_text = self._format_discussion(session)
+        if session.get("continuity_context"):
+            discussion_text = f"{session['continuity_context']}\n\n{discussion_text}"
         # modeが指定されていない場合はメッセージ数で自動判定
         if mode is None:
             msg_count = len(session["messages"])

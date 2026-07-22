@@ -74,6 +74,7 @@ const State = {
   suggestedRoles: [],   // APIから返ってきた役割リスト [{role, persona_id, persona_name, ...}]
   meetingCategory: null,
   suggestedPersonaIds: [],
+  continueFromSessionId: null,  // PHASE3: 継続議論スレッド（継続元session_id）
 };
 
 const $ = id => document.getElementById(id);
@@ -1743,6 +1744,58 @@ async function updateChecklistItem(index, status, note) {
   }
 }
 
+// ===== PHASE3: 継続議論スレッド（①〜④） =====
+let _continuableMeetings = [];
+
+async function openContinuableMeetingsModal() {
+  const overlay = $('continuableMeetingsOverlay');
+  const container = $('continuableMeetingsList');
+  if (!overlay || !container) return;
+  container.innerHTML = '<div style="color:var(--text-muted);font-size:12px;">⏳ 読み込み中...</div>';
+  overlay.classList.remove('hidden');
+  try {
+    const data = await API.get('/api/meetings/continuable');
+    _continuableMeetings = data.meetings || [];
+    if (_continuableMeetings.length === 0) {
+      container.innerHTML = '<div style="color:var(--text-muted);font-size:13px;">継続可能な会議がまだありません。</div>';
+      return;
+    }
+    container.innerHTML = _continuableMeetings.map((m, i) => `
+      <div class="continuable-item" style="border-bottom:1px solid var(--border);padding:10px 0;cursor:pointer;" onclick="selectContinuableMeeting(${i})">
+        <div style="font-size:13px;font-weight:600;">${escapeHtml(m.topic || '')}</div>
+        <div style="font-size:11px;color:var(--text-muted);">${escapeHtml(m.category || '')} ・ ${m.created_at ? new Date(m.created_at).toLocaleDateString() : ''}${m.report_id ? ' ・ 📋 レポートあり' : ''}</div>
+      </div>`).join('');
+  } catch (e) {
+    if (e.code === 'PLAN_LIMIT') {
+      overlay.classList.add('hidden');
+      openPricingModal(e.message);
+    } else {
+      container.innerHTML = `<div style="color:var(--text-muted);font-size:12px;">${escapeHtml(e.message || '取得に失敗しました')}</div>`;
+    }
+  }
+}
+
+function closeContinuableMeetingsModal() {
+  const overlay = $('continuableMeetingsOverlay');
+  if (overlay) overlay.classList.add('hidden');
+}
+
+function selectContinuableMeeting(index) {
+  const m = _continuableMeetings[index];
+  if (!m) return;
+  closeContinuableMeetingsModal();
+  State.continueFromSessionId = m.session_id;
+  if (DOM.topicInput) DOM.topicInput.value = m.topic || '';
+  showChecklistModal(m.session_id);
+}
+
+function continueFromChecklist() {
+  if (!_checklistSessionId) return;
+  closeChecklistModal();
+  State.continueFromSessionId = _checklistSessionId;
+  startMeeting();
+}
+
 async function useTrialLayer2() {
   console.log('[LOG] レポートボタン押下 layer=layer2(trial) plan=' + State.currentUser?.plan);
   const sid = State.sessionId || _briefSessionId;
@@ -2451,7 +2504,9 @@ async function startMeeting() {
       meeting_category: State.meetingCategory || 'chat',
       ...(State.opponentPersonaId ? { opponent_persona_id: State.opponentPersonaId } : {}),
       ...(State.opponentName ? { opponent_name: State.opponentName } : {}),
+      ...(State.continueFromSessionId ? { continue_from_session_id: State.continueFromSessionId } : {}),
     });
+    State.continueFromSessionId = null;
     State.sessionId = data.session_id; State.topic = data.topic;
     console.log('[LOG] 会議開始 sessionId=' + State.sessionId);
     State.members = data.members; State.facilitator = data.facilitator;

@@ -1031,15 +1031,16 @@ def get_persona_patterns(persona_id, user_id, pattern_type=None, limit=5, topic_
 
 # ===== meetingsテーブル =====
 
-def create_meeting_record(session_id, user_id, topic, category=None):
+def create_meeting_record(session_id, user_id, topic, category=None, parent_meeting_id=None):
     """会議開始時にmeetingsテーブルへ行を作成（ゲスト会議はuser_id=NULL）"""
     conn = get_connection()
     try:
         conn.run("""
-            INSERT INTO meetings (session_id, user_id, topic, category)
-            VALUES (:session_id, :user_id, :topic, :category)
+            INSERT INTO meetings (session_id, user_id, topic, category, parent_meeting_id)
+            VALUES (:session_id, :user_id, :topic, :category, :parent_meeting_id)
             ON CONFLICT (session_id) DO NOTHING
-        """, session_id=session_id, user_id=user_id, topic=topic, category=category)
+        """, session_id=session_id, user_id=user_id, topic=topic,
+             category=category, parent_meeting_id=parent_meeting_id)
     finally:
         conn.close()
 
@@ -1085,6 +1086,76 @@ def persist_meeting_transcript(session_id, messages, convergence):
                 import json as _json
                 conn.run("UPDATE meetings SET unresolved_issues=:u WHERE id=:mid",
                          u=_json.dumps(convergence['unresolved']), mid=meeting_id)
+    finally:
+        conn.close()
+
+
+# ===== PHASE3: 継続議論スレッド =====
+
+def get_continuity_context(session_id, user_id, new_category=None):
+    """継続元会議（session_id）の決定事項・チェックリスト進捗から、継続コンテキストの
+    テキストを組み立てて返す。(parent_meeting_id, continuity_context) のタプルを返す。
+    継続元が見つからない・本人の会議でない場合は (None, None) を返す。"""
+    conn = get_connection()
+    try:
+        rows = conn.run(
+            "SELECT id, category FROM meetings WHERE session_id=:sid AND user_id=:uid",
+            sid=session_id, uid=user_id)
+        if not rows:
+            return None, None
+        parent_meeting_id, parent_category = rows[0]
+
+        lines = []
+        status_labels = {'done': '完了', 'in_progress': '実施中', 'not_started': '未完了'}
+
+        cl_rows = conn.run("""
+            SELECT checklist_items, checked_flags FROM layer3_reports
+            WHERE meeting_id=:mid AND user_id=:uid
+            ORDER BY created_at DESC LIMIT 1
+        """, mid=parent_meeting_id, uid=user_id)
+        has_incomplete = False
+        if cl_rows:
+            items, flags = cl_rows[0]
+            items = items or []
+            flags = flags or {}
+            for i, item in enumerate(items):
+                flag = flags.get(str(i)) or {}
+                status = flag.get('status', 'not_started')
+                note = flag.get('note', '')
+                label = status_labels.get(status, '未完了')
+                line = f"{label}：{item}"
+                if note:
+                    line += f"（{note}）"
+                lines.append(line)
+                if status in ('in_progress', 'not_started'):
+                    has_incomplete = True
+        if lines and has_incomplete:
+            lines.append("→ 実施中・未完了の項目について、なぜ進んでいないか、今後どう進めるかを議論してください。")
+
+        dec_rows = conn.run("""
+            SELECT item, value, status, basis FROM meeting_decisions
+            WHERE meeting_id=:mid ORDER BY id
+        """, mid=parent_meeting_id)
+        if dec_rows:
+            same_category = bool(new_category) and new_category == parent_category
+            lines.append("")
+            lines.append("（前回決定した事項——制約として厳密に従うこと）" if same_category
+                         else "（参考：前回決定した事項）")
+            for item, value, status, basis in dec_rows:
+                status_label = '確定' if status == 'confirmed' else '仮'
+                dec_line = f"・{item}：{value}【{status_label}】"
+                if basis:
+                    dec_line += f"（根拠：{basis}）"
+                if status != 'confirmed':
+                    dec_line += "※状況が変わっていれば見直してよい"
+                lines.append(dec_line)
+            lines.append(
+                "上記の決定事項という制約に厳密に従い、矛盾する内容を述べないこと。"
+                if same_category else
+                "上記は別カテゴリの前回会議での決定事項です。参考情報として扱い、新しい文脈に合わせて解釈してよい。")
+
+        continuity_context = "\n".join(lines).strip()
+        return parent_meeting_id, (continuity_context or None)
     finally:
         conn.close()
 

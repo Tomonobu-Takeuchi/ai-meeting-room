@@ -63,6 +63,7 @@
 
     .attach-btn{display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:var(--radius);border:1px dashed var(--border);background:transparent;color:var(--text-secondary);font-size:12px;cursor:pointer;transition:all 0.15s;white-space:nowrap;}
     .attach-btn:hover{border-color:var(--accent-blue);color:var(--accent-blue);}
+    .continue-text-short{display:none;}
     .main-layout{display:flex;flex:1;overflow:hidden;position:relative;}
     .left-panel{width:160px;min-width:160px;background:var(--bg-surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
     .panel-header{padding:14px 16px 10px;font-size:11px;font-weight:700;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--border-subtle);display:flex;justify-content:space-between;align-items:center;}
@@ -137,6 +138,8 @@
     .welcome-screen .user-only, #authRow2 .user-only{display:none;}
     body.guest-mode .welcome-screen .guest-only, body.guest-mode #authRow2 .guest-only{display:inline-flex;}
     body:not(.guest-mode) .welcome-screen .user-only, body:not(.guest-mode) #authRow2 .user-only{display:inline-flex;}
+    #headerRow2Pre .user-only{display:none;}
+    body:not(.guest-mode) #headerRow2Pre .user-only{display:inline-flex;}
     .welcome-cta{margin:4px 0;}
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(4px);}
     .modal-overlay.hidden{display:none;}
@@ -212,6 +215,8 @@
       #startMeetingBtn{padding:6px 10px;font-size:12px;}
       .attach-text{display:none;}
       .attach-btn{padding:7px 10px;font-size:15px;}
+      .continue-text-full{display:none;}
+      .continue-text-short{display:inline;}
       .in-meeting-topic{font-size:12px;}
 
       /* 左パネルをオーバーレイ式に */
@@ -535,6 +540,9 @@
   </div>
   <!-- 第2行：会議前 -->
   <div class="header-row2" id="headerRow2Pre">
+    <button class="btn user-only" id="continueThreadBtn" onclick="openContinuableMeetingsModal()" style="flex-shrink:0;white-space:nowrap;" title="前回の会議の議論を継続する">
+      🔁 <span class="continue-text-full">前回の会議の議論を継続する</span><span class="continue-text-short">続きから</span>
+    </button>
     <input type="text" id="topicInput" placeholder="📋 議題を入力してください" />
     <button class="btn-mic hidden" id="topicMicBtn" title="議題を音声入力">🎤</button>
     <label class="attach-btn" for="fileInput" title="資料添付">📎<span class="attach-text"> 資料添付</span>
@@ -1809,8 +1817,19 @@
   <div class="modal" style="max-width:520px;">
     <h2 style="font-size:18px;margin-bottom:14px;">📋 実行チェックリスト</h2>
     <div id="checklistItemsContainer" style="max-height:60vh;overflow-y:auto;"></div>
-    <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
       <button class="btn" onclick="closeChecklistModal()">閉じる</button>
+      <button class="btn btn-green" onclick="continueFromChecklist()">この内容で会議開始 →</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="continuableMeetingsOverlay" onclick="if(event.target===this)closeContinuableMeetingsModal()">
+  <div class="modal" style="max-width:520px;">
+    <h2 style="font-size:18px;margin-bottom:14px;">🔁 前回の会議の議論を継続する</h2>
+    <div id="continuableMeetingsList" style="max-height:60vh;overflow-y:auto;"></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+      <button class="btn" onclick="closeContinuableMeetingsModal()">閉じる</button>
     </div>
   </div>
 </div>
