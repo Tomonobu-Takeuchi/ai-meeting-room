@@ -2787,6 +2787,80 @@ def test_func37_premium_layer2_access(client):
         conn.close()
 
 
+def test_func41_checkout_regular_price_recording(client):
+    section("機能試験41: is_earlybird=Falseの場合、payments.amount_jpyが正規価格で記録されることの確認")
+    from unittest.mock import patch, MagicMock
+    from src.database import get_connection
+
+    uid = state.get('user_id')
+    if not uid:
+        skip("機能試験41: テスト用ユーザーが未作成のためSKIP")
+        return
+
+    conn = get_connection()
+    session_ids = []
+    try:
+        expected = {'standard': 980, 'pro': 1980, 'premium': 2980}
+        for ptype, expected_amount in expected.items():
+            fake_session = MagicMock()
+            fake_session.id = f'cs_test_ft41_{ptype}_{uuid.uuid4().hex[:8]}'
+            fake_session.url = 'https://checkout.stripe.com/test'
+            session_ids.append(fake_session.id)
+
+            with patch('src.main.count_earlybird_users', return_value=999), \
+                 patch('src.main.stripe.checkout.Session.create', return_value=fake_session):
+                r = client.post('/api/payment/checkout', json={'type': ptype})
+                check_code(r, 200, f"{ptype}: is_earlybird=False状態でのcheckout → 200")
+
+            row = conn.run("SELECT amount_jpy FROM payments WHERE stripe_session_id=:sid", sid=fake_session.id)
+            amount = row[0][0] if row else None
+            check(amount == expected_amount, f"{ptype}: 正規価格{expected_amount}円がpaymentsに記録される (got {amount})")
+    finally:
+        for sid in session_ids:
+            try:
+                conn.run("DELETE FROM payments WHERE stripe_session_id=:sid", sid=sid)
+            except Exception:
+                pass
+        conn.close()
+
+
+def test_func42_checkout_early_price_recording(client):
+    section("機能試験42: is_earlybird=Trueの場合、引き続き早期価格が記録されることの確認（回帰確認）")
+    from unittest.mock import patch, MagicMock
+    from src.database import get_connection
+
+    uid = state.get('user_id')
+    if not uid:
+        skip("機能試験42: テスト用ユーザーが未作成のためSKIP")
+        return
+
+    conn = get_connection()
+    session_ids = []
+    try:
+        expected = {'standard': 480, 'pro': 980, 'premium': 1480}
+        for ptype, expected_amount in expected.items():
+            fake_session = MagicMock()
+            fake_session.id = f'cs_test_ft42_{ptype}_{uuid.uuid4().hex[:8]}'
+            fake_session.url = 'https://checkout.stripe.com/test'
+            session_ids.append(fake_session.id)
+
+            with patch('src.main.count_earlybird_users', return_value=0), \
+                 patch('src.main.stripe.checkout.Session.create', return_value=fake_session):
+                r = client.post('/api/payment/checkout', json={'type': ptype})
+                check_code(r, 200, f"{ptype}: is_earlybird=True状態でのcheckout → 200")
+
+            row = conn.run("SELECT amount_jpy FROM payments WHERE stripe_session_id=:sid", sid=fake_session.id)
+            amount = row[0][0] if row else None
+            check(amount == expected_amount, f"{ptype}: 早期価格{expected_amount}円がpaymentsに記録される (got {amount})")
+    finally:
+        for sid in session_ids:
+            try:
+                conn.run("DELETE FROM payments WHERE stripe_session_id=:sid", sid=sid)
+            except Exception:
+                pass
+        conn.close()
+
+
 def test_func38_earlybird_premium_count():
     section("機能試験38: count_earlybird_users()：premiumがearlybirdカウントに含まれることの確認")
     from src.database import count_earlybird_users, get_connection
@@ -3002,6 +3076,8 @@ if __name__ == '__main__':
             safe_run("機能試験38: count_earlybird_users()のpremium対応確認", test_func38_earlybird_premium_count)
             safe_run("機能試験39: webhook premium価格IDでの月次更新確認", test_func39_webhook_invoice_premium_renewal)
             safe_run("機能試験40: delete_account()のpremium Stripe解約確認", test_func40_delete_account_premium_stripe_cancel)
+            safe_run("機能試験41: is_earlybird=False時の正規価格記録確認", test_func41_checkout_regular_price_recording, client)
+            safe_run("機能試験42: is_earlybird=True時の早期価格記録確認（回帰）", test_func42_checkout_early_price_recording, client)
     finally:
         cleanup()
 

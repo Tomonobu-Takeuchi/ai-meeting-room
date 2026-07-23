@@ -45,8 +45,6 @@ APP_BASE_URL = os.environ.get('APP_BASE_URL', 'http://localhost:5000')
 if STRIPE_SECRET_KEY:
     stripe.api_key = STRIPE_SECRET_KEY
 
-STANDARD_PRICE_JPY = 480
-PRO_PRICE_JPY = 980
 STANDARD_CREDITS = 50
 
 # 4価格ID（アーリーバード・月回数制対応）
@@ -56,7 +54,13 @@ STRIPE_PRICE_PRO_EARLY = os.environ.get('STRIPE_PRICE_PRO_EARLY', '')
 STRIPE_PRICE_PRO_REGULAR = os.environ.get('STRIPE_PRICE_PRO_REGULAR', '')
 STRIPE_PRICE_PREMIUM_EARLY = os.environ.get('STRIPE_PRICE_PREMIUM_EARLY', '')
 STRIPE_PRICE_PREMIUM_REGULAR = os.environ.get('STRIPE_PRICE_PREMIUM_REGULAR', '')
-PREMIUM_PRICE_JPY = 1480  # アーリーバード価格（save_payment記録用）
+
+PRICE_JPY_TABLE = {
+    'standard': {'early': 480, 'regular': 980},
+    'pro': {'early': 980, 'regular': 1980},
+    'premium': {'early': 1480, 'regular': 2980},
+}
+
 LAYER3_MONTHLY_LIMIT = {'pro': 30, 'premium': 60}  # 積み残し解消：散在していた上限値を統合
 EARLYBIRD_LIMIT = 100
 
@@ -2243,9 +2247,10 @@ def payment_checkout():
         return jsonify({"error": str(e)}), 500
 
     try:
+        tier = 'early' if is_earlybird else 'regular'
         save_payment(
             user_id, checkout_session.id, payment_type,
-            {'standard': STANDARD_PRICE_JPY, 'pro': PRO_PRICE_JPY, 'premium': PREMIUM_PRICE_JPY}[payment_type],
+            PRICE_JPY_TABLE[payment_type][tier],
             0,
         )
     except Exception as e:
