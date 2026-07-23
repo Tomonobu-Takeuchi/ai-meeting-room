@@ -3857,7 +3857,7 @@ function renderAuthArea() {
     else if (_p2 === 'standard') _left = Math.max(0, 15 - (_u2.monthly_meeting_count || 0));
     // pro残日数（authRow2Nameと同一ロジック）
     let _proText = null;
-    if (_p2 === 'pro') {
+    if (_p2 === 'pro' || _p2 === 'premium') {
       if (_u2.plan_expires_at) {
         const _pdays = Math.ceil((new Date(_u2.plan_expires_at) - new Date()) / (1000*60*60*24));
         _proText = _pdays > 0 ? `会議は使い放題です（あと${_pdays}日）` : '会議は使い放題です（無制限）';
@@ -3903,11 +3903,11 @@ function renderAuthArea() {
     if (State.currentUser) {
       const _u = State.currentUser;
       const _plan = _u.plan || 'free';
-      const _pl = { free:'FREE', standard:'STD', pro:'PRO' }[_plan] || _plan;
+      const _pl = { free:'FREE', standard:'STD', pro:'PRO', premium:'PREM' }[_plan] || _plan;
       let _rem = '';
       if (_plan === 'free') _rem = ` 残${Math.max(0, 3 - (_u.monthly_meeting_count||0))}/3`;
       else if (_plan === 'standard') _rem = ` 残${Math.max(0, 15 - (_u.monthly_meeting_count||0))}/15`;
-      else if (_plan === 'pro') {
+      else if (_plan === 'pro' || _plan === 'premium') {
         if (_u.plan_expires_at) {
           const _days = Math.ceil((new Date(_u.plan_expires_at) - new Date()) / (1000*60*60*24));
           _rem = _days > 0 ? ` あと${_days}日` : ' 無制限';
@@ -3926,7 +3926,7 @@ function renderAuthArea() {
   if (State.currentUser) {
     const u = State.currentUser;
     const plan = u.plan || 'free';
-    const planLabels = { free: '無料', standard: 'スタンダード', pro: 'PRO' };
+    const planLabels = { free: '無料', standard: 'スタンダード', pro: 'PRO', premium: 'PREMIUM' };
     const planLabel = planLabels[plan] || plan;
     let remainingLabel = '';
     if (plan === 'free') {
@@ -3935,7 +3935,7 @@ function renderAuthArea() {
     } else if (plan === 'standard') {
       const remaining = Math.max(0, 15 - (u.monthly_meeting_count || 0));
       remainingLabel = `残り${remaining}回`;
-    } else if (plan === 'pro') {
+    } else if (plan === 'pro' || plan === 'premium') {
       if (u.plan_expires_at) {
         const days = Math.ceil((new Date(u.plan_expires_at) - new Date()) / (1000 * 60 * 60 * 24));
         remainingLabel = days > 0 ? `あと${days}日` : '無制限';
@@ -4345,33 +4345,42 @@ async function refreshEarlybirdStatus() {
     const data = await API.get('/api/payment/earlybird-status');
     const stdPriceEl = $('standardPriceDisplay');
     const proPriceEl = $('proPriceDisplay');
+    const premiumPriceEl = $('premiumPriceDisplay');
     const counterEl = $('earlybirdCounter');
     const guideStdEl = $('guideStdPrice');
     const guideProEl = $('guideProPrice');
+    const guidePremiumEl = $('guidePremiumPrice');
     const stdCampaignEl = $('standardCampaignBadge');
     const proCampaignEl = $('proCampaignBadge');
+    const premiumCampaignEl = $('premiumCampaignBadge');
     if (data.is_full) {
       if (stdPriceEl) stdPriceEl.innerHTML = '¥980<span>/月</span>';
       if (proPriceEl) proPriceEl.innerHTML = '¥1,980<span>/月</span>';
+      if (premiumPriceEl) premiumPriceEl.innerHTML = '¥2,980<span>/月</span>';
       if (guideStdEl) guideStdEl.textContent = '¥980 / 月';
       if (guideProEl) guideProEl.textContent = '¥1,980 / 月';
+      if (guidePremiumEl) guidePremiumEl.textContent = '¥2,980 / 月';
       // pricing-modal-design: キャンペーン終了時はバッジを非表示（正規価格のみ表示）
       if (stdCampaignEl) stdCampaignEl.classList.add('hidden');
       if (proCampaignEl) proCampaignEl.classList.add('hidden');
+      if (premiumCampaignEl) premiumCampaignEl.classList.add('hidden');
       if (counterEl) {
-        counterEl.textContent = 'アーリーバード特典（先着100名）は終了しました。現在は正規価格（スタンダード¥980/月・プロ¥1,980/月）です。';
+        counterEl.textContent = 'アーリーバード特典（先着100名）は終了しました。現在は正規価格（スタンダード¥980/月・プロ¥1,980/月・プレミアム¥2,980/月）です。';
         counterEl.classList.remove('hidden');
       }
     } else {
       // pricing-modal-design: LP（persona-meeting.html）と同じ「今だけ半額キャンペーン」表示に統一
       if (stdPriceEl) stdPriceEl.innerHTML = '<span class="pricing-card-price-old">¥980</span>¥480<span>/月</span>';
       if (proPriceEl) proPriceEl.innerHTML = '<span class="pricing-card-price-old">¥1,980</span>¥980<span>/月</span>';
+      if (premiumPriceEl) premiumPriceEl.innerHTML = '<span class="pricing-card-price-old">¥2,980</span>¥1,480<span>/月</span>';
       if (guideStdEl) guideStdEl.textContent = '¥480 / 月';
       if (guideProEl) guideProEl.textContent = '¥980 / 月';
+      if (guidePremiumEl) guidePremiumEl.textContent = '¥1,480 / 月';
       if (stdCampaignEl) stdCampaignEl.classList.remove('hidden');
       if (proCampaignEl) proCampaignEl.classList.remove('hidden');
+      if (premiumCampaignEl) premiumCampaignEl.classList.remove('hidden');
       if (counterEl) {
-        counterEl.textContent = `🎉 アーリーバード特典 残り${data.earlybird_remaining}枠（先着100名限定・終了後は正規価格 スタンダード¥980/月・プロ¥1,980/月）`;
+        counterEl.textContent = `🎉 アーリーバード特典 残り${data.earlybird_remaining}枠（先着100名限定・終了後は正規価格 スタンダード¥980/月・プロ¥1,980/月・プレミアム¥2,980/月）`;
         counterEl.classList.remove('hidden');
       }
     }
@@ -4399,6 +4408,11 @@ function openPricingModal(reason) {
         ? new Date(State.currentUser.plan_expires_at).toLocaleDateString('ja-JP')
         : '—';
       msg += `現在のプラン: <b>PRO</b> · 有効期限: ${exp}`;
+    } else if (plan === 'premium') {
+      const exp = State.currentUser.plan_expires_at
+        ? new Date(State.currentUser.plan_expires_at).toLocaleDateString('ja-JP')
+        : '—';
+      msg += `現在のプラン: <b>プレミアム</b> · 有効期限: ${exp}`;
     }
     planEl.innerHTML = msg;
     planEl.classList.remove('hidden');
@@ -4407,8 +4421,10 @@ function openPricingModal(reason) {
   const plan = State.currentUser?.plan || 'free';
   const stdBtn = $('buyStandardBtn');
   const proBtn = $('buyProBtn');
+  const premiumBtn = $('buyPremiumBtn');
   if (stdBtn) stdBtn.disabled = false;
   if (proBtn) proBtn.disabled = (plan === 'pro');
+  if (premiumBtn) premiumBtn.disabled = (plan === 'premium');
   overlay.classList.remove('hidden');
 }
 
@@ -4425,20 +4441,29 @@ function showPurchaseConfirm(type) {
     return;
   }
   closePricingModal();
-  const isStandard = type === 'standard';
-  $('purchaseConfirmTitle').textContent = isStandard
-    ? 'スタンダードプランに登録'
-    : 'プロプランに登録';
-  $('purchaseConfirmDesc').textContent = isStandard
-    ? '月15回まで会議できるサブスクリプションに登録します（毎月自動更新・いつでも解約可）。'
-    : '月間会議回数無制限のプロプランに登録します（毎月自動更新・いつでも解約可）。';
+  let title, desc;
+  if (type === 'standard') {
+    title = 'スタンダードプランに登録';
+    desc = '月15回まで会議できるサブスクリプションに登録します（毎月自動更新・いつでも解約可）。';
+  } else if (type === 'premium') {
+    title = 'プレミアムプランに登録';
+    desc = '月間会議回数無制限・継続議論スレッド機能付きのプレミアムプランに登録します（毎月自動更新・いつでも解約可）。';
+  } else {
+    title = 'プロプランに登録';
+    desc = '月間会議回数無制限のプロプランに登録します（毎月自動更新・いつでも解約可）。';
+  }
+  $('purchaseConfirmTitle').textContent = title;
+  $('purchaseConfirmDesc').textContent = desc;
   $('purchaseConfirmOverlay').classList.remove('hidden');
   $('purchaseConfirmOk').dataset.planType = type;
 }
 
 async function purchasePlan(type, newWindow = null) {
   $('purchaseConfirmOverlay').classList.add('hidden');
-  const btn = type === 'standard' ? $('buyStandardBtn') : $('buyProBtn');
+  let btn;
+  if (type === 'standard') btn = $('buyStandardBtn');
+  else if (type === 'premium') btn = $('buyPremiumBtn');
+  else btn = $('buyProBtn');
   if (btn) { btn.disabled = true; btn.textContent = '処理中...'; }
   try {
     const data = await API.post('/api/payment/checkout', { type });
@@ -4459,7 +4484,9 @@ async function purchasePlan(type, newWindow = null) {
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.textContent = type === 'standard' ? 'スタンダードプランに登録' : 'プロプランに登録';
+      if (type === 'standard') btn.textContent = 'スタンダードプランに登録';
+      else if (type === 'premium') btn.textContent = 'プレミアムプランに登録';
+      else btn.textContent = 'プロプランに登録';
     }
   }
 }
