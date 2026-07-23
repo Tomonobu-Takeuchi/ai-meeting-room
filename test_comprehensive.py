@@ -1591,8 +1591,8 @@ def test_func18_pricing_modal_campaign():
         check(f'id="{i}"' in html, f"index.html に id={i} が存在する")
 
     check('pricing-card-price-old' in html, "index.htmlの初期HTMLに取り消し線価格クラスが存在する")
-    check(html.count('今だけ半額キャンペーン') == 2,
-          "index.htmlにキャンペーンバッジ文言が2箇所（スタンダード・プロ）存在する")
+    check(html.count('今だけ半額キャンペーン') == 3,
+          "index.htmlにキャンペーンバッジ文言が3箇所（スタンダード・プロ・プレミアム）存在する")
 
     if 'async function refreshEarlybirdStatus()' in js:
         start = js.index('async function refreshEarlybirdStatus()')

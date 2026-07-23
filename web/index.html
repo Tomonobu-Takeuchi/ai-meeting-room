@@ -371,10 +371,10 @@
     .btn-upgrade:hover{opacity:0.9;background:linear-gradient(135deg,#6D28D9,#1D4ED8);}
 
     /* ===== 料金モーダル ===== */
-    .pricing-modal{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:32px;width:520px;max-width:94vw;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow);}
+    .pricing-modal{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:32px;width:720px;max-width:94vw;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow);}
     .pricing-modal h2{font-size:20px;font-weight:700;margin-bottom:6px;text-align:center;}
     .pricing-subtitle{font-size:13px;color:var(--text-secondary);text-align:center;margin-bottom:24px;}
-    .pricing-cards{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:20px;}
+    .pricing-cards{display:grid;grid-template-columns:repeat(4, 1fr);gap:14px;margin-bottom:20px;}
     @media(max-width:600px){.pricing-cards{grid-template-columns:1fr;}}
     .pricing-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 16px;display:flex;flex-direction:column;gap:10px;position:relative;}
     .pricing-card .btn{white-space:normal;line-height:1.3;text-align:center;}
@@ -1492,6 +1492,7 @@
           <tr><td>無料</td><td>¥0</td><td>月3回</td><td>3体まで</td></tr>
           <tr><td>スタンダード</td><td id="guideStdPrice">¥480 / 月</td><td>月15回（継続課金・先着100名アーリーバード価格）</td><td>無制限</td></tr>
           <tr><td>プロ</td><td id="guideProPrice">¥980 / 月</td><td>無制限</td><td>無制限</td></tr>
+          <tr><td>プレミアム</td><td id="guidePremiumPrice">¥1,480 / 月</td><td>無制限</td><td>無制限</td></tr>
         </table>
         <p class="howto-p" style="font-weight:600;margin-top:12px">📄 レポート機能（プラン別）</p>
         <table class="howto-table">
@@ -1667,6 +1668,21 @@
           <li>Layer3戦略レポート月30回</li>
         </ul>
         <button class="btn btn-purple" id="buyProBtn" onclick="showPurchaseConfirm('pro')">プロプランに登録</button>
+      </div>
+      <!-- プレミアム -->
+      <div class="pricing-card">
+        <div class="pricing-card-campaign" id="premiumCampaignBadge">今だけ半額キャンペーン</div>
+        <div class="pricing-card-label">プレミアム</div>
+        <div class="pricing-card-price" id="premiumPriceDisplay"><span class="pricing-card-price-old">¥2,980</span>¥1,480<span>/月</span></div>
+        <div class="pricing-card-desc">継続議論・進捗管理機能付き</div>
+        <ul class="pricing-card-features">
+          <li>月間会議回数無制限</li>
+          <li>全ペルソナ利用可（無制限作成）</li>
+          <li>学習データ登録</li>
+          <li>全レポート利用可</li>
+          <li>継続議論スレッド・進捗管理チェックリスト</li>
+        </ul>
+        <button class="btn btn-purple" id="buyPremiumBtn" onclick="showPurchaseConfirm('premium')">プレミアムプランに登録</button>
       </div>
     </div>
     <div class="pricing-modal-footer">
