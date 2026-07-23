@@ -45,8 +45,6 @@ APP_BASE_URL = os.environ.get('APP_BASE_URL', 'http://localhost:5000')
 if STRIPE_SECRET_KEY:
     stripe.api_key = STRIPE_SECRET_KEY
 
-STANDARD_PRICE_JPY = 480
-PRO_PRICE_JPY = 980
 STANDARD_CREDITS = 50
 
 # 4価格ID（アーリーバード・月回数制対応）
@@ -54,6 +52,16 @@ STRIPE_PRICE_STANDARD_EARLY = os.environ.get('STRIPE_PRICE_STANDARD_EARLY', '')
 STRIPE_PRICE_STANDARD_REGULAR = os.environ.get('STRIPE_PRICE_STANDARD_REGULAR', '')
 STRIPE_PRICE_PRO_EARLY = os.environ.get('STRIPE_PRICE_PRO_EARLY', '')
 STRIPE_PRICE_PRO_REGULAR = os.environ.get('STRIPE_PRICE_PRO_REGULAR', '')
+STRIPE_PRICE_PREMIUM_EARLY = os.environ.get('STRIPE_PRICE_PREMIUM_EARLY', '')
+STRIPE_PRICE_PREMIUM_REGULAR = os.environ.get('STRIPE_PRICE_PREMIUM_REGULAR', '')
+
+PRICE_JPY_TABLE = {
+    'standard': {'early': 480, 'regular': 980},
+    'pro': {'early': 980, 'regular': 1980},
+    'premium': {'early': 1480, 'regular': 2980},
+}
+
+LAYER3_MONTHLY_LIMIT = {'pro': 30, 'premium': 60}  # 積み残し解消：散在していた上限値を統合
 EARLYBIRD_LIMIT = 100
 
 import sentry_sdk
@@ -1579,9 +1587,9 @@ JSONのみ出力してください。"""
             app.logger.error(f"[LAYER1_PARSE_ERROR] session={session_id} category={category} raw={layer1_text[:200]}")
             layer1_data = {"conclusion": "レポートの生成に失敗しました。もう一度お試しください。", "actions": [], "user_basis": ""}
 
-        # proプランの残り回数計算（フロント初期表示用・参照のみ・加算しない）
+        # pro/premiumプランの残り回数計算（フロント初期表示用・参照のみ・加算しない）
         layer3_remaining = None
-        if plan == 'pro':
+        if plan in ('pro', 'premium'):
             from datetime import datetime, timezone
             now = datetime.now(timezone.utc)
             reset_at = layer3_monthly_reset_at
@@ -1593,7 +1601,7 @@ JSONのみ出力してください。"""
                 (reset_at.year == now.year and reset_at.month < now.month)
             )
             current_count = 0 if needs_reset else layer3_monthly_count
-            layer3_remaining = max(0, 30 - current_count)
+            layer3_remaining = max(0, LAYER3_MONTHLY_LIMIT[plan] - current_count)
 
         return jsonify({
             "plan": plan,
@@ -1625,7 +1633,7 @@ def generate_brief_layer2(session_id):
         plan, trial_layer2_used, trial_layer3_used, _, _ = _get_brief_billing_info(user_id)
 
         can_use_layer2 = (
-            plan in ('standard', 'pro') or
+            plan in ('standard', 'pro', 'premium') or
             (plan == 'free' and not trial_layer2_used and is_trial_request == 'layer2') or
             (plan == 'free' and trial_layer2_used and is_blur_request)
         )
@@ -1688,7 +1696,7 @@ def generate_brief_layer3(session_id):
 
         layer3_remaining = None
         if plan in ('pro', 'premium'):
-            layer3_monthly_limit = 30 if plan == 'pro' else 60
+            layer3_monthly_limit = LAYER3_MONTHLY_LIMIT[plan]
             from datetime import datetime, timezone
             now = datetime.now(timezone.utc)
             reset_at = layer3_monthly_reset_at
@@ -1784,7 +1792,7 @@ def generate_brief_layer3(session_id):
         if layer3_parse_ok and plan in ('pro', 'premium') and user_id:
             from src.database import get_connection
             from datetime import datetime, timezone
-            layer3_monthly_limit = 30 if plan == 'pro' else 60
+            layer3_monthly_limit = LAYER3_MONTHLY_LIMIT[plan]
             conn_l3 = get_connection()
             try:
                 now = datetime.now(timezone.utc)
@@ -2196,8 +2204,8 @@ def payment_checkout():
     data = request.json or {}
     payment_type = data.get("type")
 
-    if payment_type not in ('standard', 'pro'):
-        return jsonify({"error": "typeは 'standard' または 'pro' を指定してください"}), 400
+    if payment_type not in ('standard', 'pro', 'premium'):
+        return jsonify({"error": "typeは 'standard'・'pro'・'premium' のいずれかを指定してください"}), 400
     if not STRIPE_SECRET_KEY:
         return jsonify({"error": "決済機能が設定されていません"}), 500
 
@@ -2205,8 +2213,10 @@ def payment_checkout():
 
     if payment_type == 'standard':
         price_id = STRIPE_PRICE_STANDARD_EARLY if is_earlybird else STRIPE_PRICE_STANDARD_REGULAR
-    else:
+    elif payment_type == 'pro':
         price_id = STRIPE_PRICE_PRO_EARLY if is_earlybird else STRIPE_PRICE_PRO_REGULAR
+    else:
+        price_id = STRIPE_PRICE_PREMIUM_EARLY if is_earlybird else STRIPE_PRICE_PREMIUM_REGULAR
 
     if not price_id:
         return jsonify({"error": "価格IDが未設定です（Railway環境変数を確認してください）"}), 500
@@ -2237,9 +2247,10 @@ def payment_checkout():
         return jsonify({"error": str(e)}), 500
 
     try:
+        tier = 'early' if is_earlybird else 'regular'
         save_payment(
             user_id, checkout_session.id, payment_type,
-            STANDARD_PRICE_JPY if payment_type == 'standard' else PRO_PRICE_JPY,
+            PRICE_JPY_TABLE[payment_type][tier],
             0,
         )
     except Exception as e:
@@ -2460,6 +2471,12 @@ def _handle_checkout_completed(event, datetime, timedelta):
             update_user_plan(user_id, 'pro', expires_at, stripe_customer_id=customer_id)
             app.logger.info(f"[WEBHOOK] plan変更完了 user_id={user_id} plan=pro expires={expires_at}")
             print(f"[webhook][ch3] update_user_plan 完了")
+        elif payment_type == 'premium':
+            expires_at = datetime.utcnow() + timedelta(days=31)
+            print(f"[webhook][ch3] update_user_plan 開始 user={user_id} plan=premium expires={expires_at}")
+            update_user_plan(user_id, 'premium', expires_at, stripe_customer_id=customer_id)
+            app.logger.info(f"[WEBHOOK] plan変更完了 user_id={user_id} plan=premium expires={expires_at}")
+            print(f"[webhook][ch3] update_user_plan 完了")
         else:
             print(f"[webhook][ch3] 未知の payment_type={payment_type!r}")
             return
@@ -2514,7 +2531,11 @@ def _handle_invoice_payment(event, datetime, timedelta):
 
     print(f"[webhook] price_id={price_id!r} user={uid}")
 
-    if price_id in (STRIPE_PRICE_PRO_EARLY, STRIPE_PRICE_PRO_REGULAR):
+    if price_id in (STRIPE_PRICE_PREMIUM_EARLY, STRIPE_PRICE_PREMIUM_REGULAR):
+        expires_at = datetime.utcnow() + timedelta(days=31)
+        update_user_plan(uid, 'premium', expires_at)
+        print(f"[webhook] premiumサブスク更新完了 user={uid} expires={expires_at}")
+    elif price_id in (STRIPE_PRICE_PRO_EARLY, STRIPE_PRICE_PRO_REGULAR):
         expires_at = datetime.utcnow() + timedelta(days=31)
         update_user_plan(uid, 'pro', expires_at)
         print(f"[webhook] proサブスク更新完了 user={uid} expires={expires_at}")
@@ -2813,8 +2834,8 @@ def delete_account():
     if not bcrypt.checkpw(current_password.encode('utf-8'), user['password_hash'].encode('utf-8')):
         return jsonify({"error": "パスワードが正しくありません"}), 400
 
-    # proプランのStripeサブスクリプションをキャンセル
-    if user.get('plan') == 'pro' and STRIPE_SECRET_KEY:
+    # pro/premiumプランのStripeサブスクリプションをキャンセル
+    if user.get('plan') in ('pro', 'premium') and STRIPE_SECRET_KEY:
         conn = get_connection()
         try:
             rows = conn.run(
