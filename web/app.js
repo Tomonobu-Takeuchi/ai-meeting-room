@@ -1102,11 +1102,12 @@ async function loadLayer3(sid, category) {
         if (layer3CostInfo) layer3CostInfo.style.display = (State.currentUser?.plan === 'pro') ? 'inline' : 'none';
         const remainingEl = $('layer3RemainingInfo');
         if (remainingEl && data.layer3_remaining !== null && data.layer3_remaining !== undefined) {
-          remainingEl.textContent = `🔄 今月の残り生成回数：${data.layer3_remaining} / 30回`;
+          const _l3limit = (State.currentUser?.plan === 'premium') ? 60 : 30;
+          remainingEl.textContent = `🔄 今月の残り生成回数：${data.layer3_remaining} / ${_l3limit}回`;
           remainingEl.style.cssText = 'display:inline;font-size:11px;opacity:0.8;';
         }
       }
-    } else if (State.currentUser?.plan === 'pro' && data.layer3_remaining === 0) {
+    } else if ((State.currentUser?.plan === 'pro' || State.currentUser?.plan === 'premium') && data.layer3_remaining === 0) {
       DOM.downloadLayer3Btn.style.display = 'none';
       const proLockedEl = $('layer3ProLocked');
       if (proLockedEl) proLockedEl.classList.remove('hidden');
@@ -1211,7 +1212,7 @@ async function showReportModal() {
     // ===== Layer2・Layer3を並行起動 =====
     const plan = data.plan;
     const isLoggedIn = !!State.currentUser;
-    if (plan === 'standard' || plan === 'pro') {
+    if (plan === 'standard' || plan === 'pro' || plan === 'premium') {
       loadLayer2(sid, data.category || 'chat');
     } else if (!isLoggedIn) {
       DOM.downloadLayer2Btn.style.display = 'none';
@@ -1231,9 +1232,9 @@ async function showReportModal() {
       DOM.layer3Section.style.display = 'none';
     } else {
       DOM.layer3Section.style.display = '';
-      if (plan === 'pro' && data.layer3_remaining > 0) {
+      if ((plan === 'pro' || plan === 'premium') && data.layer3_remaining > 0) {
         loadLayer3(sid, data.category || 'strategy');
-      } else if (plan === 'pro' && data.layer3_remaining === 0) {
+      } else if ((plan === 'pro' || plan === 'premium') && data.layer3_remaining === 0) {
         const proLockedEl = $('layer3ProLocked');
         if (proLockedEl) proLockedEl.classList.remove('hidden');
       } else if (!isLoggedIn) {
@@ -1971,7 +1972,7 @@ async function downloadLayer3PDF() {
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
     // BUG-17修正：PDF保存成功後に残り回数表示を-1更新
-    if (State.currentUser?.plan === 'pro' && _briefData) {
+    if ((State.currentUser?.plan === 'pro' || State.currentUser?.plan === 'premium') && _briefData) {
       if (_briefData.layer3_remaining !== null && _briefData.layer3_remaining !== undefined) {
         _briefData.layer3_remaining = Math.max(0, _briefData.layer3_remaining - 1);
       }
@@ -1988,7 +1989,8 @@ async function downloadLayer3PDF() {
     if (_briefData?.layer3_remaining !== null && _briefData?.layer3_remaining !== undefined) {
       const ri = document.getElementById('layer3RemainingInfo');
       if (ri) {
-        ri.textContent = `🔄 今月の残り生成回数：${_briefData.layer3_remaining} / 30回`;
+        const _l3limit2 = (State.currentUser?.plan === 'premium') ? 60 : 30;
+        ri.textContent = `🔄 今月の残り生成回数：${_briefData.layer3_remaining} / ${_l3limit2}回`;
         ri.style.cssText = 'display:inline;font-size:11px;opacity:0.8;';
       }
     }
@@ -4234,8 +4236,8 @@ async function requestEmailChange() {
 function openDeleteAccountDialog() {
   const u = State.currentUser;
   if (!u) return;
-  const msg = (u.plan === 'pro')
-    ? 'proプランを解約し、アカウントを削除します。この操作は取り消せません。よろしいですか？'
+  const msg = (u.plan === 'pro' || u.plan === 'premium')
+    ? `${u.plan === 'premium' ? 'premium' : 'pro'}プランを解約し、アカウントを削除します。この操作は取り消せません。よろしいですか？`
     : 'アカウントを削除します。この操作は取り消せません。よろしいですか？';
   $('deleteAccountConfirmText').textContent = msg;
   $('deleteAccountPasswordInput').value = '';
