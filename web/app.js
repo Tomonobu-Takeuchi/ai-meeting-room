@@ -1111,6 +1111,8 @@ async function loadLayer3(sid, category) {
       DOM.downloadLayer3Btn.style.display = 'none';
       const proLockedEl = $('layer3ProLocked');
       if (proLockedEl) proLockedEl.classList.remove('hidden');
+      const proLockedLimitEl = $('layer3ProLockedLimit');
+      if (proLockedLimitEl) proLockedLimitEl.textContent = (State.currentUser?.plan === 'premium') ? '60' : '30';
     } else if ((State.currentUser?.plan === 'free' || State.currentUser?.plan === 'standard') && !_briefData?.trial_layer3_used) {
       DOM.layer3Trial.classList.remove('hidden');
     } else {
@@ -1237,6 +1239,8 @@ async function showReportModal() {
       } else if ((plan === 'pro' || plan === 'premium') && data.layer3_remaining === 0) {
         const proLockedEl = $('layer3ProLocked');
         if (proLockedEl) proLockedEl.classList.remove('hidden');
+        const proLockedLimitEl = $('layer3ProLockedLimit');
+        if (proLockedLimitEl) proLockedLimitEl.textContent = (plan === 'premium') ? '60' : '30';
       } else if (!isLoggedIn) {
         DOM.downloadLayer3Btn.style.display = 'none';
         DOM.layer3Locked.classList.remove('hidden');
