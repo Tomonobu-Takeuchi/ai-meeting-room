@@ -1133,7 +1133,7 @@ def list_continuable_meetings():
             "session_id": r[0],
             "topic": r[1],
             "category": r[2],
-            "created_at": r[3].isoformat() if r[3] else None,
+            "created_at": r[3].isoformat() + 'Z' if r[3] else None,
             "report_id": r[4],
         } for r in rows]
         return jsonify({"meetings": meetings})
