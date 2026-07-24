@@ -144,7 +144,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 .lplan{font-size:10px;color:var(--gray2);margin-top:4px}
 
 /* PLANS */
-.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:28px}
+.plans{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:28px}
 .plan{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:22px 18px}
 .plan.featured{border-color:#C03020}
 .plan-n{font-size:16px;font-weight:900;margin-bottom:6px}
@@ -154,8 +154,9 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 .plan-div{height:1px;background:var(--border);margin:12px 0}
 .plan-item{font-size:12px;color:#A0B4C8;padding:3px 0;display:flex;gap:6px}
 .plan-item::before{content:"✓";color:var(--cyan);flex-shrink:0}
-.free-c{color:#7F8C8D}.std-c{color:var(--cyan)}.pro-c{color:#E59866}
+.free-c{color:#7F8C8D}.std-c{color:var(--cyan)}.pro-c{color:#E59866}.premium-c{color:#A78BFA}
 .plan-badge{display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;border-radius:12px;background:rgba(192,48,32,0.2);color:#E59866;margin-bottom:8px}
+.plan-badge-premium{background:rgba(124,58,237,0.2);color:#A78BFA}
 .plan-campaign{display:inline-block;background:#412402;color:#FAC775;font-size:12px;font-weight:500;padding:3px 10px;border-radius:20px;margin-bottom:8px;}
 .plan-p-old{color:#5F5E5A;font-size:16px;text-decoration:line-through;margin-right:8px;font-weight:400;}
 
@@ -257,11 +258,11 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
             <button class="screen-btn" style="margin-top:8px;padding:6px 14px;font-size:13px;" onclick="document.getElementById('sub-modal-img').src='/static/images/report_examples/layer1_report.png';document.getElementById('sub-modal-wrap').style.display='flex'">📄 Layer1サンプルを見る</button>
           </li>
           <li style="margin-bottom:16px;">
-            <div>Layer2：議論分析レポートPDF（Standard/Pro）</div>
+            <div>Layer2：議論分析レポートPDF（Standard/Pro/Premium）</div>
             <button class="screen-btn" style="margin-top:8px;padding:6px 14px;font-size:13px;" onclick="document.getElementById('sub-modal-img').src='/static/images/report_examples/layer2_report.jpg';document.getElementById('sub-modal-wrap').style.display='flex'">📄 Layer2サンプルを見る</button>
           </li>
           <li>
-            <div>Layer3：SWOT・4P・戦略フレームワークPDF（Proプラン）</div>
+            <div>Layer3：SWOT・4P・戦略フレームワークPDF（Pro・Premiumプラン）</div>
             <button class="screen-btn" style="margin-top:8px;padding:6px 14px;font-size:13px;" onclick="document.getElementById('framework-modal').style.display='flex'">📊 フレームワークとレポートの内容を見る</button>
           </li>
         </ul>
@@ -413,7 +414,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
         <div class="lcontent">
           <h4>議論分析レポート PDF</h4>
           <p>各ペルソナの意見・論点整理・対立軸の分析。「なぜこの結論になったか」が体系的にわかる。</p>
-          <p class="lplan">Standard / Pro（無料プランは試用1回）</p>
+          <p class="lplan">Standard / Pro / Premium（無料プランは試用1回）</p>
           <button class="screen-btn" onclick="openModal('/static/images/report_examples/layer2_report.jpg','Layer2 議論分析レポートのサンプル')">📄 Layer2サンプルを見る</button>
         </div>
       </div>
@@ -422,7 +423,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
         <div class="lcontent">
           <h4>戦略フレームワーク PDF</h4>
           <p>SWOT分析・ターゲット市場・4P実行戦略・リスクと対策を含む戦略提言。提案書・事業計画にそのまま使える。</p>
-          <p class="lplan">Proプラン（月30回）／ 無料・Standardは試用1回</p>
+          <p class="lplan">Pro（月30回）・Premium（月60回）／ 無料・Standardは試用1回</p>
           <button class="screen-btn" onclick="document.getElementById('framework-modal').style.display='flex'">📊 戦略フレームワークレポートを表示</button>
         </div>
       </div>
@@ -432,7 +433,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 <section class="sec" style="background:var(--bg2)">
   <div class="sec-inner">
     <p class="label">Pricing</p>
-    <h2 class="title">シンプルな3プラン</h2>
+    <h2 class="title">シンプルな4プラン</h2>
     <div class="plans">
       <div class="plan">
         <div class="plan-n free-c">Free</div>
@@ -467,6 +468,19 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
         <div class="plan-item">Layer1・2・3 全レポート利用可</div>
         <div class="plan-item">Layer3：月30回まで</div>
       </div>
+      <div class="plan">
+        <div class="plan-badge plan-badge-premium">継続プロジェクト向け</div>
+        <div class="plan-campaign">今だけ半額キャンペーン</div>
+        <div class="plan-n premium-c">Premium</div>
+        <div class="plan-p"><span class="plan-p-old">¥2,980</span>¥1,480<span> / 月</span></div>
+        <div class="plan-unit">先着100名アーリーバード価格・終了後¥2,980/月</div>
+        <div class="plan-div"></div>
+        <div class="plan-item">会議回数：無制限</div>
+        <div class="plan-item">ペルソナ作成：無制限</div>
+        <div class="plan-item">Layer1・2・3 全レポート利用可</div>
+        <div class="plan-item">会議を跨いで続きから議論を再開できる</div>
+        <div class="plan-item">実行タスクを進捗チェックリストで管理</div>
+      </div>
     </div>
   </div>
 </section>
@@ -493,7 +507,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
     <div class="cta-btns">
       <a href="/app" class="cta-btn-pri">🚀 無料で始める（登録5分・カード不要）</a>
     </div>
-    <p class="cta-note">18歳以上対象 ／ Stripe決済（Standard・Proプラン）／ いつでも解約可能</p>
+    <p class="cta-note">18歳以上対象 ／ Stripe決済（Standard・Pro・Premiumプラン）／ いつでも解約可能</p>
     <div class="cta-links">
       <a href="/terms" class="cta-link">利用規約</a>
       <a href="/privacy" class="cta-link">プライバシーポリシー</a>
