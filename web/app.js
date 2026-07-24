@@ -1728,7 +1728,7 @@ function renderChecklistItems() {
         <div style="display:flex;gap:6px;margin-bottom:6px;">
           <button type="button" class="btn ${status === 'done' ? 'btn-primary' : ''}" style="font-size:11px;padding:4px 8px;" onclick="updateChecklistItem(${i},'done')">✅ 完了</button>
           <button type="button" class="btn ${status === 'in_progress' ? 'btn-primary' : ''}" style="font-size:11px;padding:4px 8px;" onclick="updateChecklistItem(${i},'in_progress')">🔄 実施中</button>
-          <button type="button" class="btn ${status === 'not_started' ? 'btn-primary' : ''}" style="font-size:11px;padding:4px 8px;" onclick="updateChecklistItem(${i},'not_started')">⬜ 未完了</button>
+          <button type="button" class="btn ${status === 'not_started' ? 'btn-primary' : ''}" style="font-size:11px;padding:4px 8px;" onclick="updateChecklistItem(${i},'not_started')">⬜ 未着手</button>
         </div>
         <textarea data-checklist-note="${i}" placeholder="進捗メモ（任意）" style="width:100%;font-size:12px;min-height:40px;" onblur="updateChecklistItem(${i}, null, this.value)">${escapeHtml(note)}</textarea>
       </div>`;
@@ -1768,7 +1768,7 @@ async function openContinuableMeetingsModal() {
     container.innerHTML = _continuableMeetings.map((m, i) => `
       <div class="continuable-item" style="border-bottom:1px solid var(--border);padding:10px 0;cursor:pointer;" onclick="selectContinuableMeeting(${i})">
         <div style="font-size:13px;font-weight:600;">${escapeHtml(m.topic || '')}</div>
-        <div style="font-size:11px;color:var(--text-muted);">${escapeHtml(m.category || '')} ・ ${m.created_at ? new Date(m.created_at).toLocaleDateString() : ''}${m.report_id ? ' ・ 📋 レポートあり' : ''}</div>
+        <div style="font-size:12px;color:var(--text-secondary);">${escapeHtml(m.category || '')} ・ ${m.created_at ? new Date(m.created_at).toLocaleDateString('ja-JP') + ' ' + new Date(m.created_at).toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'}) : ''}${m.report_id ? ' ・ 📋 レポートあり' : ''}</div>
       </div>`).join('');
   } catch (e) {
     if (e.code === 'PLAN_LIMIT') {
@@ -1791,6 +1791,8 @@ function selectContinuableMeeting(index) {
   closeContinuableMeetingsModal();
   State.continueFromSessionId = m.session_id;
   if (DOM.topicInput) DOM.topicInput.value = m.topic || '';
+  // 前回の会議のカテゴリを引き継ぐ（未設定時にState内の古いカテゴリが誤って使われるのを防ぐ）
+  if (m.category) State.meetingCategory = m.category;
   showChecklistModal(m.session_id);
 }
 
@@ -1798,7 +1800,8 @@ function continueFromChecklist() {
   if (!_checklistSessionId) return;
   closeChecklistModal();
   State.continueFromSessionId = _checklistSessionId;
-  startMeeting();
+  // 通常の新規会議開始と同じ導線（カテゴリ選択→チーム提案→メンバー選択）を経由してから開始する
+  showCategorySelectModal();
 }
 
 async function useTrialLayer2() {
