@@ -21,6 +21,22 @@ def _dumps(data):
     return json.dumps(data, default=_json_serial)
 
 
+class _MockStream:
+    """モックモード用の疑似ストリーム。実際のclient.messages.streamと
+    同じインターフェース（with構文・.text_streamプロパティ）を持たせる。"""
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        pass
+
+    @property
+    def text_stream(self):
+        dummy = "これはモックモードのダミー応答です。実際のAnthropic APIは呼び出されていません。"
+        for char in dummy:
+            yield char
+
+
 class MeetingRoom:
     def __init__(self, persona_manager, data_dir=None):
         self.persona_manager = persona_manager
@@ -35,6 +51,8 @@ class MeetingRoom:
 
     def _stream_with_retry(self, max_tokens, system, messages, max_retries=3):
         """overloaded_errorの場合にリトライするストリーミング"""
+        if os.getenv('MOCK_ANTHROPIC', '').lower() == 'true':
+            return _MockStream()
         for attempt in range(max_retries):
             try:
                 return self.client.messages.stream(
