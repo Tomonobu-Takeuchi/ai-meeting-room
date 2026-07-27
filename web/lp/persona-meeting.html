@@ -499,6 +499,43 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
   </div>
 </section>
 
+<!-- BETA1-LP-APPLY -->
+<section class="sec" id="beta-apply" style="background:var(--bg2)">
+  <div class="sec-inner" style="max-width:560px;text-align:center;">
+    <p class="label">Limited Time</p>
+    <h2 class="title">YouTubeをご覧の方へ：期間限定でPremium機能を無料開放</h2>
+    <p style="color:#c8d8e8;margin:16px 0;">メールアドレスをご入力ください。承認後、ご入力いただいたメールアドレスでサインアップすると、期間中Premium機能（無制限会議・全レポート・継続議論）をお試しいただけます。</p>
+    <form id="betaApplyForm" onsubmit="return submitBetaApply(event)" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:20px;">
+      <input type="email" id="betaApplyEmail" required placeholder="your@email.com" style="padding:10px 14px;border-radius:6px;border:1px solid #1e3a5f;min-width:260px;">
+      <button type="submit" class="screen-btn">申請する</button>
+    </form>
+    <p id="betaApplyMsg" style="margin-top:12px;color:#7CFFB2;display:none;"></p>
+  </div>
+</section>
+<script>
+async function submitBetaApply(ev){
+  ev.preventDefault();
+  const email = document.getElementById('betaApplyEmail').value.trim();
+  const msg = document.getElementById('betaApplyMsg');
+  try{
+    const res = await fetch('/api/beta/apply', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({email})
+    });
+    const data = await res.json();
+    msg.textContent = data.message || data.error || '送信しました';
+    msg.style.display = 'block';
+    msg.style.color = res.ok ? '#7CFFB2' : '#FF8A8A';
+  }catch(e){
+    msg.textContent = '送信に失敗しました。時間をおいて再度お試しください。';
+    msg.style.display = 'block';
+    msg.style.color = '#FF8A8A';
+  }
+  return false;
+}
+</script>
+
 <!-- CTA -->
 <section id="cta">
   <div>

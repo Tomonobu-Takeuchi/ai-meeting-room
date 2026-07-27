@@ -251,6 +251,52 @@ def create_user(email, password_hash, name='', birth_date=None):
         conn.close()
         raise e
 
+def create_beta_application(email):
+    conn = get_connection()
+    try:
+        conn.run(
+            "INSERT INTO beta_applications (email) VALUES (:email)",
+            email=email
+        )
+    finally:
+        conn.close()
+
+
+def get_approved_beta_application(email):
+    """承認済み(approved)かつ未付与(granted_atがNULL)の申請を1件取得する"""
+    conn = get_connection()
+    try:
+        rows = conn.run(
+            """SELECT id, premium_expires_at FROM beta_applications
+               WHERE email=:email AND status='approved' AND granted_at IS NULL
+               ORDER BY applied_at DESC LIMIT 1""",
+            email=email
+        )
+        if not rows:
+            return None
+        return {"id": rows[0][0], "premium_expires_at": rows[0][1]}
+    finally:
+        conn.close()
+
+
+def grant_beta_premium(user_id, application_id, premium_expires_at):
+    """DB直接付与：premium付与とis_beta_compフラグを同時に立て、
+    beta_applications側もgranted済みに更新する"""
+    conn = get_connection()
+    try:
+        conn.run(
+            """UPDATE users SET plan='premium', plan_expires_at=:expires,
+               is_beta_comp=TRUE WHERE id=:uid""",
+            expires=premium_expires_at, uid=user_id
+        )
+        conn.run(
+            "UPDATE beta_applications SET status='granted', granted_at=NOW() WHERE id=:aid",
+            aid=application_id
+        )
+    finally:
+        conn.close()
+
+
 def get_user_by_email(email):
     conn = get_connection()
     rows = conn.run("""
@@ -279,7 +325,7 @@ def get_user_by_id(user_id):
                    monthly_meeting_count, monthly_reset_at, avatar, password_hash,
                    trial_layer2_used, trial_layer3_used,
                    layer3_monthly_count, layer3_monthly_reset_at,
-                   is_earlybird, billing_anchor_day
+                   is_earlybird, billing_anchor_day, is_beta_comp
             FROM users WHERE id=:id
         """, id=user_id)
         if not rows:
@@ -290,7 +336,7 @@ def get_user_by_id(user_id):
                          'monthly_meeting_count','monthly_reset_at','avatar','password_hash',
                          'trial_layer2_used','trial_layer3_used',
                          'layer3_monthly_count','layer3_monthly_reset_at',
-                         'is_earlybird','billing_anchor_day'], r)
+                         'is_earlybird','billing_anchor_day','is_beta_comp'], r)
         d['name'] = decrypt_value(conn, d['name'])
         conn.close()
         d['credits'] = d['credits'] or 0
