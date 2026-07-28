@@ -2678,10 +2678,13 @@ function maybeShowBetaSurveyPopup() {
   if (!modal || !link) return;
 
   link.href = isContinuation ? BETA_SURVEY_FORM_URL_CONTINUATION : BETA_SURVEY_FORM_URL_FIRST;
+  link.onclick = () => markBetaSurveyShown(isContinuation);
   if (title) title.textContent = isContinuation ? '継続議論のご感想をお聞かせください' : 'アンケートにご協力ください';
   modal.classList.remove('hidden');
+  // 注意：ここでは表示済みにしない。実際にリンクをクリックした時点(markBetaSurveyShown)で確定する。
+}
 
-  // モーダルを開いた時点で表示済み扱いにする（フォームへの回答有無に関わらず、再度出さない）
+function markBetaSurveyShown(isContinuation) {
   fetch('/api/beta/survey-shown', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -2692,6 +2695,7 @@ function maybeShowBetaSurveyPopup() {
   } else {
     State.currentUser.beta_survey1_shown = true;
   }
+  closeBetaSurveyModal();
 }
 
 function closeBetaSurveyModal() {
