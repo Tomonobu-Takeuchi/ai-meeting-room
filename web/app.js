@@ -75,6 +75,7 @@ const State = {
   meetingCategory: null,
   suggestedPersonaIds: [],
   continueFromSessionId: null,  // PHASE3: 継続議論スレッド（継続元session_id）
+  isCurrentMeetingContinuation: false,  // BETA1-SURVEY-POPUP: 現在の会議が継続議論かどうか（continueFromSessionIdはstart直後にnullへリセットされるため、end時まで持ち越す用）
 };
 
 const $ = id => document.getElementById(id);
@@ -2515,6 +2516,7 @@ async function startMeeting() {
       ...(State.opponentName ? { opponent_name: State.opponentName } : {}),
       ...(State.continueFromSessionId ? { continue_from_session_id: State.continueFromSessionId } : {}),
     });
+    State.isCurrentMeetingContinuation = !!State.continueFromSessionId;
     State.continueFromSessionId = null;
     State.sessionId = data.session_id; State.topic = data.topic;
     console.log('[LOG] 会議開始 sessionId=' + State.sessionId);
@@ -2655,7 +2657,46 @@ async function endMeeting() {
   }
   if (!State.currentUser) {
     showGuestFeedbackPrompt();
+  } else if (State.currentUser.is_beta_comp) {
+    maybeShowBetaSurveyPopup();
   }
+}
+
+// BETA1-SURVEY-POPUP: is_beta_compユーザーに対し、初回会議終了時と継続議論終了時、
+// それぞれ1回だけアンケートポップアップを表示する
+const BETA_SURVEY_FORM_URL_FIRST = 'https://docs.google.com/forms/d/e/1FAIpQLSecBwUlb6A98iFrH878WyagFaEeO4TkgR3cXSea1mXzY0WqbQ/viewform';
+const BETA_SURVEY_FORM_URL_CONTINUATION = 'https://docs.google.com/forms/d/e/1FAIpQLSeIR8pUBntoqgvgvgNUnFS2F-Z_9-2pnIRUy2nszOVmZbdr6A/viewform';
+
+function maybeShowBetaSurveyPopup() {
+  const isContinuation = State.isCurrentMeetingContinuation;
+  const alreadyShown = isContinuation ? State.currentUser.beta_survey2_shown : State.currentUser.beta_survey1_shown;
+  if (alreadyShown) return;
+
+  const modal = document.getElementById('betaSurveyModal');
+  const link = document.getElementById('betaSurveyModalLink');
+  const title = document.getElementById('betaSurveyModalTitle');
+  if (!modal || !link) return;
+
+  link.href = isContinuation ? BETA_SURVEY_FORM_URL_CONTINUATION : BETA_SURVEY_FORM_URL_FIRST;
+  if (title) title.textContent = isContinuation ? '継続議論のご感想をお聞かせください' : 'アンケートにご協力ください';
+  modal.classList.remove('hidden');
+
+  // モーダルを開いた時点で表示済み扱いにする（フォームへの回答有無に関わらず、再度出さない）
+  fetch('/api/beta/survey-shown', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: isContinuation ? 'continuation' : 'first' })
+  }).catch(() => {});
+  if (isContinuation) {
+    State.currentUser.beta_survey2_shown = true;
+  } else {
+    State.currentUser.beta_survey1_shown = true;
+  }
+}
+
+function closeBetaSurveyModal() {
+  const modal = document.getElementById('betaSurveyModal');
+  if (modal) modal.classList.add('hidden');
 }
 
 function showCrisisBanner() {
