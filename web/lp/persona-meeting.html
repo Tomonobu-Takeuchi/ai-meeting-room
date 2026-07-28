@@ -204,6 +204,43 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
     <div class="concept-box">
       <p>特定のテーマ（企画や報告資料、お悩みごと等）に対して、複数の偉人や専門家、またあなたが設定した独自のペルソナとの会議シミュレーションを行い、賢人からの知恵を借りて事前に対応策を提案してくれます。</p>
     </div>
+<!-- BETA1-LP-APPLY -->
+<section class="sec" id="beta-apply" style="background:var(--bg2)">
+  <div class="sec-inner" style="max-width:560px;text-align:center;">
+    <p class="label">Limited Time</p>
+    <h2 class="title">YouTubeをご覧の方へ：期間限定でPremium機能を無料開放</h2>
+    <p style="color:#c8d8e8;margin:16px 0;">メールアドレスをご入力ください。承認後、ご入力いただいたメールアドレスでサインアップすると、期間中Premium機能（無制限会議・全レポート・継続議論）をお試しいただけます。</p>
+    <form id="betaApplyForm" onsubmit="return submitBetaApply(event)" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:20px;">
+      <input type="email" id="betaApplyEmail" required placeholder="your@email.com" style="padding:10px 14px;border-radius:6px;border:1px solid #1e3a5f;min-width:260px;">
+      <button type="submit" class="screen-btn">申請する</button>
+    </form>
+    <p id="betaApplyMsg" style="margin-top:12px;color:#7CFFB2;display:none;"></p>
+  </div>
+</section>
+<script>
+async function submitBetaApply(ev){
+  ev.preventDefault();
+  const email = document.getElementById('betaApplyEmail').value.trim();
+  const msg = document.getElementById('betaApplyMsg');
+  try{
+    const res = await fetch('/api/beta/apply', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({email})
+    });
+    const data = await res.json();
+    msg.textContent = data.message || data.error || '送信しました';
+    msg.style.display = 'block';
+    msg.style.color = res.ok ? '#7CFFB2' : '#FF8A8A';
+  }catch(e){
+    msg.textContent = '送信に失敗しました。時間をおいて再度お試しください。';
+    msg.style.display = 'block';
+    msg.style.color = '#FF8A8A';
+  }
+  return false;
+}
+</script>
+
     <div style="text-align:center;margin:28px auto 4px;">
   <a href="/app" class="cta-btn-pri">🚀 登録不要・無料でお試し（3回）→</a>
   <p style="font-size:12px;color:#9AB0C8;margin-top:10px;">クレジットカード不要・そのまま会議を始められます</p>
@@ -498,6 +535,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
     <p class="quote-note">※AIペルソナが実際の会議シミュレーションで生成した発言を、そのまま掲載しています</p>
   </div>
 </section>
+
 
 <!-- CTA -->
 <section id="cta">

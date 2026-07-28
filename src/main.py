@@ -19,7 +19,7 @@ load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file_
 from flask import Flask, Response, jsonify, request, send_from_directory, send_file, session
 import anthropic
 import bcrypt
-from src.email_sender import send_email_change_confirmation
+from src.email_sender import send_email_change_confirmation, send_email
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
@@ -35,6 +35,9 @@ from src.database import (
     set_earlybird_and_billing_anchor, count_earlybird_users,
     reset_monthly_meeting_count, set_standard_plan,
     record_access_log,
+    create_beta_application,
+    get_approved_beta_application,
+    grant_beta_premium,
 )
 from src.scheduler import init_scheduler
 
@@ -172,6 +175,26 @@ def serve_appjs():
 
 # ===== ユーザー認証API =====
 
+@app.route("/api/beta/apply", methods=["POST"])
+@limiter.limit("5 per hour;10 per day")
+def apply_beta_premium():
+    data = request.json or {}
+    email = data.get("email", "").strip().lower()
+    if not email or "@" not in email:
+        return jsonify({"error": "正しいメールアドレスを入力してください"}), 400
+
+    create_beta_application(email)
+
+    admin_email = os.environ.get("ADMIN_NOTIFY_EMAIL", "")
+    if admin_email:
+        send_email(
+            admin_email,
+            "【AI-PERSONA会議室】ベータ1プレミアム申請",
+            f"<p>新しい申請がありました：{email}</p>"
+        )
+
+    return jsonify({"message": "申請を受け付けました。承認後、ご登録いただいたメールアドレスでサインアップすると、期間中プレミアム機能をご利用いただけます。"})
+
 @app.route("/api/auth/register", methods=["POST"])
 @limiter.limit("5 per hour;10 per day")
 def register():
@@ -210,6 +233,15 @@ def register():
     password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
     try:
         user = create_user(email, password_hash, name, birth_date=birth_date_str)
+
+        # BETA1-LP-APPLY: 承認済みベータ申請があれば、サインアップ時に自動でpremium付与する
+        try:
+            approved = get_approved_beta_application(email)
+            if approved:
+                grant_beta_premium(user['id'], approved['id'], approved['premium_expires_at'])
+        except Exception:
+            pass
+
         try:
             _c = get_connection()
             _c.run("UPDATE users SET tos_agreed_at=NOW() WHERE id=:id", id=user['id'])
@@ -2835,7 +2867,8 @@ def delete_account():
         return jsonify({"error": "パスワードが正しくありません"}), 400
 
     # pro/premiumプランのStripeサブスクリプションをキャンセル
-    if user.get('plan') in ('pro', 'premium') and STRIPE_SECRET_KEY:
+    # is_beta_compアカウント（ベータ協力の無償提供）は実際のStripe契約が存在しないためスキップする
+    if user.get('plan') in ('pro', 'premium') and STRIPE_SECRET_KEY and not user.get('is_beta_comp'):
         conn = get_connection()
         try:
             rows = conn.run(

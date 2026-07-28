@@ -2988,6 +2988,120 @@ def test_func40_delete_account_premium_stripe_cancel():
         conn.close()
 
 
+def test_func43_beta_apply_and_auto_grant():
+    section("機能試験43: ベータ申請→承認→サインアップ時自動premium付与の確認")
+    from src.database import get_connection
+    from datetime import datetime, timedelta
+
+    ts = str(int(time.time()))
+    email = f"betaapply_{ts}@test.invalid"
+    other_email = f"betanotapproved_{ts}@test.invalid"
+    pw = "testpass123"
+    uid = None
+    uid_other = None
+    conn = get_connection()
+
+    try:
+        # 1. 申請APIを呼ぶ
+        with flask_app.test_client() as c:
+            r0 = c.post('/api/beta/apply', json={'email': email})
+            check_code(r0, 200, "POST /api/beta/apply → 200")
+
+            rows = conn.run(
+                "SELECT id, status FROM beta_applications WHERE email=:email ORDER BY id DESC LIMIT 1",
+                email=email
+            )
+            check(bool(rows), "beta_applicationsに申請レコードが作成される")
+            check(rows[0][1] == 'pending', f"初期状態はstatus='pending' (got {rows[0][1] if rows else None})")
+
+            # 2. 竹内さんによる承認操作を模擬（直接SQL）
+            expires = datetime.utcnow() + timedelta(days=30)
+            conn.run(
+                "UPDATE beta_applications SET status='approved', premium_expires_at=:exp, approved_at=NOW() WHERE email=:email",
+                exp=expires, email=email
+            )
+
+            # 3. 承認済みメールでサインアップ → 自動でpremium付与されること
+            r1 = c.post('/api/auth/register',
+                        json={'email': email, 'password': pw, 'name': 'ベータ申請テスト',
+                              'tos_agreed': True, 'birth_date': '1990-01-01'})
+            check_code(r1, 200, "承認済みメールでの登録 → 200")
+            body1 = r1.get_json() or {}
+            uid = (body1.get('user') or {}).get('id')
+            check((body1.get('user') or {}).get('plan') == 'premium',
+                  f"登録レスポンスのplanが'premium' (got {(body1.get('user') or {}).get('plan')})")
+
+            rows_u = conn.run(
+                "SELECT plan, plan_expires_at, is_beta_comp FROM users WHERE id=:id", id=uid)
+            check(rows_u[0][0] == 'premium', "DB上もplan='premium'")
+            check(bool(rows_u[0][2]) is True, "is_beta_comp=TRUEが設定される")
+
+            rows_a = conn.run(
+                "SELECT status, granted_at FROM beta_applications WHERE email=:email", email=email)
+            check(rows_a[0][0] == 'granted', f"beta_applications.statusが'granted'になる (got {rows_a[0][0]})")
+            check(rows_a[0][1] is not None, "granted_atが記録される")
+
+            # 4. 【回帰確認】未承認メールで通常登録した場合、premiumにならないこと
+            r2 = c.post('/api/auth/register',
+                        json={'email': other_email, 'password': pw, 'name': '未承認テスト',
+                              'tos_agreed': True, 'birth_date': '1990-01-01'})
+            check_code(r2, 200, "未承認メールでの登録 → 200")
+            body2 = r2.get_json() or {}
+            uid_other = (body2.get('user') or {}).get('id')
+            check((body2.get('user') or {}).get('plan') == 'free',
+                  f"未承認メールはplan='free'のまま (got {(body2.get('user') or {}).get('plan')})")
+
+    finally:
+        try:
+            if uid:
+                conn.run("DELETE FROM users WHERE id=:id", id=uid)
+            if uid_other:
+                conn.run("DELETE FROM users WHERE id=:id", id=uid_other)
+            conn.run("DELETE FROM beta_applications WHERE email IN (:e1, :e2)", e1=email, e2=other_email)
+        except Exception:
+            pass
+        conn.close()
+
+
+def test_func44_beta_comp_delete_account_skips_stripe():
+    section("機能試験44: is_beta_comp=TRUEユーザーの退会時、Stripe API呼び出しがスキップされる確認（モック）")
+    from unittest.mock import patch, MagicMock
+    from src.database import get_connection
+
+    ts = str(int(time.time()))
+    email = f"betacompdel_{ts}@test.invalid"
+    pw = "testpass123"
+    uid = None
+    conn = get_connection()
+    try:
+        with flask_app.test_client() as c:
+            r = c.post('/api/auth/register',
+                        json={'email': email, 'password': pw, 'name': 'is_beta_comp退会テスト',
+                              'tos_agreed': True, 'birth_date': '1990-01-01'})
+            check_code(r, 200, "退会テスト用ユーザー登録 → 200")
+            uid = (r.get_json() or {}).get('user', {}).get('id')
+
+            fake_customer = 'cus_test_stale_' + str(uuid.uuid4())[:8]
+            conn.run(
+                "UPDATE users SET plan='premium', is_beta_comp=TRUE, stripe_customer_id=:cid WHERE id=:id",
+                cid=fake_customer, id=uid
+            )
+
+            with patch('src.main.stripe.Subscription.list') as mock_list, \
+                 patch('src.main.stripe.Subscription.cancel') as mock_cancel:
+                r2 = c.delete('/api/auth/account', json={'current_password': pw})
+                check_code(r2, 200, "is_beta_compユーザーのDELETE /api/auth/account → 200")
+                check(mock_list.call_count == 0, f"Stripe Subscription.listが呼ばれない (got {mock_list.call_count}回)")
+                check(mock_cancel.call_count == 0, f"Stripe Subscription.cancelが呼ばれない (got {mock_cancel.call_count}回)")
+    finally:
+        try:
+            if uid is not None:
+                conn.run("DELETE FROM users WHERE id=:id", id=uid)
+        except Exception:
+            pass
+        conn.close()
+
+
 def safe_run(name: str, func, *args):
     """テスト関数を安全に実行。DB接続エラー等は SKIP として記録し継続。"""
     import pg8000.exceptions
@@ -3078,6 +3192,8 @@ if __name__ == '__main__':
             safe_run("機能試験40: delete_account()のpremium Stripe解約確認", test_func40_delete_account_premium_stripe_cancel)
             safe_run("機能試験41: is_earlybird=False時の正規価格記録確認", test_func41_checkout_regular_price_recording, client)
             safe_run("機能試験42: is_earlybird=True時の早期価格記録確認（回帰）", test_func42_checkout_early_price_recording, client)
+            safe_run("機能試験43: ベータ申請→承認→自動付与の確認", test_func43_beta_apply_and_auto_grant)
+            safe_run("機能試験44: is_beta_comp退会時のStripe呼び出しスキップ確認", test_func44_beta_comp_delete_account_skips_stripe)
     finally:
         cleanup()
 
