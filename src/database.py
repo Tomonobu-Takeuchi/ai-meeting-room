@@ -297,6 +297,16 @@ def grant_beta_premium(user_id, application_id, premium_expires_at):
         conn.close()
 
 
+def mark_beta_survey_shown(user_id, survey_type):
+    """survey_type: 'first' または 'continuation'"""
+    column = 'beta_survey1_shown_at' if survey_type == 'first' else 'beta_survey2_shown_at'
+    conn = get_connection()
+    try:
+        conn.run(f"UPDATE users SET {column}=NOW() WHERE id=:id", id=user_id)
+    finally:
+        conn.close()
+
+
 def get_user_by_email(email):
     conn = get_connection()
     rows = conn.run("""
@@ -325,7 +335,8 @@ def get_user_by_id(user_id):
                    monthly_meeting_count, monthly_reset_at, avatar, password_hash,
                    trial_layer2_used, trial_layer3_used,
                    layer3_monthly_count, layer3_monthly_reset_at,
-                   is_earlybird, billing_anchor_day, is_beta_comp
+                   is_earlybird, billing_anchor_day, is_beta_comp,
+                   beta_survey1_shown_at, beta_survey2_shown_at
             FROM users WHERE id=:id
         """, id=user_id)
         if not rows:
@@ -336,7 +347,8 @@ def get_user_by_id(user_id):
                          'monthly_meeting_count','monthly_reset_at','avatar','password_hash',
                          'trial_layer2_used','trial_layer3_used',
                          'layer3_monthly_count','layer3_monthly_reset_at',
-                         'is_earlybird','billing_anchor_day','is_beta_comp'], r)
+                         'is_earlybird','billing_anchor_day','is_beta_comp',
+                         'beta_survey1_shown_at','beta_survey2_shown_at'], r)
         d['name'] = decrypt_value(conn, d['name'])
         conn.close()
         d['credits'] = d['credits'] or 0

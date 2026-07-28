@@ -3102,6 +3102,58 @@ def test_func44_beta_comp_delete_account_skips_stripe():
         conn.close()
 
 
+def test_func45_beta_survey_popup_flags():
+    section("機能試験45: is_beta_compユーザーのアンケート表示フラグ管理の確認")
+    from src.database import get_connection
+
+    ts = str(int(time.time()))
+    email = f"betasurvey_{ts}@test.invalid"
+    pw = "testpass123"
+    uid = None
+    conn = get_connection()
+    try:
+        with flask_app.test_client() as c:
+            r = c.post('/api/auth/register',
+                        json={'email': email, 'password': pw, 'name': 'アンケート試験',
+                              'tos_agreed': True, 'birth_date': '1990-01-01'})
+            check_code(r, 200, "テスト用ユーザー登録 → 200")
+            body = r.get_json() or {}
+            uid = body.get('user', {}).get('id')
+            check(body.get('user', {}).get('beta_survey1_shown') is False,
+                  "登録直後はbeta_survey1_shownがFalse")
+            check(body.get('user', {}).get('beta_survey2_shown') is False,
+                  "登録直後はbeta_survey2_shownがFalse")
+
+            # ログインしていない状態でsurvey-shownを呼ぶと401になること
+            r_anon = flask_app.test_client().post('/api/beta/survey-shown', json={'type': 'first'})
+            check_code(r_anon, 401, "未ログインでのPOST /api/beta/survey-shown → 401")
+
+            # ログイン状態を再現するため、同じクライアントセッションでログイン
+            c.post('/api/auth/login', json={'email': email, 'password': pw})
+
+            r1 = c.post('/api/beta/survey-shown', json={'type': 'first'})
+            check_code(r1, 200, "POST /api/beta/survey-shown type=first → 200")
+
+            rows = conn.run("SELECT beta_survey1_shown_at, beta_survey2_shown_at FROM users WHERE id=:id", id=uid)
+            check(rows[0][0] is not None, "beta_survey1_shown_atが記録される")
+            check(rows[0][1] is None, "beta_survey2_shown_atはまだNULLのまま")
+
+            r2 = c.post('/api/beta/survey-shown', json={'type': 'continuation'})
+            check_code(r2, 200, "POST /api/beta/survey-shown type=continuation → 200")
+            rows2 = conn.run("SELECT beta_survey2_shown_at FROM users WHERE id=:id", id=uid)
+            check(rows2[0][0] is not None, "beta_survey2_shown_atも記録される")
+
+            r3 = c.post('/api/beta/survey-shown', json={'type': 'invalid_type'})
+            check_code(r3, 400, "不正なtype値 → 400")
+    finally:
+        try:
+            if uid is not None:
+                conn.run("DELETE FROM users WHERE id=:id", id=uid)
+        except Exception:
+            pass
+        conn.close()
+
+
 def safe_run(name: str, func, *args):
     """テスト関数を安全に実行。DB接続エラー等は SKIP として記録し継続。"""
     import pg8000.exceptions
@@ -3194,6 +3246,7 @@ if __name__ == '__main__':
             safe_run("機能試験42: is_earlybird=True時の早期価格記録確認（回帰）", test_func42_checkout_early_price_recording, client)
             safe_run("機能試験43: ベータ申請→承認→自動付与の確認", test_func43_beta_apply_and_auto_grant)
             safe_run("機能試験44: is_beta_comp退会時のStripe呼び出しスキップ確認", test_func44_beta_comp_delete_account_skips_stripe)
+            safe_run("機能試験45: is_beta_compユーザーのアンケート表示フラグ管理の確認", test_func45_beta_survey_popup_flags)
     finally:
         cleanup()
 

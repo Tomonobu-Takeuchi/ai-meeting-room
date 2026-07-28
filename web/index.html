@@ -1043,6 +1043,24 @@
   </div>
 </div>
 
+<div class="modal-overlay hidden" id="betaSurveyModal">
+  <div class="modal" style="max-width:420px;text-align:center;">
+    <h2 style="font-size:16px;font-weight:600;margin:0 0 12px;" id="betaSurveyModalTitle">アンケートにご協力ください</h2>
+    <p style="font-size:13px;color:var(--text-secondary);margin:0 0 20px;line-height:1.6;">
+      無料でPremium機能をお試しいただいているお礼に、ぜひご感想をお聞かせください。3〜10分ほどで回答できます。
+    </p>
+    <a id="betaSurveyModalLink" href="#" target="_blank" rel="noopener"
+       style="display:inline-block;background:var(--accent-blue);color:#fff;border-radius:8px;padding:10px 24px;font-size:14px;font-weight:600;text-decoration:none;margin-bottom:12px;">
+      アンケートに回答する
+    </a>
+    <div>
+      <button onclick="closeBetaSurveyModal()" style="font-size:12px;color:var(--text-muted);background:none;border:none;cursor:pointer;padding:6px;">
+        あとで回答する
+      </button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay hidden" id="deleteConfirmOverlay">
   <div class="delete-confirm-box">
     <h3>🗑️ 削除確認</h3>

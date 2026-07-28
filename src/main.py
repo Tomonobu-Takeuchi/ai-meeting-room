@@ -38,6 +38,7 @@ from src.database import (
     create_beta_application,
     get_approved_beta_application,
     grant_beta_premium,
+    mark_beta_survey_shown,
 )
 from src.scheduler import init_scheduler
 
@@ -195,6 +196,17 @@ def apply_beta_premium():
 
     return jsonify({"message": "申請を受け付けました。承認後、ご登録いただいたメールアドレスでサインアップすると、期間中プレミアム機能をご利用いただけます。"})
 
+@app.route("/api/beta/survey-shown", methods=["POST"])
+@login_required
+def beta_survey_shown():
+    data = request.json or {}
+    survey_type = data.get("type")
+    if survey_type not in ('first', 'continuation'):
+        return jsonify({"error": "invalid type"}), 400
+    user_id = get_current_user_id()
+    mark_beta_survey_shown(user_id, survey_type)
+    return jsonify({"ok": True})
+
 @app.route("/api/auth/register", methods=["POST"])
 @limiter.limit("5 per hour;10 per day")
 def register():
@@ -262,6 +274,9 @@ def register():
             "plan_expires_at": full_user.get('plan_expires_at'),
             "trial_layer2_used": bool(full_user.get('trial_layer2_used') or False),
             "trial_layer3_used": bool(full_user.get('trial_layer3_used') or False),
+            "is_beta_comp": bool(full_user.get('is_beta_comp') or False),
+            "beta_survey1_shown": full_user.get('beta_survey1_shown_at') is not None,
+            "beta_survey2_shown": full_user.get('beta_survey2_shown_at') is not None,
         }})
     except Exception as e:
         return jsonify({"error": f"登録エラー: {str(e)}"}), 500
@@ -345,6 +360,9 @@ def me():
         "plan_expires_at": user.get('plan_expires_at'),
         "trial_layer2_used": bool(user.get('trial_layer2_used') or False),
         "trial_layer3_used": bool(user.get('trial_layer3_used') or False),
+        "is_beta_comp": bool(user.get('is_beta_comp') or False),
+        "beta_survey1_shown": user.get('beta_survey1_shown_at') is not None,
+        "beta_survey2_shown": user.get('beta_survey2_shown_at') is not None,
     }})
 
 
