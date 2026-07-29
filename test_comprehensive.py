@@ -2991,7 +2991,6 @@ def test_func40_delete_account_premium_stripe_cancel():
 def test_func43_beta_apply_and_auto_grant():
     section("機能試験43: ベータ申請→承認→サインアップ時自動premium付与の確認")
     from src.database import get_connection
-    from datetime import datetime, timedelta
 
     ts = str(int(time.time()))
     email = f"betaapply_{ts}@test.invalid"
@@ -3012,14 +3011,16 @@ def test_func43_beta_apply_and_auto_grant():
                 email=email
             )
             check(bool(rows), "beta_applicationsに申請レコードが作成される")
-            check(rows[0][1] == 'pending', f"初期状態はstatus='pending' (got {rows[0][1] if rows else None})")
+            # 改修①: 自動承認により、申請直後からstatus='approved'となる
+            check(rows[0][1] == 'approved', f"初期状態はstatus='approved' (got {rows[0][1] if rows else None})")
 
-            # 2. 竹内さんによる承認操作を模擬（直接SQL）
-            expires = datetime.utcnow() + timedelta(days=30)
-            conn.run(
-                "UPDATE beta_applications SET status='approved', premium_expires_at=:exp, approved_at=NOW() WHERE email=:email",
-                exp=expires, email=email
+            # 改修①により手動承認SQLは不要。premium_expires_atが自動設定されていることを確認する
+            rows_exp = conn.run(
+                "SELECT premium_expires_at, approved_at FROM beta_applications WHERE email=:email",
+                email=email
             )
+            check(rows_exp[0][0] is not None, "premium_expires_atが自動設定される")
+            check(rows_exp[0][1] is not None, "approved_atが自動設定される")
 
             # 3. 承認済みメールでサインアップ → 自動でpremium付与されること
             r1 = c.post('/api/auth/register',
@@ -3154,6 +3155,198 @@ def test_func45_beta_survey_popup_flags():
         conn.close()
 
 
+def test_func46_beta_apply_no_duplicate():
+    section("機能試験46: 重複申請時にbeta_applicationsの行が増えないこと")
+    from src.database import get_connection
+
+    ts = str(int(time.time()))
+    email = f"betadup_{ts}@test.invalid"
+    conn = get_connection()
+    try:
+        with flask_app.test_client() as c:
+            r1 = c.post('/api/beta/apply', json={'email': email})
+            check_code(r1, 200, "1回目の申請 → 200")
+
+            r2 = c.post('/api/beta/apply', json={'email': email})
+            check_code(r2, 200, "2回目の申請 → 200（エラーにならない）")
+
+            r3 = c.post('/api/beta/apply', json={'email': email})
+            check_code(r3, 200, "3回目の申請 → 200")
+
+            rows = conn.run(
+                "SELECT COUNT(*) FROM beta_applications WHERE email=:email", email=email)
+            check(rows[0][0] == 1, f"3回申請しても行数は1件 (got {rows[0][0]})")
+    finally:
+        conn.run("DELETE FROM beta_applications WHERE email=:email", email=email)
+        conn.close()
+
+
+def test_func47_beta_apply_email_normalization():
+    section("機能試験47: メールアドレスの正規化（大文字・空白）と重複判定")
+    from src.database import get_connection
+
+    ts = str(int(time.time()))
+    base = f"betanorm_{ts}@test.invalid"
+    conn = get_connection()
+    try:
+        with flask_app.test_client() as c:
+            c.post('/api/beta/apply', json={'email': base})
+            # 大文字＋前後空白で再申請 → 同一とみなされ増えないこと
+            c.post('/api/beta/apply', json={'email': f"  {base.upper()}  "})
+
+            rows = conn.run(
+                "SELECT COUNT(*) FROM beta_applications WHERE email=:email", email=base)
+            check(rows[0][0] == 1, f"大文字・空白違いでも1件のまま (got {rows[0][0]})")
+    finally:
+        conn.run("DELETE FROM beta_applications WHERE email=:email", email=base)
+        conn.close()
+
+
+def test_func48_login_grants_beta_premium():
+    section("機能試験48: 既存freeアカウントがログイン時にpremium付与されること")
+    from src.database import get_connection
+
+    ts = str(int(time.time()))
+    email = f"betalogin_{ts}@test.invalid"
+    pw = "testpass123"
+    uid = None
+    conn = get_connection()
+    try:
+        with flask_app.test_client() as c:
+            # 1. 申請より先に通常サインアップ（＝freeアカウントを作る）
+            r0 = c.post('/api/auth/register',
+                        json={'email': email, 'password': pw, 'name': 'ログイン付与テスト',
+                              'tos_agreed': True, 'birth_date': '1990-01-01'})
+            check_code(r0, 200, "先にサインアップ → 200")
+            uid = ((r0.get_json() or {}).get('user') or {}).get('id')
+            check(((r0.get_json() or {}).get('user') or {}).get('plan') == 'free',
+                  "この時点ではplan='free'")
+
+            # 2. その後に申請（改修①により自動でapprovedになる）
+            r1 = c.post('/api/beta/apply', json={'email': email})
+            check_code(r1, 200, "サインアップ後に申請 → 200")
+
+        # 3. ログインし直すと付与されること
+        with flask_app.test_client() as c2:
+            r2 = c2.post('/api/auth/login', json={'email': email, 'password': pw})
+            check_code(r2, 200, "ログイン → 200")
+            body = r2.get_json() or {}
+            resp_plan = (body.get('user') or {}).get('plan')
+            check(resp_plan == 'premium',
+                  f"レスポンスのuser.planが'premium' (got {resp_plan})")
+
+        rows_u = conn.run(
+            "SELECT plan, is_beta_comp FROM users WHERE id=:id", id=uid)
+        check(rows_u[0][0] == 'premium', "DB上もplan='premium'")
+        check(bool(rows_u[0][1]) is True, "is_beta_comp=TRUEが設定される")
+
+        rows_a = conn.run(
+            "SELECT status, granted_at FROM beta_applications WHERE email=:email", email=email)
+        check(rows_a[0][0] == 'granted', f"申請がgrantedになる (got {rows_a[0][0]})")
+        check(rows_a[0][1] is not None, "granted_atが記録される")
+    finally:
+        if uid:
+            conn.run("DELETE FROM users WHERE id=:id", id=uid)
+        conn.run("DELETE FROM beta_applications WHERE email=:email", email=email)
+        conn.close()
+
+
+def test_func49_login_no_double_grant():
+    section("機能試験49: 付与済みユーザーの再ログインで二重付与が起きないこと")
+    from src.database import get_connection
+
+    ts = str(int(time.time()))
+    email = f"betadouble_{ts}@test.invalid"
+    pw = "testpass123"
+    uid = None
+    conn = get_connection()
+    try:
+        with flask_app.test_client() as c:
+            c.post('/api/auth/register',
+                   json={'email': email, 'password': pw, 'name': '二重付与テスト',
+                         'tos_agreed': True, 'birth_date': '1990-01-01'})
+            c.post('/api/beta/apply', json={'email': email})
+        with flask_app.test_client() as c2:
+            c2.post('/api/auth/login', json={'email': email, 'password': pw})
+
+        rows1 = conn.run(
+            "SELECT granted_at FROM beta_applications WHERE email=:email", email=email)
+        first_granted_at = rows1[0][0]
+        check(first_granted_at is not None, "1回目のログインで付与される")
+
+        uid = conn.run("SELECT id FROM users WHERE email=:email", email=email)[0][0]
+
+        # 2回目のログイン
+        with flask_app.test_client() as c3:
+            r = c3.post('/api/auth/login', json={'email': email, 'password': pw})
+            check_code(r, 200, "2回目のログイン → 200")
+
+        rows2 = conn.run(
+            "SELECT granted_at FROM beta_applications WHERE email=:email", email=email)
+        check(rows2[0][0] == first_granted_at,
+              "granted_atが変化しない（二重付与なし）")
+    finally:
+        if uid:
+            conn.run("DELETE FROM users WHERE id=:id", id=uid)
+        conn.run("DELETE FROM beta_applications WHERE email=:email", email=email)
+        conn.close()
+
+
+def test_func50_login_without_beta_application():
+    section("機能試験50: ベータ申請のない通常ユーザーのログインが従来通りであること")
+    from src.database import get_connection
+
+    ts = str(int(time.time()))
+    email = f"betanone_{ts}@test.invalid"
+    pw = "testpass123"
+    uid = None
+    conn = get_connection()
+    try:
+        with flask_app.test_client() as c:
+            r0 = c.post('/api/auth/register',
+                        json={'email': email, 'password': pw, 'name': '通常ユーザー',
+                              'tos_agreed': True, 'birth_date': '1990-01-01'})
+            uid = ((r0.get_json() or {}).get('user') or {}).get('id')
+        with flask_app.test_client() as c2:
+            r = c2.post('/api/auth/login', json={'email': email, 'password': pw})
+            check_code(r, 200, "ログイン → 200")
+            plan = ((r.get_json() or {}).get('user') or {}).get('plan')
+            check(plan == 'free', f"planは'free'のまま (got {plan})")
+
+        rows = conn.run("SELECT plan, is_beta_comp FROM users WHERE id=:id", id=uid)
+        check(rows[0][0] == 'free', "DB上もplan='free'")
+        check(bool(rows[0][1]) is False, "is_beta_compはFALSEのまま")
+    finally:
+        if uid:
+            conn.run("DELETE FROM users WHERE id=:id", id=uid)
+        conn.close()
+
+
+def test_func51_beta_apply_survives_email_failure():
+    section("機能試験51: メール送信失敗時もAPIは200を返し、申請行が作成されること")
+    from src.database import get_connection
+    import src.main as main_mod
+
+    ts = str(int(time.time()))
+    email = f"betamailfail_{ts}@test.invalid"
+    conn = get_connection()
+    original = main_mod.send_email
+    try:
+        # send_emailが常にFalseを返す状態を模擬（Brevo障害相当）
+        main_mod.send_email = lambda *a, **kw: False
+        with flask_app.test_client() as c:
+            r = c.post('/api/beta/apply', json={'email': email})
+            check_code(r, 200, "メール送信失敗でもAPIは200を返す")
+
+        rows = conn.run(
+            "SELECT COUNT(*) FROM beta_applications WHERE email=:email", email=email)
+        check(rows[0][0] == 1, "メール送信失敗でも申請行は作成される")
+    finally:
+        main_mod.send_email = original
+        conn.run("DELETE FROM beta_applications WHERE email=:email", email=email)
+        conn.close()
+
+
 def safe_run(name: str, func, *args):
     """テスト関数を安全に実行。DB接続エラー等は SKIP として記録し継続。"""
     import pg8000.exceptions
@@ -3247,6 +3440,12 @@ if __name__ == '__main__':
             safe_run("機能試験43: ベータ申請→承認→自動付与の確認", test_func43_beta_apply_and_auto_grant)
             safe_run("機能試験44: is_beta_comp退会時のStripe呼び出しスキップ確認", test_func44_beta_comp_delete_account_skips_stripe)
             safe_run("機能試験45: is_beta_compユーザーのアンケート表示フラグ管理の確認", test_func45_beta_survey_popup_flags)
+            safe_run("機能試験46: 重複申請時にbeta_applicationsの行が増えないこと", test_func46_beta_apply_no_duplicate)
+            safe_run("機能試験47: メールアドレスの正規化と重複判定", test_func47_beta_apply_email_normalization)
+            safe_run("機能試験48: 既存freeアカウントのログイン時premium付与", test_func48_login_grants_beta_premium)
+            safe_run("機能試験49: 再ログインでの二重付与防止", test_func49_login_no_double_grant)
+            safe_run("機能試験50: ベータ申請のない通常ユーザーのログイン回帰確認", test_func50_login_without_beta_application)
+            safe_run("機能試験51: メール送信失敗時も申請行が作成されること", test_func51_beta_apply_survives_email_failure)
     finally:
         cleanup()
 

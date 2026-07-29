@@ -209,7 +209,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
   <div class="sec-inner" style="max-width:560px;text-align:center;">
     <p class="label">Limited Time</p>
     <h2 class="title">YouTubeをご覧の方へ：期間限定でPremium機能を無料開放</h2>
-    <p style="color:#c8d8e8;margin:16px 0;">メールアドレスをご入力ください。承認後、ご入力いただいたメールアドレスでサインアップすると、期間中Premium機能（無制限会議・全レポート・継続議論）をお試しいただけます。</p>
+    <p style="color:#c8d8e8;margin:16px 0;">メールアドレスをご入力ください。折り返しご案内のメールをお送りします。ご入力いただいたメールアドレスでサインアップすると、<strong>2026年8月31日まで</strong>Premium機能（無制限会議・全レポート・継続議論）を無料でお試しいただけます。</p>
     <form id="betaApplyForm" onsubmit="return submitBetaApply(event)" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:20px;">
       <input type="email" id="betaApplyEmail" required placeholder="your@email.com" style="padding:10px 14px;border-radius:6px;border:1px solid #1e3a5f;min-width:260px;">
       <button type="submit" class="screen-btn">申請する</button>
@@ -232,6 +232,10 @@ async function submitBetaApply(ev){
     msg.textContent = data.message || data.error || '送信しました';
     msg.style.display = 'block';
     msg.style.color = res.ok ? '#7CFFB2' : '#FF8A8A';
+    // 改修⑤: 申請成功をGA4イベントとして記録する
+    if (res.ok && typeof gtag === 'function') {
+      gtag('event', 'beta_apply_submit');
+    }
   }catch(e){
     msg.textContent = '送信に失敗しました。時間をおいて再度お試しください。';
     msg.style.display = 'block';
@@ -839,6 +843,18 @@ window.addEventListener("load",function(){
   if(si){ si.addEventListener("load",resizeStrategyMap); }
 });
 window.addEventListener("resize",function(){ resizeAiMeetingMap(); resizeStrategyMap(); resizeStrategyMapOnModal(); });
+</script>
+<script>
+// 改修⑥: YouTube等から付与されたUTMパラメータを、
+// LPからアプリ(/app)へ遷移する際に引き継ぐ。
+// GA4上でLPセッションとアプリセッションを同一流入として扱えるようにするため。
+(function () {
+  var qs = window.location.search;
+  if (!qs) return;
+  document.querySelectorAll('a[href="/app"]').forEach(function (a) {
+    a.href = '/app' + qs;
+  });
+})();
 </script>
 </body>
 </html>
