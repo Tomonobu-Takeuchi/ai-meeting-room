@@ -1731,6 +1731,15 @@
 
 <div class="auth-modal-overlay hidden" id="authModalOverlay">
   <div class="auth-modal">
+    <!-- 改修⑮-2: ベータ経由の来訪者向け案内 -->
+    <div id="betaOnboardBanner" class="hidden"
+         style="background:#2d1b4e;border:1px solid #7C3AED;border-radius:8px;
+                padding:12px 14px;margin-bottom:16px;font-size:13px;line-height:1.6;">
+      <div style="font-weight:bold;color:#c4b5fd;margin-bottom:4px;">
+        ベータ1へのお申し込みありがとうございます
+      </div>
+      <div id="betaOnboardText" style="color:#d8d8e8;"></div>
+    </div>
     <!-- ログイン画面 -->
     <div id="loginPanel">
       <h2>🔑 ログイン</h2>
@@ -1744,6 +1753,7 @@
       </div>
       <button class="auth-btn" id="loginSubmitBtn">ログイン</button>
       <div class="auth-switch">アカウントをお持ちでない方は <a onclick="showRegisterPanel()">新規登録</a></div>
+      <div class="auth-switch" style="margin-top:4px;"><a onclick="showPasswordResetPanel()">パスワードをお忘れですか</a></div>
       <div class="auth-guest"><a onclick="closeAuthModal()">ゲストとして続ける</a></div>
     </div>
     <!-- 登録画面 -->
@@ -1765,6 +1775,26 @@
       <div class="auth-switch">すでにアカウントをお持ちの方は <a onclick="showLoginPanel()">ログイン</a></div>
       <div class="auth-guest"><a onclick="closeAuthModal()">ゲストとして続ける</a></div>
       <div style="text-align:center;font-size:11px;color:var(--text-muted);margin-top:8px;"><a href="/tokutori" target="_blank" style="color:var(--purple-light)">特定商取引法に基づく表示</a></div>
+    </div>
+    <!-- 改修⑯: パスワード再設定（要求） -->
+    <div id="passwordResetPanel" class="hidden">
+      <h2>🔑 パスワード再設定</h2>
+      <p>ご登録のメールアドレスに、再設定用のリンクをお送りします</p>
+      <div class="auth-error" id="passwordResetError"></div>
+      <div id="passwordResetMsg" style="color:#7CFFB2;font-size:13px;margin-bottom:8px;display:none;"></div>
+      <input class="auth-input" type="email" id="passwordResetEmail" placeholder="メールアドレス" />
+      <button class="auth-btn" id="passwordResetSubmitBtn">再設定メールを送る</button>
+      <div class="auth-switch"><a onclick="showLoginPanel()">ログインに戻る</a></div>
+    </div>
+
+    <!-- 改修⑯: パスワード再設定（新パスワード入力） -->
+    <div id="passwordResetConfirmPanel" class="hidden">
+      <h2>🔑 新しいパスワードの設定</h2>
+      <p id="passwordResetConfirmEmail" style="font-size:13px;color:var(--text-secondary);"></p>
+      <div class="auth-error" id="passwordResetConfirmError"></div>
+      <input class="auth-input" type="password" id="newPassword" placeholder="新しいパスワード（6文字以上）" />
+      <input class="auth-input" type="password" id="newPasswordConfirm" placeholder="もう一度入力" />
+      <button class="auth-btn" id="passwordResetConfirmBtn">パスワードを変更する</button>
     </div>
   </div>
 </div>

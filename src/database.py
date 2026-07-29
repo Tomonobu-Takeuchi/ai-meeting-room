@@ -254,26 +254,130 @@ def create_user(email, password_hash, name='', birth_date=None):
 def create_beta_application(email, premium_expires_at=None):
     """ベータ1申請を作成する。
 
-    改修①（自動承認）: ベータ1は審査で絞る趣旨ではないため、作成時点で
-      status='approved' とし、竹内さんの手動SQL承認を不要にする。
-    改修⑬（重複防止）: emailにUNIQUE制約があるため、既に申請済みの
-      アドレスでは ON CONFLICT DO NOTHING により行が増えない。
-      既存行の status / premium_expires_at は上書きしない
-      （granted済みの行を pending 相当に巻き戻さないため）。
+    改修①（自動承認）: 作成時点で status='approved' とする。
+    改修⑬（重複防止）: ON CONFLICT DO NOTHING により行が増えない。
+    改修⑰（本人確認トークン）: 案内メールのリンクに埋め込むトークンを発行する。
+      既に申請済みの場合、既存のトークンをそのまま返す（再申請でも同じ
+      リンクが使えるようにするため）。
 
-    戻り値: True=新規作成された / False=既に申請済みでスキップされた
+    戻り値: (is_new, access_token) のタプル
+      is_new=True  : 新規作成された
+      is_new=False : 既に申請済みでスキップされた
     """
+    import secrets
+    token = secrets.token_urlsafe(32)
     conn = get_connection()
     try:
         rows = conn.run(
             """INSERT INTO beta_applications
-                   (email, status, premium_expires_at, approved_at)
-               VALUES (:email, 'approved', :expires, NOW())
+                   (email, status, premium_expires_at, approved_at, access_token)
+               VALUES (:email, 'approved', :expires, NOW(), :token)
                ON CONFLICT (email) DO NOTHING
+               RETURNING access_token""",
+            email=email, expires=premium_expires_at, token=token
+        )
+        if rows:
+            return True, rows[0][0]
+        # 既存行があった場合、そのトークンを返す。
+        # 第1便以前に作られた行は access_token が NULL のため、その場合は補填する。
+        existing = conn.run(
+            "SELECT access_token FROM beta_applications WHERE email=:email",
+            email=email
+        )
+        current = existing[0][0] if existing else None
+        if current:
+            return False, current
+        conn.run(
+            "UPDATE beta_applications SET access_token=:token WHERE email=:email",
+            token=token, email=email
+        )
+        return False, token
+    finally:
+        conn.close()
+
+
+def get_beta_application_by_token(token):
+    """アクセストークンからベータ申請を取得する（改修⑰）。
+
+    見つからない・トークンがNULL・空文字の場合は None を返す。
+    """
+    if not token:
+        return None
+    conn = get_connection()
+    try:
+        rows = conn.run(
+            """SELECT id, email, status, premium_expires_at, granted_at
+               FROM beta_applications
+               WHERE access_token = :token
+               LIMIT 1""",
+            token=token
+        )
+        if not rows:
+            return None
+        r = rows[0]
+        return dict(zip(['id', 'email', 'status', 'premium_expires_at', 'granted_at'], r))
+    finally:
+        conn.close()
+
+
+def set_password_reset_token(email, token, hours=24):
+    """パスワード再設定トークンを発行する（改修⑯）。
+
+    アカウントが存在しない場合は False を返すが、呼び出し側は
+    その事実を利用者に開示しないこと（アカウント有無の推測を防ぐため）。
+    """
+    conn = get_connection()
+    try:
+        rows = conn.run(
+            """UPDATE users
+               SET password_reset_token = :token,
+                   password_reset_expires = NOW() + (:hours || ' hours')::interval
+               WHERE email = :email
                RETURNING id""",
-            email=email, expires=premium_expires_at
+            token=token, hours=str(hours), email=email
         )
         return bool(rows)
+    finally:
+        conn.close()
+
+
+def get_user_by_password_reset_token(token):
+    """有効な（期限内の）再設定トークンからユーザーを取得する（改修⑯）。"""
+    if not token:
+        return None
+    conn = get_connection()
+    try:
+        rows = conn.run(
+            """SELECT id, email
+               FROM users
+               WHERE password_reset_token = :token
+                 AND password_reset_expires IS NOT NULL
+                 AND password_reset_expires > NOW()
+               LIMIT 1""",
+            token=token
+        )
+        if not rows:
+            return None
+        return dict(zip(['id', 'email'], rows[0]))
+    finally:
+        conn.close()
+
+
+def apply_password_reset(user_id, password_hash):
+    """新パスワードを保存し、トークンを無効化する（改修⑯）。
+
+    トークンは使い捨て。再設定完了後は同じURLを再利用できない。
+    """
+    conn = get_connection()
+    try:
+        conn.run(
+            """UPDATE users
+               SET password_hash = :ph,
+                   password_reset_token = NULL,
+                   password_reset_expires = NULL
+               WHERE id = :id""",
+            ph=password_hash, id=user_id
+        )
     finally:
         conn.close()
 
