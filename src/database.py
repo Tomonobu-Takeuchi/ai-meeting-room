@@ -251,13 +251,29 @@ def create_user(email, password_hash, name='', birth_date=None):
         conn.close()
         raise e
 
-def create_beta_application(email):
+def create_beta_application(email, premium_expires_at=None):
+    """ベータ1申請を作成する。
+
+    改修①（自動承認）: ベータ1は審査で絞る趣旨ではないため、作成時点で
+      status='approved' とし、竹内さんの手動SQL承認を不要にする。
+    改修⑬（重複防止）: emailにUNIQUE制約があるため、既に申請済みの
+      アドレスでは ON CONFLICT DO NOTHING により行が増えない。
+      既存行の status / premium_expires_at は上書きしない
+      （granted済みの行を pending 相当に巻き戻さないため）。
+
+    戻り値: True=新規作成された / False=既に申請済みでスキップされた
+    """
     conn = get_connection()
     try:
-        conn.run(
-            "INSERT INTO beta_applications (email) VALUES (:email)",
-            email=email
+        rows = conn.run(
+            """INSERT INTO beta_applications
+                   (email, status, premium_expires_at, approved_at)
+               VALUES (:email, 'approved', :expires, NOW())
+               ON CONFLICT (email) DO NOTHING
+               RETURNING id""",
+            email=email, expires=premium_expires_at
         )
+        return bool(rows)
     finally:
         conn.close()
 

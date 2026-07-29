@@ -176,6 +176,52 @@ def serve_appjs():
 
 # ===== ユーザー認証API =====
 
+def _notify_email_failure(context: str, to_email: str):
+    """改修⑦: メール送信失敗をSentryへ警告として送る。
+    送信先アドレスは本人特定につながるため、ドメイン部のみを記録する。"""
+    try:
+        domain = to_email.split("@")[-1] if "@" in to_email else "unknown"
+        sentry_sdk.capture_message(
+            f"email send failed: context={context} to_domain={domain}",
+            level="warning"
+        )
+    except Exception:
+        pass
+
+
+def _beta_apply_user_body(expires_label: str) -> str:
+    """改修②: 申請者本人への案内メール本文"""
+    return f"""
+<html>
+<body style="font-family: sans-serif; color: #333; line-height: 1.8;">
+  <p>このたびはAI-PERSONA会議室のベータテストにお申し込みいただき、ありがとうございます。</p>
+  <p>Premium機能をご利用いただける状態になりました。<br>
+  下記からこのメールアドレスでアカウントを作成してください。<br>
+  すでにアカウントをお持ちの場合は、そのままログインしていただければ自動で切り替わります。</p>
+  <p style="margin:24px 0;">
+    <a href="https://ai-paradise.net/app"
+       style="background:#7C3AED;color:#fff;padding:12px 24px;border-radius:6px;
+              text-decoration:none;font-weight:bold;display:inline-block;">
+      アカウント作成・ログイン
+    </a>
+  </p>
+  <p><strong>ご利用いただける機能</strong><br>
+  ・会議の開催回数：無制限<br>
+  ・ペルソナ：無制限<br>
+  ・レポート：Layer1〜3すべて<br>
+  ・継続議論スレッド（前回の会議の続きから議論を再開）<br>
+  ・実行管理チェックリスト</p>
+  <p><strong>ご利用期間</strong><br>{expires_label} まで</p>
+  <p>ご利用の中でお気づきの点がありましたら、会議終了時に表示されるアンケートからお聞かせいただけますと幸いです。</p>
+  <p style="color:#888;font-size:12px;margin-top:32px;">
+    AI-PERSONA会議室 / info@ai-paradise.net<br>
+    このメールに心当たりがない場合は、破棄してください。
+  </p>
+</body>
+</html>
+"""
+
+
 @app.route("/api/beta/apply", methods=["POST"])
 @limiter.limit("5 per hour;10 per day")
 def apply_beta_premium():
@@ -184,17 +230,35 @@ def apply_beta_premium():
     if not email or "@" not in email:
         return jsonify({"error": "正しいメールアドレスを入力してください"}), 400
 
-    create_beta_application(email)
+    # 改修①: 自動承認。期限は環境変数から取得する
+    expires = os.environ.get("BETA1_PREMIUM_EXPIRES_AT", "2026-08-31 23:59:59")
+    expires_label = os.environ.get("BETA1_PREMIUM_EXPIRES_LABEL", "2026年8月31日")
 
+    # 改修⑬: 既に申請済みなら行は増えない（is_new=False）
+    is_new = create_beta_application(email, expires)
+
+    # 改修②: 申請者本人への案内。再申請時も案内は再送する
+    # （前回のメールを紛失した人が再度申請するケースを救うため）
+    ok_user = send_email(
+        email,
+        "【AI-PERSONA会議室】ベータ1 Premium体験のご案内",
+        _beta_apply_user_body(expires_label)
+    )
+    if not ok_user:
+        _notify_email_failure("beta_apply_user", email)
+
+    # 管理者通知
     admin_email = os.environ.get("ADMIN_NOTIFY_EMAIL", "")
     if admin_email:
-        send_email(
+        ok_admin = send_email(
             admin_email,
             "【AI-PERSONA会議室】ベータ1プレミアム申請",
-            f"<p>新しい申請がありました：{email}</p>"
+            f"<p>新しい申請がありました：{email}</p><p>新規={is_new}</p>"
         )
+        if not ok_admin:
+            _notify_email_failure("beta_apply_admin", admin_email)
 
-    return jsonify({"message": "申請を受け付けました。承認後、ご登録いただいたメールアドレスでサインアップすると、期間中プレミアム機能をご利用いただけます。"})
+    return jsonify({"message": "お申し込みを受け付けました。ご入力いただいたメールアドレスに、ご利用開始の案内をお送りしました。"})
 
 @app.route("/api/beta/survey-shown", methods=["POST"])
 @login_required
@@ -306,6 +370,21 @@ def login():
     session['user_id'] = user['id']
     session['user_email'] = user['email']
     session['user_name'] = user['name']
+
+    # 改修③: 承認済みベータ申請があればログイン時にも付与する。
+    # register()内の判定だけでは、「先に無料で試してから申請した人」や
+    # 「既にアカウントを持っている人」を永久に取りこぼすため。
+    # 付与が発生した場合、レスポンスに古いplanを返さないようuserを再取得する。
+    try:
+        approved = get_approved_beta_application(user['email'])
+        if approved:
+            grant_beta_premium(user['id'], approved['id'], approved['premium_expires_at'])
+            refreshed = get_user_by_id(user['id'])
+            if refreshed:
+                user = refreshed
+    except Exception:
+        pass
+
     app.logger.info(f"[LOGIN] user_id={user['id']} plan={user.get('plan','free')} credits={user.get('credits',0)}")
     return jsonify({"message": "ログイン成功", "user": {
         "id": user['id'], "email": user['email'],

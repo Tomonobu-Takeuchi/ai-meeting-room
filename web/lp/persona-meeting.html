@@ -232,6 +232,10 @@ async function submitBetaApply(ev){
     msg.textContent = data.message || data.error || '送信しました';
     msg.style.display = 'block';
     msg.style.color = res.ok ? '#7CFFB2' : '#FF8A8A';
+    // 改修⑤: 申請成功をGA4イベントとして記録する
+    if (res.ok && typeof gtag === 'function') {
+      gtag('event', 'beta_apply_submit');
+    }
   }catch(e){
     msg.textContent = '送信に失敗しました。時間をおいて再度お試しください。';
     msg.style.display = 'block';
@@ -839,6 +843,18 @@ window.addEventListener("load",function(){
   if(si){ si.addEventListener("load",resizeStrategyMap); }
 });
 window.addEventListener("resize",function(){ resizeAiMeetingMap(); resizeStrategyMap(); resizeStrategyMapOnModal(); });
+</script>
+<script>
+// 改修⑥: YouTube等から付与されたUTMパラメータを、
+// LPからアプリ(/app)へ遷移する際に引き継ぐ。
+// GA4上でLPセッションとアプリセッションを同一流入として扱えるようにするため。
+(function () {
+  var qs = window.location.search;
+  if (!qs) return;
+  document.querySelectorAll('a[href="/app"]').forEach(function (a) {
+    a.href = '/app' + qs;
+  });
+})();
 </script>
 </body>
 </html>
