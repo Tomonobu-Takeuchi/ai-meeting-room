@@ -611,10 +611,15 @@ async function init() {
       if (e.target.id === 'loginBtnHeader') openAuthModal();
       if (e.target.id === 'loginSubmitBtn') submitLogin();
       if (e.target.id === 'registerSubmitBtn') submitRegister();
+      // 改修⑯: パスワード再設定
+      if (e.target.id === 'passwordResetSubmitBtn') submitPasswordResetRequest();
+      if (e.target.id === 'passwordResetConfirmBtn') submitPasswordResetConfirm();
     });
     // Enterキーでサブミット
     $('loginPassword')?.addEventListener('keydown', e => { if (e.key === 'Enter') submitLogin(); });
     $('registerPassword')?.addEventListener('keydown', e => { if (e.key === 'Enter') submitRegister(); });
+    $('passwordResetEmail')?.addEventListener('keydown', e => { if (e.key === 'Enter') submitPasswordResetRequest(); });
+    $('newPasswordConfirm')?.addEventListener('keydown', e => { if (e.key === 'Enter') submitPasswordResetConfirm(); });
     // モーダル外クリックで閉じる
     $('authModalOverlay')?.addEventListener('click', e => { if (e.target === $('authModalOverlay')) closeAuthModal(); });
     DOM.cancelAddPersona?.addEventListener('click', closeAddModal);
@@ -747,6 +752,9 @@ async function init() {
   window.addEventListener('beforeunload', e => {
     if (State.sessionId) { e.preventDefault(); e.returnValue = ''; }
   });
+
+  // 改修⑮-2⑯: URLパラメータに応じた入口の出し分け
+  handleEntryParams();
 }
 
 // ===== カテゴリ選択モーダル =====
@@ -4085,14 +4093,151 @@ function startFree() {
   }
 }
 
-function showLoginPanel() {
-  $('loginPanel').classList.remove('hidden');
-  $('registerPanel').classList.add('hidden');
+// 改修⑯: パネルが4種類になったため、共通の切替関数に集約する。
+// 個別に hidden を付け外しすると、追加時の付け忘れでパネルが
+// 二重表示される事故が起きるため。
+const AUTH_PANELS = ['loginPanel', 'registerPanel', 'passwordResetPanel', 'passwordResetConfirmPanel'];
+
+function showAuthPanel(target) {
+  AUTH_PANELS.forEach(function (id) {
+    const el = $(id);
+    if (!el) return;
+    if (id === target) el.classList.remove('hidden');
+    else el.classList.add('hidden');
+  });
 }
 
-function showRegisterPanel() {
-  $('loginPanel').classList.add('hidden');
-  $('registerPanel').classList.remove('hidden');
+function showLoginPanel() { showAuthPanel('loginPanel'); }
+function showRegisterPanel() { showAuthPanel('registerPanel'); }
+function showPasswordResetPanel() { showAuthPanel('passwordResetPanel'); }
+function showPasswordResetConfirmPanel() { showAuthPanel('passwordResetConfirmPanel'); }
+
+function switchToLoginWith(email) {
+  showLoginPanel();
+  $('loginEmail').value = email;
+  $('loginPassword').value = '';
+  $('loginPassword').focus();
+}
+
+function switchToRegisterWith(email) {
+  showRegisterPanel();
+  $('registerEmail').value = email;
+  $('registerPassword').focus();
+}
+
+// 改修⑮-2⑯: URLパラメータに応じた入口の出し分け
+async function handleEntryParams() {
+  const params = new URLSearchParams(location.search);
+  const resetToken = params.get('reset');
+  const betaMode = params.get('beta');
+  const betaToken = params.get('t');
+
+  // パスワード再設定リンクから来た場合
+  if (resetToken) {
+    try {
+      const res = await fetch('/api/auth/password-reset-verify?t=' + encodeURIComponent(resetToken));
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'リンクが無効です');
+      openAuthModal();
+      showPasswordResetConfirmPanel();
+      $('passwordResetConfirmEmail').textContent = data.email + ' のパスワードを設定します';
+      window.__resetToken = resetToken;
+    } catch (e) {
+      openAuthModal();
+      showPasswordResetPanel();
+      $('passwordResetError').textContent =
+        'リンクが無効か、有効期限が切れています。お手数ですが再度お手続きください。';
+    }
+    return;
+  }
+
+  // ベータ案内メールから来た場合
+  if (betaMode === 'new' || betaMode === 'login') {
+    openAuthModal();
+    let email = '';
+    if (betaToken) {
+      try {
+        const res = await fetch('/api/beta/resolve-token?t=' + encodeURIComponent(betaToken));
+        const data = await res.json();
+        if (res.ok) email = data.email || '';
+      } catch (e) { /* トークンが無効でも画面は出す。手入力で進めるため */ }
+    }
+
+    const banner = $('betaOnboardBanner');
+    const text = $('betaOnboardText');
+    if (banner && text) {
+      banner.classList.remove('hidden');
+      text.textContent = email
+        ? '申請いただいた ' + email + ' で手続きすると、Premium機能が自動で有効になります。'
+        : '申請したメールアドレスで手続きすると、Premium機能が自動で有効になります。';
+    }
+
+    if (betaMode === 'new') {
+      showRegisterPanel();
+      if (email) {
+        $('registerEmail').value = email;
+        // 改修⑰: トークンで確認済みのアドレスを変更させない。
+        // 申請と異なるアドレスで登録して付与されない事故を防ぐ。
+        $('registerEmail').readOnly = true;
+        $('registerEmail').style.opacity = '0.75';
+      }
+    } else {
+      showLoginPanel();
+      if (email) {
+        $('loginEmail').value = email;
+        $('loginEmail').readOnly = true;
+        $('loginEmail').style.opacity = '0.75';
+      }
+    }
+  }
+}
+
+// 改修⑯
+async function submitPasswordResetRequest() {
+  const email = $('passwordResetEmail').value.trim();
+  const err = $('passwordResetError');
+  const msg = $('passwordResetMsg');
+  err.textContent = '';
+  msg.style.display = 'none';
+  if (!email || email.indexOf('@') === -1) {
+    err.textContent = '正しいメールアドレスを入力してください';
+    return;
+  }
+  try {
+    const res = await fetch('/api/auth/password-reset-request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '送信に失敗しました');
+    msg.textContent = data.message;
+    msg.style.display = 'block';
+  } catch (e) {
+    err.textContent = e.message;
+  }
+}
+
+async function submitPasswordResetConfirm() {
+  const pw = $('newPassword').value.trim();
+  const pw2 = $('newPasswordConfirm').value.trim();
+  const err = $('passwordResetConfirmError');
+  err.textContent = '';
+  if (pw.length < 6) { err.textContent = 'パスワードは6文字以上にしてください'; return; }
+  if (pw !== pw2) { err.textContent = 'パスワードが一致しません'; return; }
+  try {
+    const res = await fetch('/api/auth/password-reset-confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: window.__resetToken, password: pw })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '変更に失敗しました');
+    showToast(data.message, 'success');
+    showLoginPanel();
+  } catch (e) {
+    err.textContent = e.message;
+  }
 }
 
 async function submitLogin() {
@@ -4132,8 +4277,23 @@ async function submitLogin() {
     // ペルソナを再読み込み（ユーザー固有のペルソナを反映）
     await reloadPersonas();
     if (!localStorage.getItem('guide_shown')) showGuideModal();
+    // 改修⑱: ベータ経由でPremiumになったことを明示する。
+    // 表示されない＝付与されていない、と本人が気づけるようにするため。
+    if (data.user && data.user.plan === 'premium' && data.user.is_beta_comp) {
+      const until = data.user.plan_expires_at ? String(data.user.plan_expires_at).slice(0, 10) : '';
+      showToast('Premium機能が有効になりました' + (until ? '（' + until + 'まで）' : ''), 'success');
+    }
   } catch (e) {
-    $('loginError').textContent = translateApiError(e.message, 'ログイン');
+    // 改修⑮-3: サーバーは「メールアドレスまたはパスワードが違います」のみを返し、
+    // アカウント未登録とパスワード誤りを区別しない（アカウント有無の推測を防ぐ設計）。
+    // そのため原因を判定せず、失敗時は一律で新規登録への導線を添える。
+    const loginEmailVal = $('loginEmail').value.trim();
+    const errEl3 = $('loginError');
+    errEl3.innerHTML =
+      translateApiError(e.message, 'ログイン') + '<br>' +
+      'アカウントをお持ちでない場合は ' +
+      '<a onclick="switchToRegisterWith(\'' + loginEmailVal.replace(/'/g, "\\'") + '\')" ' +
+      'style="text-decoration:underline;cursor:pointer;">新規登録</a>へ';
   } finally {
     const btn = $('loginSubmitBtn');
     if (btn) { btn.textContent = 'ログイン'; btn.disabled = false; }
@@ -4187,8 +4347,26 @@ async function submitRegister() {
     showToast(`登録完了！${data.user.name || data.user.email} でログインしました`, 'success');
     await reloadPersonas();
     if (!localStorage.getItem('guide_shown')) showGuideModal();
+    // 改修⑱: ベータ経由でPremiumになったことを明示する。
+    // 表示されない＝付与されていない、と本人が気づけるようにするため。
+    if (data.user && data.user.plan === 'premium' && data.user.is_beta_comp) {
+      const until = data.user.plan_expires_at ? String(data.user.plan_expires_at).slice(0, 10) : '';
+      showToast('Premium機能が有効になりました' + (until ? '（' + until + 'まで）' : ''), 'success');
+    }
   } catch (e) {
-    $('registerError').textContent = translateApiError(e.message, '登録');
+    // 改修⑮-3: 「すでに登録されています」の場合、その場でログインへ移れるようにする。
+    // 利用者に自分が新規か既存かを判断させず、間違えても1クリックで復帰できる形にする。
+    const msg = translateApiError(e.message, '登録');
+    const errEl2 = $('registerError');
+    if (msg.indexOf('すでに登録されています') !== -1) {
+      const em = $('registerEmail').value.trim();
+      errEl2.innerHTML =
+        'このメールアドレスはすでに登録されています。<br>' +
+        '<a onclick="switchToLoginWith(\'' + em.replace(/'/g, "\\'") + '\')" ' +
+        'style="text-decoration:underline;cursor:pointer;">このアドレスでログインする</a>';
+    } else {
+      errEl2.textContent = msg;
+    }
   } finally {
     const btn = $('registerSubmitBtn');
     if (btn) { btn.textContent = '登録する'; btn.disabled = false; }

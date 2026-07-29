@@ -3347,6 +3347,211 @@ def test_func51_beta_apply_survives_email_failure():
         conn.close()
 
 
+def test_func52_beta_token_issued_and_stable():
+    section("機能試験52: 申請でトークンが発行され、再申請でも変わらないこと")
+    from src.database import get_connection
+
+    ts = str(int(time.time()))
+    email = f"betatoken_{ts}@test.invalid"
+    conn = get_connection()
+    try:
+        with flask_app.test_client() as c:
+            c.post('/api/beta/apply', json={'email': email})
+            rows1 = conn.run(
+                "SELECT access_token FROM beta_applications WHERE email=:email", email=email)
+            token1 = rows1[0][0]
+            check(bool(token1), "1回目の申請でaccess_tokenが発行される")
+
+            c.post('/api/beta/apply', json={'email': email})
+            rows2 = conn.run(
+                "SELECT access_token FROM beta_applications WHERE email=:email", email=email)
+            token2 = rows2[0][0]
+            check(token2 == token1, "再申請してもaccess_tokenが変わらない")
+    finally:
+        conn.run("DELETE FROM beta_applications WHERE email=:email", email=email)
+        conn.close()
+
+
+def test_func53_beta_resolve_token():
+    section("機能試験53: トークン解決API（有効/無効/空）の確認")
+    from src.database import get_connection
+
+    ts = str(int(time.time()))
+    email = f"betaresolve_{ts}@test.invalid"
+    conn = get_connection()
+    try:
+        with flask_app.test_client() as c:
+            c.post('/api/beta/apply', json={'email': email})
+            rows = conn.run(
+                "SELECT access_token FROM beta_applications WHERE email=:email", email=email)
+            token = rows[0][0]
+
+            r1 = c.get('/api/beta/resolve-token?t=' + token)
+            check_code(r1, 200, "有効なトークン → 200")
+            body1 = r1.get_json() or {}
+            check(body1.get('email') == email, f"正しいメールアドレスが返る (got {body1.get('email')})")
+
+            r2 = c.get('/api/beta/resolve-token?t=invalid_token_xyz')
+            check_code(r2, 404, "無効なトークン → 404")
+            check((r2.get_json() or {}).get('code') == 'INVALID_TOKEN', "code=INVALID_TOKEN")
+
+            r3 = c.get('/api/beta/resolve-token?t=')
+            check_code(r3, 404, "空のトークン → 404（500にならない）")
+    finally:
+        conn.run("DELETE FROM beta_applications WHERE email=:email", email=email)
+        conn.close()
+
+
+def test_func54_password_reset_flow():
+    section("機能試験54: パスワード再設定フロー（要求→verify→confirm→ログイン）")
+    from src.database import get_connection
+
+    ts = str(int(time.time()))
+    email = f"betareset_{ts}@test.invalid"
+    old_pw = "oldpass123"
+    new_pw = "newpass456"
+    uid = None
+    conn = get_connection()
+    try:
+        with flask_app.test_client() as c:
+            r0 = c.post('/api/auth/register',
+                        json={'email': email, 'password': old_pw, 'name': '再設定テスト',
+                              'tos_agreed': True, 'birth_date': '1990-01-01'})
+            check_code(r0, 200, "テスト用ユーザー登録 → 200")
+            uid = ((r0.get_json() or {}).get('user') or {}).get('id')
+
+        with flask_app.test_client() as c2:
+            r1 = c2.post('/api/auth/password-reset-request', json={'email': email})
+            check_code(r1, 200, "パスワード再設定要求 → 200")
+
+        rows = conn.run(
+            "SELECT password_reset_token, password_reset_expires FROM users WHERE id=:id", id=uid)
+        token = rows[0][0]
+        check(bool(token), "DBにpassword_reset_tokenが記録される")
+        check(rows[0][1] is not None, "DBにpassword_reset_expiresが記録される")
+
+        with flask_app.test_client() as c3:
+            r2 = c3.get('/api/auth/password-reset-verify?t=' + token)
+            check_code(r2, 200, "verify → 200")
+            check((r2.get_json() or {}).get('email') == email, "verifyで正しいメールアドレスが返る")
+
+            r3 = c3.post('/api/auth/password-reset-confirm',
+                         json={'token': token, 'password': new_pw})
+            check_code(r3, 200, "confirm → 200")
+
+        with flask_app.test_client() as c4:
+            r_new = c4.post('/api/auth/login', json={'email': email, 'password': new_pw})
+            check_code(r_new, 200, "新パスワードでログイン成功")
+        with flask_app.test_client() as c5:
+            r_old = c5.post('/api/auth/login', json={'email': email, 'password': old_pw})
+            check_code(r_old, 401, "旧パスワードではログイン失敗")
+    finally:
+        if uid:
+            conn.run("DELETE FROM users WHERE id=:id", id=uid)
+        conn.close()
+
+
+def test_func55_password_reset_token_single_use():
+    section("機能試験55: パスワード再設定トークンが使い捨てであること")
+    from src.database import get_connection
+
+    ts = str(int(time.time()))
+    email = f"betaresetonce_{ts}@test.invalid"
+    pw = "testpass123"
+    uid = None
+    conn = get_connection()
+    try:
+        with flask_app.test_client() as c:
+            r0 = c.post('/api/auth/register',
+                        json={'email': email, 'password': pw, 'name': '使い捨てテスト',
+                              'tos_agreed': True, 'birth_date': '1990-01-01'})
+            uid = ((r0.get_json() or {}).get('user') or {}).get('id')
+            c.post('/api/auth/password-reset-request', json={'email': email})
+
+        rows = conn.run("SELECT password_reset_token FROM users WHERE id=:id", id=uid)
+        token = rows[0][0]
+
+        with flask_app.test_client() as c2:
+            r1 = c2.post('/api/auth/password-reset-confirm',
+                         json={'token': token, 'password': 'newpass789'})
+            check_code(r1, 200, "1回目のconfirm → 200")
+
+            r2 = c2.post('/api/auth/password-reset-confirm',
+                         json={'token': token, 'password': 'anotherpass000'})
+            check_code(r2, 404, "同じトークンで2回目のconfirm → 404（使い捨て）")
+    finally:
+        if uid:
+            conn.run("DELETE FROM users WHERE id=:id", id=uid)
+        conn.close()
+
+
+def test_func56_password_reset_no_account_disclosure():
+    section("機能試験56: 存在しないアカウントでもアカウント有無を漏らさないこと")
+    ts = str(int(time.time()))
+    email = f"betanoexist_{ts}@test.invalid"
+    with flask_app.test_client() as c:
+        r = c.post('/api/auth/password-reset-request', json={'email': email})
+        check_code(r, 200, "存在しないアカウントでも200")
+        body = r.get_json() or {}
+        check(body.get('message') == "パスワード再設定用のメールをお送りしました。24時間以内にメール内のリンクからお手続きください。",
+              "存在有無にかかわらず同一のメッセージ")
+
+
+def test_func57_route_c_reset_then_login_grants_premium():
+    section("機能試験57: 道C（既存アカウント→申請→パスワード再設定→ログイン→premium付与）")
+    from src.database import get_connection
+
+    ts = str(int(time.time()))
+    email = f"betaroutec_{ts}@test.invalid"
+    old_pw = "oldpass123"
+    new_pw = "newpass456"
+    uid = None
+    conn = get_connection()
+    try:
+        with flask_app.test_client() as c:
+            # 1. 既存アカウント作成（free）
+            r0 = c.post('/api/auth/register',
+                        json={'email': email, 'password': old_pw, 'name': '道Cテスト',
+                              'tos_agreed': True, 'birth_date': '1990-01-01'})
+            check_code(r0, 200, "既存アカウント作成 → 200")
+            uid = ((r0.get_json() or {}).get('user') or {}).get('id')
+            check(((r0.get_json() or {}).get('user') or {}).get('plan') == 'free',
+                  "この時点ではplan='free'")
+
+            # 2. ベータ申請（パスワード失念という設定のため、申請メール内リンクは使わない）
+            r1 = c.post('/api/beta/apply', json={'email': email})
+            check_code(r1, 200, "ベータ申請 → 200")
+
+        # 3. パスワード再設定
+        with flask_app.test_client() as c2:
+            c2.post('/api/auth/password-reset-request', json={'email': email})
+        rows = conn.run("SELECT password_reset_token FROM users WHERE id=:id", id=uid)
+        token = rows[0][0]
+        with flask_app.test_client() as c3:
+            r2 = c3.post('/api/auth/password-reset-confirm',
+                         json={'token': token, 'password': new_pw})
+            check_code(r2, 200, "パスワード再設定 → 200")
+
+        # 4. 新パスワードでログイン → premium付与されること
+        with flask_app.test_client() as c4:
+            r3 = c4.post('/api/auth/login', json={'email': email, 'password': new_pw})
+            check_code(r3, 200, "新パスワードでログイン → 200")
+            body = r3.get_json() or {}
+            resp_plan = (body.get('user') or {}).get('plan')
+            check(resp_plan == 'premium', f"レスポンスのuser.planが'premium' (got {resp_plan})")
+            check(bool((body.get('user') or {}).get('is_beta_comp')) is True,
+                  "レスポンスにis_beta_comp=Trueが含まれる")
+
+        rows_u = conn.run("SELECT plan, is_beta_comp FROM users WHERE id=:id", id=uid)
+        check(rows_u[0][0] == 'premium', "DB上もplan='premium'")
+        check(bool(rows_u[0][1]) is True, "DB上もis_beta_comp=TRUE")
+    finally:
+        if uid:
+            conn.run("DELETE FROM users WHERE id=:id", id=uid)
+        conn.run("DELETE FROM beta_applications WHERE email=:email", email=email)
+        conn.close()
+
+
 def safe_run(name: str, func, *args):
     """テスト関数を安全に実行。DB接続エラー等は SKIP として記録し継続。"""
     import pg8000.exceptions
@@ -3446,6 +3651,12 @@ if __name__ == '__main__':
             safe_run("機能試験49: 再ログインでの二重付与防止", test_func49_login_no_double_grant)
             safe_run("機能試験50: ベータ申請のない通常ユーザーのログイン回帰確認", test_func50_login_without_beta_application)
             safe_run("機能試験51: メール送信失敗時も申請行が作成されること", test_func51_beta_apply_survives_email_failure)
+            safe_run("機能試験52: 申請トークンの発行と安定性", test_func52_beta_token_issued_and_stable)
+            safe_run("機能試験53: トークン解決APIの確認", test_func53_beta_resolve_token)
+            safe_run("機能試験54: パスワード再設定フロー", test_func54_password_reset_flow)
+            safe_run("機能試験55: パスワード再設定トークンの使い捨て確認", test_func55_password_reset_token_single_use)
+            safe_run("機能試験56: パスワード再設定のアカウント有無非開示確認", test_func56_password_reset_no_account_disclosure)
+            safe_run("機能試験57: 道C（再設定→ログイン→premium付与）", test_func57_route_c_reset_then_login_grants_premium)
     finally:
         cleanup()
 

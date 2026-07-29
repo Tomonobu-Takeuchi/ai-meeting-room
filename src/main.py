@@ -39,6 +39,10 @@ from src.database import (
     get_approved_beta_application,
     grant_beta_premium,
     mark_beta_survey_shown,
+    get_beta_application_by_token,
+    set_password_reset_token,
+    get_user_by_password_reset_token,
+    apply_password_reset,
 )
 from src.scheduler import init_scheduler
 
@@ -189,22 +193,53 @@ def _notify_email_failure(context: str, to_email: str):
         pass
 
 
-def _beta_apply_user_body(expires_label: str) -> str:
-    """改修②: 申請者本人への案内メール本文"""
+def _beta_apply_user_body(expires_label: str, email: str, token: str) -> str:
+    """改修②⑮-1⑰: 申請者本人への案内メール。
+
+    道A（新規登録）と道B（ログイン）でボタンを分け、利用者に
+    「自分がどちらか」を選ばせるだけにする。
+    トークン付きURLにすることで、リンクを踏めた＝そのアドレスを
+    受信できる、という本人確認を兼ねる（改修⑰）。
+    """
+    base = APP_BASE_URL.rstrip('/')
+    url_new = f"{base}/app?beta=new&t={token}"
+    url_login = f"{base}/app?beta=login&t={token}"
     return f"""
 <html>
 <body style="font-family: sans-serif; color: #333; line-height: 1.8;">
   <p>このたびはAI-PERSONA会議室のベータテストにお申し込みいただき、ありがとうございます。</p>
   <p>Premium機能をご利用いただける状態になりました。<br>
-  下記からこのメールアドレスでアカウントを作成してください。<br>
-  すでにアカウントをお持ちの場合は、そのままログインしていただければ自動で切り替わります。</p>
-  <p style="margin:24px 0;">
-    <a href="https://ai-paradise.net/app"
+  下記のうち、<strong>あてはまる方</strong>を選んでお進みください。</p>
+
+  <div style="border:1px solid #ddd;border-radius:8px;padding:16px;margin:20px 0;">
+    <p style="margin:0 0 8px;font-weight:bold;">■ はじめてご利用の方</p>
+    <p style="margin:0 0 12px;font-size:14px;">
+      下のボタンから、このメールアドレス（<strong>{email}</strong>）でアカウントを作成してください。<br>
+      登録が完了した瞬間から、Premium機能が使えます。
+    </p>
+    <a href="{url_new}"
        style="background:#7C3AED;color:#fff;padding:12px 24px;border-radius:6px;
               text-decoration:none;font-weight:bold;display:inline-block;">
-      アカウント作成・ログイン
+      アカウントを作成する
     </a>
-  </p>
+  </div>
+
+  <div style="border:1px solid #ddd;border-radius:8px;padding:16px;margin:20px 0;">
+    <p style="margin:0 0 8px;font-weight:bold;">■ すでにアカウントをお持ちの方</p>
+    <p style="margin:0 0 12px;font-size:14px;">
+      下のボタンからログインしてください。<br>
+      ログインした瞬間に、Premium機能へ切り替わります。
+    </p>
+    <a href="{url_login}"
+       style="background:#4B5563;color:#fff;padding:12px 24px;border-radius:6px;
+              text-decoration:none;font-weight:bold;display:inline-block;">
+      ログインする
+    </a>
+    <p style="margin:12px 0 0;font-size:13px;color:#666;">
+      ※パスワードをお忘れの場合は、ログイン画面の「パスワードをお忘れですか」からお手続きください。
+    </p>
+  </div>
+
   <p><strong>ご利用いただける機能</strong><br>
   ・会議の開催回数：無制限<br>
   ・ペルソナ：無制限<br>
@@ -235,14 +270,15 @@ def apply_beta_premium():
     expires_label = os.environ.get("BETA1_PREMIUM_EXPIRES_LABEL", "2026年8月31日")
 
     # 改修⑬: 既に申請済みなら行は増えない（is_new=False）
-    is_new = create_beta_application(email, expires)
+    # 改修⑰: 本人確認トークンを取得する（新規・既存いずれの場合も返る）
+    is_new, access_token = create_beta_application(email, expires)
 
     # 改修②: 申請者本人への案内。再申請時も案内は再送する
     # （前回のメールを紛失した人が再度申請するケースを救うため）
     ok_user = send_email(
         email,
         "【AI-PERSONA会議室】ベータ1 Premium体験のご案内",
-        _beta_apply_user_body(expires_label)
+        _beta_apply_user_body(expires_label, email, access_token)
     )
     if not ok_user:
         _notify_email_failure("beta_apply_user", email)
@@ -258,7 +294,127 @@ def apply_beta_premium():
         if not ok_admin:
             _notify_email_failure("beta_apply_admin", admin_email)
 
-    return jsonify({"message": "お申し込みを受け付けました。ご入力いただいたメールアドレスに、ご利用開始の案内をお送りしました。"})
+    # 改修⑱: 入力アドレスを返し、LP側で表示させる。
+    # 打ち間違いに本人が気づけるようにするため。
+    return jsonify({
+        "message": f"お申し込みを受け付けました。{email} 宛に、ご利用開始の案内をお送りしました。",
+        "email": email
+    })
+
+
+@app.route("/api/beta/resolve-token", methods=["GET"])
+@limiter.limit("30 per hour")
+def beta_resolve_token():
+    """改修⑰: 案内メールのトークンから、申請時のメールアドレスを返す。
+
+    フロント側でメールアドレス欄を自動入力・変更不可にするために使う。
+    トークンは推測困難な32バイトのURL-safe文字列であり、
+    これを保持していること自体が、当該アドレスの受信者である証拠となる。
+    """
+    token = request.args.get("t", "").strip()
+    app_row = get_beta_application_by_token(token)
+    if not app_row:
+        return jsonify({"error": "リンクが無効です", "code": "INVALID_TOKEN"}), 404
+    return jsonify({
+        "email": app_row["email"],
+        "already_granted": app_row["granted_at"] is not None
+    })
+
+
+def _password_reset_body(reset_url: str) -> str:
+    """改修⑯: パスワード再設定案内メールの本文"""
+    return f"""
+<html>
+<body style="font-family: sans-serif; color: #333; line-height: 1.8;">
+  <p>パスワード再設定のご依頼を受け付けました。</p>
+  <p>下のボタンから、新しいパスワードを設定してください。<br>
+  このリンクは<strong>24時間</strong>有効です。</p>
+  <p style="margin:24px 0;">
+    <a href="{reset_url}"
+       style="background:#7C3AED;color:#fff;padding:12px 24px;border-radius:6px;
+              text-decoration:none;font-weight:bold;display:inline-block;">
+      パスワードを再設定する
+    </a>
+  </p>
+  <p style="color:#888;font-size:12px;margin-top:32px;">
+    このメールに心当たりがない場合は、破棄してください。<br>
+    パスワードは変更されません。<br>
+    AI-PERSONA会議室 / info@ai-paradise.net
+  </p>
+</body>
+</html>
+"""
+
+
+@app.route("/api/auth/password-reset-request", methods=["POST"])
+@limiter.limit("3 per hour;10 per day")
+def password_reset_request():
+    """改修⑯: パスワード再設定の要求。
+
+    セキュリティ上、アカウントの存在有無にかかわらず同一のメッセージを返す。
+    「このアドレスは登録済み」という情報を外部に漏らさないため。
+    """
+    data = request.json or {}
+    email = data.get("email", "").strip().lower()
+    if not email or "@" not in email:
+        return jsonify({"error": "正しいメールアドレスを入力してください"}), 400
+
+    token = secrets.token_urlsafe(32)
+    exists = set_password_reset_token(email, token, hours=24)
+
+    if exists:
+        reset_url = f"{APP_BASE_URL.rstrip('/')}/app?reset={token}"
+        ok = send_email(
+            email,
+            "【AI-PERSONA会議室】パスワード再設定のご案内",
+            _password_reset_body(reset_url)
+        )
+        if not ok:
+            _notify_email_failure("password_reset", email)
+
+    # アカウントの有無を問わず同じ応答を返す
+    return jsonify({
+        "message": "パスワード再設定用のメールをお送りしました。24時間以内にメール内のリンクからお手続きください。"
+    })
+
+
+@app.route("/api/auth/password-reset-verify", methods=["GET"])
+@limiter.limit("30 per hour")
+def password_reset_verify():
+    """改修⑯: 再設定トークンの有効性を確認する（画面表示前のチェック用）。"""
+    token = request.args.get("t", "").strip()
+    user = get_user_by_password_reset_token(token)
+    if not user:
+        return jsonify({"error": "リンクが無効か、有効期限が切れています", "code": "INVALID_TOKEN"}), 404
+    return jsonify({"email": user["email"]})
+
+
+@app.route("/api/auth/password-reset-confirm", methods=["POST"])
+@limiter.limit("5 per hour")
+def password_reset_confirm():
+    """改修⑯: 新しいパスワードを確定する。
+
+    完了時にトークンを無効化し、既存セッションも破棄する。
+    第三者がログイン中であった場合に追い出すため。
+    """
+    data = request.json or {}
+    token = data.get("token", "").strip()
+    new_password = data.get("password", "").strip()
+
+    if len(new_password) < 6:
+        return jsonify({"error": "パスワードは6文字以上にしてください"}), 400
+
+    user = get_user_by_password_reset_token(token)
+    if not user:
+        return jsonify({"error": "リンクが無効か、有効期限が切れています", "code": "INVALID_TOKEN"}), 404
+
+    password_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    apply_password_reset(user["id"], password_hash)
+
+    # 既存セッションを破棄する
+    session.clear()
+
+    return jsonify({"message": "パスワードを変更しました。新しいパスワードでログインしてください。"})
 
 @app.route("/api/beta/survey-shown", methods=["POST"])
 @login_required
@@ -395,6 +551,7 @@ def login():
         "plan_expires_at": user.get('plan_expires_at'),
         "trial_layer2_used": bool(user.get('trial_layer2_used') or False),
         "trial_layer3_used": bool(user.get('trial_layer3_used') or False),
+        "is_beta_comp": bool(user.get('is_beta_comp') or False),
     }})
 
 @app.route("/api/auth/logout", methods=["POST"])
