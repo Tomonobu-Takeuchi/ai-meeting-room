@@ -321,6 +321,63 @@ def beta_resolve_token():
     })
 
 
+@app.route("/api/beta/claim", methods=["POST"])
+@login_required
+@limiter.limit("10 per hour")
+def beta_claim():
+    """改修⑲: ログイン済みユーザーが、案内メールのトークンを提示して
+    Premium付与を受け取る。
+
+    背景: 付与は register() と login() の中でしか起きないため、
+    「すでにログイン済みの状態で案内メールのリンクを開いた人」は
+    一度ログアウトして入り直さない限り付与されなかった。
+
+    安全設計: ログイン中のアカウントのメールアドレスと、トークンが指す
+    申請のメールアドレスが一致する場合のみ付与する。不一致の場合は
+    400を返し、どのアドレスで手続きすべきかを明示する。
+    これにより、フロント側で取り違えが起きてもサーバー側で必ず止まる。
+    """
+    data = request.json or {}
+    token = (data.get("token") or "").strip()
+
+    app_row = get_beta_application_by_token(token)
+    if not app_row:
+        return jsonify({"error": "リンクが無効です", "code": "INVALID_TOKEN"}), 404
+
+    user = get_user_by_id(session.get('user_id'))
+    if not user:
+        return jsonify({"error": "ログインが必要です"}), 401
+
+    # 最終防衛: ログイン中のアドレスと申請アドレスの一致を必須とする
+    if (user.get('email') or '').strip().lower() != (app_row['email'] or '').strip().lower():
+        return jsonify({
+            "error": f"このご案内は {app_row['email']} 宛のものです。そのメールアドレスでログインしてください。",
+            "code": "EMAIL_MISMATCH",
+            "expected_email": app_row['email'],
+            "current_email": user.get('email')
+        }), 400
+
+    # 既に付与済みなら何もしない（granted_at IS NULL 条件は grant 側にある）
+    if app_row['granted_at'] is not None:
+        return jsonify({
+            "message": "すでにPremium機能が有効です",
+            "already_granted": True,
+            "plan": user.get('plan'),
+            "plan_expires_at": user.get('plan_expires_at')
+        })
+
+    grant_beta_premium(user['id'], app_row['id'], app_row['premium_expires_at'])
+    refreshed = get_user_by_id(user['id']) or user
+
+    return jsonify({
+        "message": "Premium機能が有効になりました",
+        "already_granted": False,
+        "plan": refreshed.get('plan'),
+        "is_beta_comp": bool(refreshed.get('is_beta_comp') or False),
+        "plan_expires_at": refreshed.get('plan_expires_at')
+    })
+
+
 def _password_reset_body(reset_url: str) -> str:
     """改修⑯: パスワード再設定案内メールの本文"""
     return f"""

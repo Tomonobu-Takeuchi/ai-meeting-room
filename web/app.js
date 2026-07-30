@@ -614,6 +614,8 @@ async function init() {
       // 改修⑯: パスワード再設定
       if (e.target.id === 'passwordResetSubmitBtn') submitPasswordResetRequest();
       if (e.target.id === 'passwordResetConfirmBtn') submitPasswordResetConfirm();
+      // 改修⑲: 別アカウントでログイン中の場合の切替
+      if (e.target.id === 'betaSwitchAccountBtn') betaSwitchAccount();
     });
     // Enterキーでサブミット
     $('loginPassword')?.addEventListener('keydown', e => { if (e.key === 'Enter') submitLogin(); });
@@ -2672,8 +2674,40 @@ async function endMeeting() {
 
 // BETA1-SURVEY-POPUP: is_beta_compユーザーに対し、初回会議終了時と継続議論終了時、
 // それぞれ1回だけアンケートポップアップを表示する
-const BETA_SURVEY_FORM_URL_FIRST = 'https://docs.google.com/forms/d/e/1FAIpQLSecBwUlb6A98iFrH878WyagFaEeO4TkgR3cXSea1mXzY0WqbQ/viewform';
-const BETA_SURVEY_FORM_URL_CONTINUATION = 'https://docs.google.com/forms/d/e/1FAIpQLSeIR8pUBntoqgvgvgNUnFS2F-Z_9-2pnIRUy2nszOVmZbdr6A/viewform';
+// 改修④: 2026/7/30、アンケートフォームを個人Googleアカウントから
+// AI-Persona会議室のビジネスアカウントへ移行したため、フォームIDを差し替えた。
+// 旧URL（個人アカウント側）に回答が集まらないよう、必ず両方を更新すること。
+const BETA_SURVEY_FORM_URL_FIRST = 'https://docs.google.com/forms/d/e/1FAIpQLSc5ThHW9eKRoujfCP5dqshUHWoyeasQeSDuWRrGgNMDustWNg/viewform';
+const BETA_SURVEY_FORM_URL_CONTINUATION = 'https://docs.google.com/forms/d/e/1FAIpQLSeIfZKP-m5pVNpdMxKOmrRJFzjYcLK0rYe_s1Q2ZvKmG4jDJw/viewform';
+
+// 改修④: 「整理番号（自動入力・変更不要）」設問のentry ID。
+// Googleフォームの「フォームに事前入力する」機能で取得した値（2026/7/30時点）。
+// フォームの設問を作り直すとIDが変わるため、変更時はここも更新すること。
+const BETA_SURVEY_ENTRY_ID_FIRST = '1166068480';
+const BETA_SURVEY_ENTRY_ID_CONTINUATION = '200225061';
+
+// 改修④: アンケートURLに利用者IDを事前入力する。
+//
+// 目的: 回答が誰のものか特定できるようにする。これがないと、
+//   ・Q10で継続意向を示した人への案内が送れない
+//   ・継続議論を使った人の評価だけを抽出できない
+//   ・未回答者にリマインドできない
+// となり、ベータ1の主目的（100名獲得とベータ2転換）が測定不能になる。
+//
+// メールアドレスではなくユーザーIDを渡す理由:
+//   ・個人情報をGoogle側へ持ち出さずに済む
+//   ・こちら側では SELECT * FROM users WHERE id = ? で必要な情報を引ける
+//   ・回答者が見ても意味が分からない値なので、書き換える動機が生まれにくい
+//
+// IDが取得できない場合はパラメータを付けずに返す。
+// 紐付けはできなくなるが、アンケート自体は回答できる状態を優先する。
+function buildBetaSurveyUrl(isContinuation) {
+  const base = isContinuation ? BETA_SURVEY_FORM_URL_CONTINUATION : BETA_SURVEY_FORM_URL_FIRST;
+  const entryId = isContinuation ? BETA_SURVEY_ENTRY_ID_CONTINUATION : BETA_SURVEY_ENTRY_ID_FIRST;
+  const uid = State.currentUser && State.currentUser.id;
+  if (!uid || !entryId) return base;
+  return base + '?usp=pp_url&entry.' + entryId + '=' + encodeURIComponent(String(uid));
+}
 
 function maybeShowBetaSurveyPopup() {
   const isContinuation = State.isCurrentMeetingContinuation;
@@ -2685,7 +2719,7 @@ function maybeShowBetaSurveyPopup() {
   const title = document.getElementById('betaSurveyModalTitle');
   if (!modal || !link) return;
 
-  link.href = isContinuation ? BETA_SURVEY_FORM_URL_CONTINUATION : BETA_SURVEY_FORM_URL_FIRST;
+  link.href = buildBetaSurveyUrl(isContinuation);
   link.onclick = () => markBetaSurveyShown(isContinuation);
   if (title) title.textContent = isContinuation ? '継続議論のご感想をお聞かせください' : 'アンケートにご協力ください';
   modal.classList.remove('hidden');
@@ -4153,7 +4187,6 @@ async function handleEntryParams() {
 
   // ベータ案内メールから来た場合
   if (betaMode === 'new' || betaMode === 'login') {
-    openAuthModal();
     let email = '';
     if (betaToken) {
       try {
@@ -4163,33 +4196,118 @@ async function handleEntryParams() {
       } catch (e) { /* トークンが無効でも画面は出す。手入力で進めるため */ }
     }
 
+    // 改修⑲: 以降の処理でメールアドレスを入力欄から読まず、
+    // トークンで確定した値を使うために保持する。
+    window.__betaContext = { token: betaToken || '', email: email, mode: betaMode };
+
     const banner = $('betaOnboardBanner');
+    const title = $('betaOnboardTitle');
     const text = $('betaOnboardText');
-    if (banner && text) {
+    const actions = $('betaOnboardActions');
+
+    // 改修⑲: A7で確認済みのとおり、この時点で State.currentUser は確定している。
+    // ログイン済みの場合、認証モーダルを無条件で開くと
+    // 「別アカウントのままログインし直す」事故が起きるため、状態で分岐する。
+    const cu = State.currentUser;
+    if (cu && cu.email) {
+      const same = String(cu.email).trim().toLowerCase() === String(email).trim().toLowerCase();
+
+      if (same && betaToken) {
+        // 申請アドレスでログイン中 → その場で付与を受け取る（モーダルは開かない）
+        try {
+          const res = await fetch('/api/beta/claim', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: betaToken })
+          });
+          const data = await res.json();
+          if (res.ok) {
+            if (typeof checkAuthStatus === 'function') await checkAuthStatus();
+            const until = data.plan_expires_at ? String(data.plan_expires_at).slice(0, 10) : '';
+            showToast(
+              (data.already_granted ? 'すでにPremium機能が有効です' : 'Premium機能が有効になりました')
+              + (until ? '（' + until + 'まで）' : ''),
+              'success'
+            );
+          } else {
+            showToast(data.error || 'Premiumの有効化に失敗しました', 'error');
+          }
+        } catch (e) {
+          showToast('Premiumの有効化に失敗しました', 'error');
+        }
+        return;
+      }
+
+      if (!same && email) {
+        // 別アカウントでログイン中 → 自動ログアウトはせず、本人に選ばせる
+        openAuthModal();
+        showLoginPanel();
+        if (banner && title && text && actions) {
+          banner.classList.remove('hidden');
+          title.textContent = 'ログイン中のアカウントが異なります';
+          text.innerHTML =
+            '現在 <strong>' + escapeHtml(cu.email) + '</strong> でログイン中です。<br>' +
+            'ベータ1のお申し込みは <strong>' + escapeHtml(email) + '</strong> です。<br>' +
+            '下のボタンでログアウトし、申込アドレスで手続きしてください。';
+          actions.classList.remove('hidden');
+        }
+        return;
+      }
+    }
+
+    // ここから先は未ログイン、またはトークン解決に失敗した場合
+    openAuthModal();
+    if (banner && title && text) {
       banner.classList.remove('hidden');
+      title.textContent = 'ベータ1へのお申し込みありがとうございます';
       text.textContent = email
         ? '申請いただいた ' + email + ' で手続きすると、Premium機能が自動で有効になります。'
         : '申請したメールアドレスで手続きすると、Premium機能が自動で有効になります。';
+      if (actions) actions.classList.add('hidden');
     }
 
     if (betaMode === 'new') {
       showRegisterPanel();
-      if (email) {
-        $('registerEmail').value = email;
-        // 改修⑰: トークンで確認済みのアドレスを変更させない。
-        // 申請と異なるアドレスで登録して付与されない事故を防ぐ。
-        $('registerEmail').readOnly = true;
-        $('registerEmail').style.opacity = '0.75';
-      }
+      applyBetaFixedEmail('register', email);
     } else {
       showLoginPanel();
-      if (email) {
-        $('loginEmail').value = email;
-        $('loginEmail').readOnly = true;
-        $('loginEmail').style.opacity = '0.75';
-      }
+      applyBetaFixedEmail('login', email);
     }
   }
+}
+
+// 改修⑲: メールアドレスを入力欄ではなく固定テキストにする。
+// readOnly ではパスワードマネージャーによる上書きを防げないため、
+// 入力欄そのものを画面から外す。
+function applyBetaFixedEmail(kind, email) {
+  const inputId = kind === 'register' ? 'registerEmail' : 'loginEmail';
+  const fixedId = kind === 'register' ? 'registerBetaEmailFixed' : 'loginBetaEmailFixed';
+  const textId = kind === 'register' ? 'registerBetaEmailText' : 'loginBetaEmailText';
+  const input = $(inputId);
+  const fixed = $(fixedId);
+  const text = $(textId);
+  if (!email || !input || !fixed || !text) return;
+  text.textContent = email;
+  fixed.classList.remove('hidden');
+  input.classList.add('hidden');
+  input.value = email;   // 既存の送信処理が値を読む場合に備えて保持する
+}
+
+// 改修⑲: HTMLに埋め込む前のエスケープ。
+// メールアドレスは外部入力であり、innerHTML に直接入れないため。
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// 改修⑲: 別アカウントでログイン中だった場合の切替
+async function betaSwitchAccount() {
+  try {
+    await fetch('/api/auth/logout', { method: 'POST' });
+  } catch (e) { /* 失敗してもリロードで再取得されるため無視 */ }
+  // URLはそのまま維持し、未ログイン状態で再度この導線に入り直す
+  location.reload();
 }
 
 // 改修⑯
@@ -4241,7 +4359,11 @@ async function submitPasswordResetConfirm() {
 }
 
 async function submitLogin() {
-  const email = $('loginEmail').value.trim();
+  // 改修⑲: ベータ経由の場合、入力欄ではなくトークンで確定したアドレスを使う。
+  // パスワードマネージャーが入力欄を書き換えても、送信先が変わらないようにするため。
+  const email = (window.__betaContext && window.__betaContext.email)
+    ? window.__betaContext.email
+    : $('loginEmail').value.trim();
   const password = $('loginPassword').value.trim();
   const errEl = $('loginError');
   if (!email || !password) { errEl.textContent = 'メールアドレスとパスワードを入力してください'; return; }
@@ -4302,7 +4424,10 @@ async function submitLogin() {
 
 async function submitRegister() {
   const name = $('registerName').value.trim();
-  const email = $('registerEmail').value.trim();
+  // 改修⑲: ベータ経由の場合、入力欄ではなくトークンで確定したアドレスを使う。
+  const email = (window.__betaContext && window.__betaContext.email)
+    ? window.__betaContext.email
+    : $('registerEmail').value.trim();
   const password = $('registerPassword').value.trim();
   const errEl = $('registerError');
   if (!email || !password) { errEl.textContent = 'メールアドレスとパスワードを入力してください'; return; }
