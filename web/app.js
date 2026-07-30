@@ -4293,14 +4293,6 @@ function applyBetaFixedEmail(kind, email) {
   input.value = email;   // 既存の送信処理が値を読む場合に備えて保持する
 }
 
-// 改修⑲: HTMLに埋め込む前のエスケープ。
-// メールアドレスは外部入力であり、innerHTML に直接入れないため。
-function escapeHtml(s) {
-  return String(s == null ? '' : s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
 // 改修⑲: 別アカウントでログイン中だった場合の切替
 async function betaSwitchAccount() {
   try {
