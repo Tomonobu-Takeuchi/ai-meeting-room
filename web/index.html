@@ -1735,16 +1735,31 @@
     <div id="betaOnboardBanner" class="hidden"
          style="background:#2d1b4e;border:1px solid #7C3AED;border-radius:8px;
                 padding:12px 14px;margin-bottom:16px;font-size:13px;line-height:1.6;">
-      <div style="font-weight:bold;color:#c4b5fd;margin-bottom:4px;">
+      <div id="betaOnboardTitle" style="font-weight:bold;color:#c4b5fd;margin-bottom:4px;">
         ベータ1へのお申し込みありがとうございます
       </div>
       <div id="betaOnboardText" style="color:#d8d8e8;"></div>
+      <!-- 改修⑲: 別アカウントでログイン中の場合の切替導線 -->
+      <div id="betaOnboardActions" class="hidden" style="margin-top:10px;">
+        <button id="betaSwitchAccountBtn" class="auth-btn"
+                style="margin:0;padding:8px 14px;font-size:13px;">
+          ログアウトして切り替える
+        </button>
+      </div>
     </div>
     <!-- ログイン画面 -->
     <div id="loginPanel">
       <h2>🔑 ログイン</h2>
       <p>ログインすると学習データがアカウントに紐付けられます</p>
       <div class="auth-error" id="loginError"></div>
+      <!-- 改修⑲: ベータ経由時はメールアドレスを入力欄ではなく固定表示にする。
+           入力欄が存在しなければパスワードマネージャーが上書きできないため。 -->
+      <div id="loginBetaEmailFixed" class="hidden"
+           style="background:var(--bg2);border:1px solid #1e3a5f;border-radius:8px;
+                  padding:10px 12px;margin-bottom:8px;font-size:14px;color:var(--text-primary);">
+        <span style="font-size:11px;color:var(--text-muted);display:block;">メールアドレス</span>
+        <span id="loginBetaEmailText"></span>
+      </div>
       <input class="auth-input" type="email" id="loginEmail" placeholder="メールアドレス" />
       <input class="auth-input" type="password" id="loginPassword" placeholder="パスワード" />
       <div style="display:flex;align-items:center;gap:8px;margin:4px 0 8px;font-size:12px;color:var(--text-secondary);">
@@ -1762,6 +1777,14 @@
       <p>無料で始められます。登録するとデータが保存されます</p>
       <div class="auth-error" id="registerError"></div>
       <input class="auth-input" type="text" id="registerName" placeholder="お名前（任意）" />
+      <!-- 改修⑲: ベータ経由時はメールアドレスを入力欄ではなく固定表示にする。
+           入力欄が存在しなければパスワードマネージャーが上書きできないため。 -->
+      <div id="registerBetaEmailFixed" class="hidden"
+           style="background:var(--bg2);border:1px solid #1e3a5f;border-radius:8px;
+                  padding:10px 12px;margin-bottom:8px;font-size:14px;color:var(--text-primary);">
+        <span style="font-size:11px;color:var(--text-muted);display:block;">メールアドレス</span>
+        <span id="registerBetaEmailText"></span>
+      </div>
       <input class="auth-input" type="email" id="registerEmail" placeholder="メールアドレス" />
       <input class="auth-input" type="password" id="registerPassword" placeholder="パスワード（6文字以上）" />
       <label style="display:block;font-size:12px;color:var(--text-secondary);margin:8px 0 2px;">生年月日（必須・14歳未満不可／14〜17歳は保護者の同意が必要です）</label>

@@ -3552,6 +3552,140 @@ def test_func57_route_c_reset_then_login_grants_premium():
         conn.close()
 
 
+def test_func58_beta_claim_requires_login():
+    section("機能試験58: 未ログインでPOST /api/beta/claimが401になること")
+    with flask_app.test_client() as c:
+        r = c.post('/api/beta/claim', json={'token': 'dummy'})
+        check_code(r, 401, "未ログインでのclaim → 401")
+
+
+def test_func59_beta_claim_grants_and_is_idempotent():
+    section("機能試験59: 一致ユーザーへの付与と、2回目はalready_granted=trueであること")
+    from src.database import get_connection
+
+    ts = str(int(time.time()))
+    email = f"betaclaim_{ts}@test.invalid"
+    pw = "testpass123"
+    uid = None
+    conn = get_connection()
+    try:
+        # 順序が重要: 先に登録（freeアカウント作成）→ ログイン状態のまま後から申請。
+        # 逆順（先に申請してから登録）だと register() 自体が承認済み申請を検知して
+        # 自動付与してしまい、claim()の「未付与状態からの付与」を検証できない。
+        with flask_app.test_client() as c2:
+            r1 = c2.post('/api/auth/register',
+                         json={'email': email, 'password': pw, 'name': 'claimテスト',
+                               'tos_agreed': True, 'birth_date': '1990-01-01'})
+            check_code(r1, 200, "先に登録 → 200")
+            uid = ((r1.get_json() or {}).get('user') or {}).get('id')
+            check((r1.get_json() or {}).get('user', {}).get('plan') == 'free',
+                  "登録直後はplan='free'")
+
+            r0 = c2.post('/api/beta/apply', json={'email': email})
+            check_code(r0, 200, "ログイン中に同一アドレスで申請 → 200")
+
+            rows = conn.run("SELECT access_token, granted_at FROM beta_applications WHERE email=:email", email=email)
+            token = rows[0][0]
+            check(rows[0][1] is None, "申請直後はgranted_atがNULL（前提の確認）")
+
+            r2 = c2.post('/api/beta/claim', json={'token': token})
+            check_code(r2, 200, "1回目のclaim → 200")
+            body2 = r2.get_json() or {}
+            check(body2.get('already_granted') is False, "1回目はalready_granted=false")
+
+            rows_u = conn.run("SELECT plan, is_beta_comp FROM users WHERE id=:id", id=uid)
+            check(rows_u[0][0] == 'premium', "DB上でplan='premium'")
+            check(bool(rows_u[0][1]) is True, "DB上でis_beta_comp=TRUE")
+            rows_a = conn.run("SELECT status, granted_at FROM beta_applications WHERE email=:email", email=email)
+            check(rows_a[0][0] == 'granted', "申請がgrantedになる")
+            first_granted_at = rows_a[0][1]
+            check(first_granted_at is not None, "granted_atが記録される")
+
+            r3 = c2.post('/api/beta/claim', json={'token': token})
+            check_code(r3, 200, "2回目のclaim → 200")
+            body3 = r3.get_json() or {}
+            check(body3.get('already_granted') is True, "2回目はalready_granted=true")
+
+            rows_a2 = conn.run("SELECT granted_at FROM beta_applications WHERE email=:email", email=email)
+            check(rows_a2[0][0] == first_granted_at, "granted_atが変化しない")
+    finally:
+        if uid:
+            conn.run("DELETE FROM users WHERE id=:id", id=uid)
+        conn.run("DELETE FROM beta_applications WHERE email=:email", email=email)
+        conn.close()
+
+
+def test_func60_beta_claim_rejects_email_mismatch():
+    section("機能試験60: 別アドレスのユーザーでは400・付与が起きないこと（本改修の主目的）")
+    from src.database import get_connection
+
+    ts = str(int(time.time()))
+    # 注意: サーバー側は email を .strip().lower() で正規化して保存するため、
+    # ここで大文字を含めるとSELECT時に一致せずIndexErrorになる（過去に発生）。
+    applied_email = f"betamismatcha_{ts}@test.invalid"
+    other_email = f"betamismatchb_{ts}@test.invalid"
+    pw = "testpass123"
+    uid_other = None
+    conn = get_connection()
+    try:
+        with flask_app.test_client() as c:
+            c.post('/api/beta/apply', json={'email': applied_email})
+        rows = conn.run("SELECT access_token FROM beta_applications WHERE email=:email", email=applied_email)
+        token = rows[0][0]
+
+        with flask_app.test_client() as c2:
+            r0 = c2.post('/api/auth/register',
+                         json={'email': other_email, 'password': pw, 'name': '不一致テスト',
+                               'tos_agreed': True, 'birth_date': '1990-01-01'})
+            check_code(r0, 200, "別アドレスで登録 → 200")
+            uid_other = ((r0.get_json() or {}).get('user') or {}).get('id')
+
+            r1 = c2.post('/api/beta/claim', json={'token': token})
+            check_code(r1, 400, "別アドレスでのclaim → 400")
+            body1 = r1.get_json() or {}
+            check(body1.get('code') == 'EMAIL_MISMATCH', f"code=EMAIL_MISMATCH (got {body1.get('code')})")
+
+        rows_u = conn.run("SELECT plan, is_beta_comp FROM users WHERE id=:id", id=uid_other)
+        check(rows_u[0][0] == 'free', "ログイン中ユーザーのplanはfreeのまま（付与されない）")
+        check(bool(rows_u[0][1]) is False, "ログイン中ユーザーのis_beta_compはFALSEのまま")
+
+        rows_a = conn.run("SELECT status, granted_at FROM beta_applications WHERE email=:email", email=applied_email)
+        check(rows_a[0][0] == 'approved', "申請側もgrantedにならず'approved'のまま")
+        check(rows_a[0][1] is None, "申請側のgranted_atもNULLのまま")
+    finally:
+        if uid_other:
+            conn.run("DELETE FROM users WHERE id=:id", id=uid_other)
+        conn.run("DELETE FROM beta_applications WHERE email=:email", email=applied_email)
+        conn.close()
+
+
+def test_func61_beta_claim_invalid_token():
+    section("機能試験61: 無効・空トークンで404になること（500にならない）")
+    ts = str(int(time.time()))
+    email = f"betaclaiminvalid_{ts}@test.invalid"
+    pw = "testpass123"
+    uid = None
+    from src.database import get_connection
+    conn = get_connection()
+    try:
+        with flask_app.test_client() as c:
+            r0 = c.post('/api/auth/register',
+                        json={'email': email, 'password': pw, 'name': '無効トークンテスト',
+                              'tos_agreed': True, 'birth_date': '1990-01-01'})
+            uid = ((r0.get_json() or {}).get('user') or {}).get('id')
+
+            r1 = c.post('/api/beta/claim', json={'token': 'invalid_token_xyz'})
+            check_code(r1, 404, "無効なトークン → 404")
+            check((r1.get_json() or {}).get('code') == 'INVALID_TOKEN', "code=INVALID_TOKEN")
+
+            r2 = c.post('/api/beta/claim', json={'token': ''})
+            check_code(r2, 404, "空のトークン → 404（500にならない）")
+    finally:
+        if uid:
+            conn.run("DELETE FROM users WHERE id=:id", id=uid)
+        conn.close()
+
+
 def safe_run(name: str, func, *args):
     """テスト関数を安全に実行。DB接続エラー等は SKIP として記録し継続。"""
     import pg8000.exceptions
@@ -3657,6 +3791,10 @@ if __name__ == '__main__':
             safe_run("機能試験55: パスワード再設定トークンの使い捨て確認", test_func55_password_reset_token_single_use)
             safe_run("機能試験56: パスワード再設定のアカウント有無非開示確認", test_func56_password_reset_no_account_disclosure)
             safe_run("機能試験57: 道C（再設定→ログイン→premium付与）", test_func57_route_c_reset_then_login_grants_premium)
+            safe_run("機能試験58: 未ログインでのclaimが401", test_func58_beta_claim_requires_login)
+            safe_run("機能試験59: claim付与と冪等性", test_func59_beta_claim_grants_and_is_idempotent)
+            safe_run("機能試験60: claimのメールアドレス不一致拒否", test_func60_beta_claim_rejects_email_mismatch)
+            safe_run("機能試験61: claimの無効・空トークン処理", test_func61_beta_claim_invalid_token)
     finally:
         cleanup()
 
