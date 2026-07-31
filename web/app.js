@@ -601,7 +601,10 @@ async function init() {
       startVoiceInput(DOM.topicInput, DOM.topicMicBtn);
     });
     DOM.chatMessages?.addEventListener('click', () => {
-      if (State.voiceMode && State.isSpeaking) { State.speechInterrupted = true; stopSpeaking(); }
+      // 画面設計書_v24 8-1：会話エリアタップは「読み上げ停止のみ」。
+      // speechInterrupted は立てない（立てると allRespond/autoDiscuss のループが break し、
+      // 会議の自動進行そのものが停止するため。BUG-VOICE-1）
+      if (State.voiceMode && State.isSpeaking) { stopSpeaking(); }
     });
 
     DOM.addMemberBtn?.addEventListener('click', openAddModal);
@@ -2945,7 +2948,10 @@ async function allRespond() {
   State.waitingForUser = false; State.speechInterrupted = false;
   for (const member of State.members.filter(m => State.selectedMemberIds.includes(m.id))) {
     await triggerMemberResponse(member.id);
-    if (State.waitingForUser || State.speechInterrupted) break;  // 質問または停止操作で中断
+    if (State.waitingForUser || State.speechInterrupted) {  // 質問または停止操作で中断
+      if (State.speechInterrupted) showToast('発言を中断しました。続けるには「全員で議論」を押してください', 'warning');
+      break;
+    }
   }
 }
 
@@ -2955,7 +2961,10 @@ async function autoDiscuss() {
   for (const member of State.members.filter(m => State.selectedMemberIds.includes(m.id))) {
     await triggerMemberResponse(member.id);
     await waitForSpeechEnd();
-    if (State.waitingForUser || State.speechInterrupted) break;  // 質問または停止操作で中断
+    if (State.waitingForUser || State.speechInterrupted) {  // 質問または停止操作で中断
+      if (State.speechInterrupted) showToast('発言を中断しました。続けるには「全員で議論」を押してください', 'warning');
+      break;
+    }
   }
 }
 
