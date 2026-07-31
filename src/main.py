@@ -1748,6 +1748,143 @@ JSONのみ出力してください。""",
 JSONのみ出力してください。""",
 }
 
+def _mock_layer3_json(category):
+    """MOCK_ANTHROPIC=true 時、Layer3のAPI応答の代わりに返すダミーJSON文字列。
+    実際のAnthropic APIは呼び出されない。ローカル開発専用。
+    各カテゴリのスキーマは LAYER3_TEMPLATES の定義に完全に対応させること。
+    特に _build_checklist_items()（src/database.py）が参照するフィールド
+    （strategy:open_issues / practice:checklist / consulting:first_action /
+     study:roadmap[].actions）は必ず含めること。"""
+    import json as _json
+    M = "【MOCK】"
+
+    if category == 'practice':
+        data = {
+            "summary": f"{M}提案内容と議論の要点のダミー要約です。実際のAPIは呼ばれていません。",
+            "logic_check": {
+                "strengths": [f"{M}論理的に強い点1", f"{M}強い点2"],
+                "gaps": [f"{M}論理の穴1", f"{M}論理の穴2"]
+            },
+            "objections": [
+                {"objection": f"{M}想定反論1", "counter": f"{M}対処法1"},
+                {"objection": f"{M}想定反論2", "counter": f"{M}対処法2"},
+                {"objection": f"{M}想定反論3", "counter": f"{M}対処法3"}
+            ],
+            "qa_list": [
+                {"question": f"{M}想定Q1", "answer": f"{M}推奨回答1"},
+                {"question": f"{M}想定Q2", "answer": f"{M}推奨回答2"},
+                {"question": f"{M}想定Q3", "answer": f"{M}推奨回答3"}
+            ],
+            "improvement": f"{M}提案全体の改善アドバイスのダミーです。",
+            "checklist": [f"{M}提出前チェック1", f"{M}チェック2", f"{M}チェック3"]
+        }
+
+    elif category == 'consulting':
+        data = {
+            "asset_inventory": {
+                "skills": [f"{M}スキル1", f"{M}スキル2"],
+                "network": f"{M}人脈・評判の強みのダミーです。",
+                "market_value": f"{M}現在の市場価値評価のダミーです。"
+            },
+            "scenarios": [
+                {"option": "現状維持", "year1": f"{M}1年後", "year5": f"{M}5年後", "risk": f"{M}リスク"},
+                {"option": "転換・変化", "year1": f"{M}1年後", "year5": f"{M}5年後", "risk": f"{M}リスク"},
+                {"option": "段階的移行", "year1": f"{M}1年後", "year5": f"{M}5年後", "risk": f"{M}リスク"}
+            ],
+            "regret_check": f"{M}後悔最小化の根拠のダミーです。",
+            "recommendation": f"{M}推奨する選択肢と根拠のダミーです。",
+            "first_action": [f"{M}今週の第一歩1", f"{M}第一歩2"]
+        }
+
+    elif category == 'relationship':
+        data = {
+            "structure_analysis": {
+                "root_cause": f"{M}問題の本質のダミーです。",
+                "user_position": f"{M}ユーザーの立場のダミーです。",
+                "other_position": f"{M}相手の立場のダミーです。"
+            },
+            "dialogue_scenarios": [
+                {"approach": "境界線の設定", "phrase": f"{M}セリフ例1",
+                 "merit": f"{M}メリット1", "risk": f"{M}リスク1"},
+                {"approach": "対話と理解", "phrase": f"{M}セリフ例2",
+                 "merit": f"{M}メリット2", "risk": f"{M}リスク2"},
+                {"approach": "適切な距離の確保", "phrase": f"{M}セリフ例3",
+                 "merit": f"{M}メリット3", "risk": f"{M}リスク3"}
+            ],
+            "recommendation": f"{M}推奨アプローチと根拠のダミーです。",
+            "caution": "⚠ このレポートはAI参考情報です。深刻な問題・ハラスメント・精神的苦しさを感じている場合は産業カウンセラー・専門機関への相談をお勧めします。"
+        }
+
+    elif category == 'study':
+        data = {
+            "motivation_diagnosis": {
+                "type": f"{M}動機づけの性質のダミーです。",
+                "need_gap": f"{M}最も満たされていない欲求のダミーです。",
+                "arcs_focus": f"{M}重視すべきARCS要因のダミーです。"
+            },
+            "expert_evaluation": {
+                "strengths": f"{M}優れている点のダミーです。",
+                "issues": f"{M}改善が必要な核心的問題のダミーです。",
+                "overall": f"{M}賢人たちの総合評価のダミーです。"
+            },
+            "improvement_priority": [
+                {"rank": 1, "action": f"{M}最初に取り組むこと", "reason": f"{M}最優先の理由"},
+                {"rank": 2, "action": f"{M}次に取り組むこと", "reason": f"{M}2番目の理由"},
+                {"rank": 3, "action": f"{M}中長期で取り組むこと", "reason": f"{M}中長期の理由"}
+            ],
+            "roadmap": [
+                {"phase": "フェーズ1", "period": f"{M}1〜3ヶ月", "theme": f"{M}テーマ1",
+                 "actions": [f"{M}行動1-1", f"{M}行動1-2"], "input_source": f"{M}参照元1"},
+                {"phase": "フェーズ2", "period": f"{M}4〜6ヶ月", "theme": f"{M}テーマ2",
+                 "actions": [f"{M}行動2-1", f"{M}行動2-2"], "input_source": f"{M}参照元2"},
+                {"phase": "フェーズ3", "period": f"{M}7〜12ヶ月", "theme": f"{M}テーマ3",
+                 "actions": [f"{M}行動3-1", f"{M}行動3-2"], "input_source": f"{M}参照元3"}
+            ],
+            "continuity": {
+                "obstacles": [
+                    f"{M}知識・スキル軸の阻害要因",
+                    f"{M}習慣軸の阻害要因",
+                    f"{M}環境軸の阻害要因"
+                ],
+                "solutions": [
+                    f"{M}もし知識面で詰まったら、ダミーの対処をする",
+                    f"{M}もし習慣が途切れたら、ダミーの対処をする",
+                    f"{M}もし環境が整わなければ、ダミーの対処をする"
+                ]
+            }
+        }
+
+    else:
+        # strategy（およびLAYER3_TEMPLATESのデフォルト）
+        data = {
+            "vision": f"{M}実現したいことのダミーです。",
+            "swot": {
+                "strength": [f"{M}強み1", f"{M}強み2"],
+                "weakness": [f"{M}弱み1", f"{M}弱み2"],
+                "opportunity": [f"{M}機会1", f"{M}機会2"],
+                "threat": [f"{M}脅威1", f"{M}脅威2"]
+            },
+            "target_market": {"primary": f"{M}ターゲット顧客像", "reason": f"{M}根拠のダミーです。"},
+            "strategy_4p": {
+                "product": f"{M}提供価値", "price": f"{M}価格設定",
+                "place": f"{M}流通チャネル", "promotion": f"{M}認知獲得方法"
+            },
+            "okr": {
+                "objective": f"{M}3ヶ月の目標",
+                "key_results": [f"{M}計測指標1", f"{M}計測指標2", f"{M}計測指標3"]
+            },
+            "competitive": {"differentiation": f"{M}競合との差別化根拠のダミーです。"},
+            "open_issues": [
+                {"issue": f"{M}未解決課題1", "why": f"{M}重要な理由1"},
+                {"issue": f"{M}未解決課題2", "why": f"{M}重要な理由2"}
+            ],
+            "risks": [
+                {"level": "中", "name": f"{M}リスク名", "reason": f"{M}リスクの理由", "advice": f"{M}対処法"}
+            ]
+        }
+
+    return _json.dumps(data, ensure_ascii=False)
+
 def _extract_issues(client, topic):
     """議題から解決すべき課題を3点抽出する（claude-haiku使用）"""
     try:
@@ -2108,13 +2245,17 @@ def generate_brief_layer3(session_id):
 議論内容：
 {discussion if discussion else "（議論なし）"}"""
 
-        layer3_res = client.messages.create(
-            model="claude-sonnet-4-6", max_tokens=4000,
-            messages=[{"role": "user", "content": layer3_prompt}]
-        )
-        if layer3_res.stop_reason == "max_tokens":
-            app.logger.warning(f"[LAYER3_TRUNCATED] session={session_id} category={category} stop_reason=max_tokens")
-        layer3_text = layer3_res.content[0].text.strip().replace("```json", "").replace("```", "").strip()
+        if os.getenv('MOCK_ANTHROPIC', '').lower() == 'true':
+            app.logger.warning(f"[MOCK] layer3 mocked session={session_id} category={category}")
+            layer3_text = _mock_layer3_json(category)
+        else:
+            layer3_res = client.messages.create(
+                model="claude-sonnet-4-6", max_tokens=4000,
+                messages=[{"role": "user", "content": layer3_prompt}]
+            )
+            if layer3_res.stop_reason == "max_tokens":
+                app.logger.warning(f"[LAYER3_TRUNCATED] session={session_id} category={category} stop_reason=max_tokens")
+            layer3_text = layer3_res.content[0].text.strip().replace("```json", "").replace("```", "").strip()
         try:
             layer3_data = json.loads(layer3_text)
             layer3_parse_ok = True
