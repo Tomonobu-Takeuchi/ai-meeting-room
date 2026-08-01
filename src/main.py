@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
 
-from flask import Flask, Response, jsonify, request, send_from_directory, send_file, session
+from flask import Flask, Response, jsonify, request, send_from_directory, send_file, session, redirect
 import anthropic
 import bcrypt
 from src.email_sender import send_email_change_confirmation, send_email
@@ -3096,6 +3096,17 @@ def lp_top():
 @app.route("/persona-meeting")
 def lp_persona_meeting():
     return send_from_directory(os.path.join(app.static_folder, "lp"), "persona-meeting.html")
+
+@app.route("/beta")
+def lp_beta_shortcut():
+    """動画テロップ・口頭案内用の短縮パス（LP-SHORT-1）。
+    ai-paradise.net/beta → /persona-meeting へUTM付きで302リダイレクトする。
+    ベータ1期間（〜2026/8/31）専用。302を使うのは、期間終了後に
+    リダイレクト先やUTMを変更できるようにするため（301はブラウザにキャッシュされる）。"""
+    return redirect(
+        "/persona-meeting?utm_source=youtube&utm_medium=telop&utm_campaign=beta1",
+        code=302
+    )
 
 @app.route("/digital-persona")
 def lp_digital_persona():
