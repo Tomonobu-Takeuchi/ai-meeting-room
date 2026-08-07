@@ -10,6 +10,7 @@ from datetime import datetime, date
 import anthropic
 
 from src.database import create_meeting_record, end_meeting_record, persist_meeting_transcript
+from src.config import MODEL_SONNET
 
 
 def _json_serial(obj):
@@ -46,7 +47,7 @@ class MeetingRoom:
         self.data_dir = data_dir
         os.makedirs(data_dir, exist_ok=True)
         self.client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"), timeout=120.0)
-        self.model = "claude-sonnet-4-6"
+        self.model = MODEL_SONNET
         self.sessions = {}
 
     def _stream_with_retry(self, max_tokens, system, messages, max_retries=3):

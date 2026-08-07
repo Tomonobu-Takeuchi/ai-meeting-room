@@ -25,6 +25,7 @@ from flask_limiter.util import get_remote_address
 
 from src.persona.persona_manager import PersonaManager
 from src.meeting.meeting_room import MeetingRoom
+from src.config import MODEL_SONNET, MODEL_HAIKU
 import stripe
 from src.database import (
     init_db, get_connection, get_user_by_email, get_user_by_id, create_user,
@@ -1238,7 +1239,7 @@ def suggest_team():
         try:
             haiku_client_pre = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"), timeout=120.0)
             haiku_pre_res = haiku_client_pre.messages.create(
-                model="claude-haiku-4-5",
+                model=MODEL_HAIKU,
                 max_tokens=20,
                 messages=[{"role": "user", "content": f"""以下の議題から最も適切なカテゴリを1つ選んでください。
 議題：{topic}
@@ -1270,7 +1271,7 @@ def suggest_team():
         try:
             haiku_client_pre = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"), timeout=120.0)
             haiku_pre_res = haiku_client_pre.messages.create(
-                model="claude-haiku-4-5",
+                model=MODEL_HAIKU,
                 max_tokens=20,
                 messages=[{"role": "user", "content": f"""以下の議題から最も適切なカテゴリを1つ選んでください。
 議題：{topic}
@@ -1319,7 +1320,7 @@ def suggest_team():
         try:
             haiku_client2 = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"), timeout=120.0)
             opponent_res = haiku_client2.messages.create(
-                model="claude-haiku-4-5",
+                model=MODEL_HAIKU,
                 max_tokens=30,
                 messages=[{"role": "user", "content": f"""以下の議題から相手役のタイプを1つ選んでください。
 議題：{topic}
@@ -1502,7 +1503,7 @@ def detect_crisis(text):
     try:
         _client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'), timeout=120.0)
         response = _client.messages.create(
-            model='claude-haiku-4-5',
+            model=MODEL_HAIKU,
             max_tokens=10,
             messages=[{
                 'role': 'user',
@@ -1890,7 +1891,7 @@ def _extract_issues(client, topic):
     try:
         import json as _json
         res = client.messages.create(
-            model="claude-haiku-4-5",
+            model=MODEL_HAIKU,
             max_tokens=300,
             messages=[{"role": "user", "content": (
                 f"以下の議題から「解決すべき課題」を3点、"
@@ -1938,7 +1939,7 @@ def _extract_convergence(session_summary, category):
             return None
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"), timeout=120.0)
         resp = client.messages.create(
-            model="claude-haiku-4-5",
+            model=MODEL_HAIKU,
             max_tokens=1500,
             messages=[{"role": "user", "content":
                 f"{CONVERGENCE_EXTRACT_PROMPT}\n\n議題：{session_summary['topic']}\n会議ログ：\n{discussion}"}],
@@ -2054,7 +2055,7 @@ def generate_brief(session_id):
 JSONのみ出力してください。"""
 
         layer1_res = client.messages.create(
-            model="claude-sonnet-4-6",
+            model=MODEL_SONNET,
             max_tokens=2000,
             messages=[{"role": "user", "content": layer1_prompt}]
         )
@@ -2132,7 +2133,7 @@ def generate_brief_layer2(session_id):
 {discussion if discussion else "（議論なし）"}"""
 
         layer2_res = client.messages.create(
-            model="claude-sonnet-4-6", max_tokens=3000,
+            model=MODEL_SONNET, max_tokens=3000,
             messages=[{"role": "user", "content": l2_prompt}]
         )
         if layer2_res.stop_reason == "max_tokens":
@@ -2250,7 +2251,7 @@ def generate_brief_layer3(session_id):
             layer3_text = _mock_layer3_json(category)
         else:
             layer3_res = client.messages.create(
-                model="claude-sonnet-4-6", max_tokens=4000,
+                model=MODEL_SONNET, max_tokens=4000,
                 messages=[{"role": "user", "content": layer3_prompt}]
             )
             if layer3_res.stop_reason == "max_tokens":
@@ -2417,7 +2418,7 @@ def generate_brief_pdf(session_id):
 JSONのみ出力してください。"""
 
         res = client.messages.create(
-            model="claude-sonnet-4-6",
+            model=MODEL_SONNET,
             max_tokens=800,
             messages=[{"role": "user", "content": layer1_prompt}]
         )
