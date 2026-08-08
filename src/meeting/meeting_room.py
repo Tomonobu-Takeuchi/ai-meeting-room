@@ -11,6 +11,7 @@ import anthropic
 
 from src.database import create_meeting_record, end_meeting_record, persist_meeting_transcript
 from src.config import MODEL_SONNET
+from src.usage_log import log_usage  # COST-1計測用（計測完了後に削除）
 
 
 def _json_serial(obj):
@@ -36,6 +37,15 @@ class _MockStream:
         dummy = "これはモックモードのダミー応答です。実際のAnthropic APIは呼び出されていません。"
         for char in dummy:
             yield char
+
+    def get_final_message(self):
+        """COST-1: 実ストリームと同じインターフェースを持たせる。
+        モックのためトークン数は0固定。実APIは呼ばれていない。"""
+        _usage = type("MockUsage", (), {
+            "input_tokens": 0, "output_tokens": 0,
+            "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0})()
+        return type("MockMessage", (), {
+            "usage": _usage, "model": "mock", "stop_reason": "mock"})()
 
 
 class MeetingRoom:
@@ -163,10 +173,18 @@ class MeetingRoom:
         )
         try:
             full_response = ""
+            _t0 = time.time()  # COST-1
             with self._stream_with_retry(512, system_prompt, messages) as stream:
                 for text in stream.text_stream:
                     full_response += text
                     yield f"data: {_dumps({'type': 'chunk', 'text': text, 'persona_id': persona_id})}\n\n"
+                log_usage("persona", stream.get_final_message(), session_id,
+                          ms=int((time.time() - _t0) * 1000),
+                          n_msg=len(session["messages"]),
+                          n_mem=len(session.get("members", [])),
+                          cat=session.get("category"),
+                          pid=persona_id,
+                          out_chars=len(full_response))  # COST-1
             msg = self.add_message(session_id, "member", persona_id, full_response)
             yield f"data: {_dumps({'type': 'done', 'persona_id': persona_id, 'message': msg})}\n\n"
         except Exception as e:
@@ -201,10 +219,18 @@ class MeetingRoom:
         )
         try:
             full_response = ""
+            _t0 = time.time()  # COST-1
             with self._stream_with_retry(700, system_prompt, [{"role": "user", "content": "議論を整理して、次のステップを示してください。"}]) as stream:
                 for text in stream.text_stream:
                     full_response += text
                     yield f"data: {_dumps({'type': 'chunk', 'text': text, 'persona_id': 'facilitator'})}\n\n"
+                log_usage("facilitator", stream.get_final_message(), session_id,
+                          ms=int((time.time() - _t0) * 1000),
+                          n_msg=len(session["messages"]),
+                          n_mem=len(session.get("members", [])),
+                          cat=session.get("category"),
+                          mode=mode, phase=phase,
+                          out_chars=len(full_response))  # COST-1
             msg = self.add_message(session_id, "facilitator", "facilitator", full_response)
             yield f"data: {_dumps({'type': 'done', 'persona_id': 'facilitator', 'message': msg})}\n\n"
         except Exception as e:

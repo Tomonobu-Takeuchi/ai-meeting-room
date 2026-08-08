@@ -26,6 +26,7 @@ from flask_limiter.util import get_remote_address
 from src.persona.persona_manager import PersonaManager
 from src.meeting.meeting_room import MeetingRoom
 from src.config import MODEL_SONNET, MODEL_HAIKU
+from src.usage_log import log_usage, log_ext_usage  # COST-1計測用（計測完了後に削除）
 import stripe
 from src.database import (
     init_db, get_connection, get_user_by_email, get_user_by_id, create_user,
@@ -880,9 +881,13 @@ def fetch_learn_youtube():
 
                 if file_size <= MAX_SIZE:
                     with open(audio_path, 'rb') as af:
+                        _t0 = time.time()                                        # COST-1
                         transcription = client.audio.transcriptions.create(
                             model="whisper-1", file=af, language="ja"
                         )
+                        log_ext_usage("whisper", "openai", model="whisper-1",
+                                      ms=int((time.time()-_t0)*1000),
+                                      size=file_size)                            # COST-1
                     full_text = transcription.text
                 else:
                     # チャンク分割
@@ -908,9 +913,12 @@ def fetch_learn_youtube():
                         )
                         if os.path.exists(chunk_path):
                             with open(chunk_path, 'rb') as af:
+                                _t0 = time.time()                                # COST-1
                                 result = client.audio.transcriptions.create(
                                     model="whisper-1", file=af, language="ja"
                                 )
+                                log_ext_usage("whisper", "openai", model="whisper-1",
+                                              ms=int((time.time()-_t0)*1000))    # COST-1
                             full_text += result.text + " "
             return jsonify({"text": full_text.strip()[:6000], "url": url})
         except Exception as e2:
@@ -949,9 +957,13 @@ def transcribe_audio():
 
             if file_size <= MAX_SIZE:
                 with open(compressed_path, 'rb') as af:
+                    _t0 = time.time()                                            # COST-1
                     result = client.audio.transcriptions.create(
                         model="whisper-1", file=af, language="ja"
                     )
+                    log_ext_usage("whisper", "openai", model="whisper-1",
+                                  ms=int((time.time()-_t0)*1000),
+                                  size=file_size)                                # COST-1
                 return jsonify({"text": result.text})
             else:
                 # 25MB超（極端に長い音声）→ チャンク分割
@@ -977,9 +989,12 @@ def transcribe_audio():
                     )
                     if os.path.exists(chunk_path):
                         with open(chunk_path, 'rb') as af:
+                            _t0 = time.time()                                    # COST-1
                             result = client.audio.transcriptions.create(
                                 model="whisper-1", file=af, language="ja"
                             )
+                            log_ext_usage("whisper", "openai", model="whisper-1",
+                                          ms=int((time.time()-_t0)*1000))        # COST-1
                         full_text += result.text + " "
                 return jsonify({"text": full_text.strip()[:8000]})
     except Exception as e:
@@ -1018,9 +1033,13 @@ def transcribe_video():
         if file_size <= MAX_SIZE:
             # 25MB以内：そのままWhisper APIへ
             with open(audio_path, "rb") as af:
+                _t0 = time.time()                                                # COST-1
                 transcription = client.audio.transcriptions.create(
                     model="whisper-1", file=af, language="ja"
                 )
+                log_ext_usage("whisper", "openai", model="whisper-1",
+                              ms=int((time.time()-_t0)*1000),
+                              size=file_size)                                    # COST-1
             os.unlink(audio_path)
             return jsonify({"text": transcription.text})
         else:
@@ -1054,9 +1073,12 @@ def transcribe_video():
                     )
                     if os.path.exists(chunk_path):
                         with open(chunk_path, "rb") as af:
+                            _t0 = time.time()                                    # COST-1
                             result = client.audio.transcriptions.create(
                                 model="whisper-1", file=af, language="ja"
                             )
+                            log_ext_usage("whisper", "openai", model="whisper-1",
+                                          ms=int((time.time()-_t0)*1000))        # COST-1
                         full_text += result.text + " "
 
             os.unlink(audio_path)
@@ -1238,6 +1260,7 @@ def suggest_team():
     if category == 'chat':
         try:
             haiku_client_pre = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"), timeout=120.0)
+            _t0 = time.time()  # COST-1
             haiku_pre_res = haiku_client_pre.messages.create(
                 model=MODEL_HAIKU,
                 max_tokens=20,
@@ -1246,6 +1269,7 @@ def suggest_team():
 選択肢：strategy（ビジネス戦略）/ practice（提案・企画強化）/ consulting（キャリア・転機）/ relationship（人間関係・交渉）/ study（学習・創作）/ chat（その他）
 カテゴリ名のみ返答してください。"""}]
             )
+            log_usage("suggest_category_1", haiku_pre_res, ms=int((time.time() - _t0) * 1000))  # COST-1
             raw_pre = haiku_pre_res.content[0].text.strip().lower()
             valid_cats = {'strategy', 'practice', 'consulting', 'relationship', 'study', 'chat'}
             category = raw_pre if raw_pre in valid_cats else ''
@@ -1270,6 +1294,7 @@ def suggest_team():
         # カテゴリ未選択時：Haikuで判定してCATEGORY_PATTERNSからペルソナを決める
         try:
             haiku_client_pre = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"), timeout=120.0)
+            _t0 = time.time()  # COST-1
             haiku_pre_res = haiku_client_pre.messages.create(
                 model=MODEL_HAIKU,
                 max_tokens=20,
@@ -1278,6 +1303,7 @@ def suggest_team():
 選択肢：strategy（ビジネス戦略）/ practice（提案・企画強化）/ consulting（キャリア・転機）/ relationship（人間関係・交渉）/ study（学習・創作）/ chat（その他）
 カテゴリ名のみ返答してください。"""}]
             )
+            log_usage("suggest_category_2", haiku_pre_res, ms=int((time.time() - _t0) * 1000))  # COST-1
             raw_pre = haiku_pre_res.content[0].text.strip().lower()
             valid_cats = {'strategy', 'practice', 'consulting', 'relationship', 'study', 'chat'}
             matched_pattern = raw_pre if raw_pre in valid_cats else 'study'
@@ -1319,6 +1345,7 @@ def suggest_team():
     if category == 'relationship' or suggested_category == 'relationship':
         try:
             haiku_client2 = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"), timeout=120.0)
+            _t0 = time.time()  # COST-1
             opponent_res = haiku_client2.messages.create(
                 model=MODEL_HAIKU,
                 max_tokens=30,
@@ -1327,6 +1354,7 @@ def suggest_team():
 選択肢：権威・強引型 / 論理・数字型 / 意固地・拒絶型 / 批判・攻撃型 / 折れない・信念型 / 叱咤・圧力型
 タイプ名のみ返答してください。"""}]
             )
+            log_usage("suggest_opponent", opponent_res, ms=int((time.time() - _t0) * 1000))  # COST-1
             type_map = {
                 '権威・強引型':     'iwasaki',
                 '論理・数字型':     'consultant',
@@ -1502,6 +1530,7 @@ def detect_crisis(text):
         return False
     try:
         _client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'), timeout=120.0)
+        _t0 = time.time()  # COST-1
         response = _client.messages.create(
             model=MODEL_HAIKU,
             max_tokens=10,
@@ -1514,6 +1543,7 @@ def detect_crisis(text):
                 )
             }]
         )
+        log_usage("crisis", response, ms=int((time.time() - _t0) * 1000))  # COST-1
         return 'はい' in response.content[0].text
     except Exception:
         return any(kw in text for kw in get_crisis_keywords())
@@ -1890,6 +1920,7 @@ def _extract_issues(client, topic):
     """議題から解決すべき課題を3点抽出する（claude-haiku使用）"""
     try:
         import json as _json
+        _t0 = time.time()  # COST-1
         res = client.messages.create(
             model=MODEL_HAIKU,
             max_tokens=300,
@@ -1901,6 +1932,7 @@ def _extract_issues(client, topic):
                 f"JSONのみ出力してください。"
             )}]
         )
+        log_usage("extract_issues", res, ms=int((time.time() - _t0) * 1000))  # COST-1
         text = res.content[0].text.strip().replace("```json","").replace("```","").strip()
         return _json.loads(text).get("issues", [])
     except Exception:
@@ -1938,12 +1970,14 @@ def _extract_convergence(session_summary, category):
             app.logger.warning("[CONVERGENCE] empty discussion")
             return None
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"), timeout=120.0)
+        _t0 = time.time()  # COST-1
         resp = client.messages.create(
             model=MODEL_HAIKU,
             max_tokens=1500,
             messages=[{"role": "user", "content":
                 f"{CONVERGENCE_EXTRACT_PROMPT}\n\n議題：{session_summary['topic']}\n会議ログ：\n{discussion}"}],
         )
+        log_usage("extract_convergence", resp, ms=int((time.time() - _t0) * 1000))  # COST-1
         text = resp.content[0].text.strip().replace("```json", "").replace("```", "").strip()
         data = json.loads(text)
         if not isinstance(data.get("decisions"), list):
@@ -2054,11 +2088,13 @@ def generate_brief(session_id):
 {l1_tmpl['json_schema']}
 JSONのみ出力してください。"""
 
+        _t0 = time.time()  # COST-1
         layer1_res = client.messages.create(
             model=MODEL_SONNET,
             max_tokens=2000,
             messages=[{"role": "user", "content": layer1_prompt}]
         )
+        log_usage("layer1", layer1_res, session_id, ms=int((time.time() - _t0) * 1000))  # COST-1
         if layer1_res.stop_reason == "max_tokens":
             app.logger.warning(f"[LAYER1_TRUNCATED] session={session_id} category={category} stop_reason=max_tokens")
         layer1_text = layer1_res.content[0].text.strip().replace("```json", "").replace("```", "").strip()
@@ -2132,10 +2168,12 @@ def generate_brief_layer2(session_id):
 議論内容：
 {discussion if discussion else "（議論なし）"}"""
 
+        _t0 = time.time()  # COST-1
         layer2_res = client.messages.create(
             model=MODEL_SONNET, max_tokens=3000,
             messages=[{"role": "user", "content": l2_prompt}]
         )
+        log_usage("layer2", layer2_res, session_id, ms=int((time.time() - _t0) * 1000))  # COST-1
         if layer2_res.stop_reason == "max_tokens":
             app.logger.warning(f"[LAYER2_TRUNCATED] session={session_id} category={category} stop_reason=max_tokens")
         layer2_text = layer2_res.content[0].text.strip().replace("```json", "").replace("```", "").strip()
@@ -2250,10 +2288,12 @@ def generate_brief_layer3(session_id):
             app.logger.warning(f"[MOCK] layer3 mocked session={session_id} category={category}")
             layer3_text = _mock_layer3_json(category)
         else:
+            _t0 = time.time()  # COST-1
             layer3_res = client.messages.create(
                 model=MODEL_SONNET, max_tokens=4000,
                 messages=[{"role": "user", "content": layer3_prompt}]
             )
+            log_usage("layer3", layer3_res, session_id, ms=int((time.time() - _t0) * 1000))  # COST-1
             if layer3_res.stop_reason == "max_tokens":
                 app.logger.warning(f"[LAYER3_TRUNCATED] session={session_id} category={category} stop_reason=max_tokens")
             layer3_text = layer3_res.content[0].text.strip().replace("```json", "").replace("```", "").strip()
@@ -2417,11 +2457,13 @@ def generate_brief_pdf(session_id):
 }}
 JSONのみ出力してください。"""
 
+        _t0 = time.time()  # COST-1
         res = client.messages.create(
             model=MODEL_SONNET,
             max_tokens=800,
             messages=[{"role": "user", "content": layer1_prompt}]
         )
+        log_usage("brief_pdf", res, session_id, ms=int((time.time() - _t0) * 1000))  # COST-1
         text = res.content[0].text.strip().replace("```json", "").replace("```", "").strip()
         data = json.loads(text)
 
@@ -2549,6 +2591,7 @@ def text_to_speech():
     try:
         import openai
         client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        _t0 = time.time()                                                        # COST-1
         response = client.audio.speech.create(
             model="tts-1",
             voice=voice_id,
@@ -2556,6 +2599,10 @@ def text_to_speech():
             response_format="mp3"
         )
         mp3_bytes = response.read()
+        log_ext_usage("tts", "openai", model="tts-1",
+                      chars=len(text),
+                      ms=int((time.time()-_t0)*1000),
+                      bytes=len(mp3_bytes))                                      # COST-1
         return Response(mp3_bytes, mimetype="audio/mpeg",
                         headers={"Cache-Control": "no-cache"})
     except Exception as e:

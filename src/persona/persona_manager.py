@@ -5,6 +5,7 @@ import uuid
 import os
 import random
 import threading
+import time
 from src.database import (
     get_connection, rows_to_dicts, row_to_dict,
     encrypt_value, decrypt_value,
@@ -18,6 +19,7 @@ from src.database import (
     update_growth_knowledge, calculate_and_save_maturity,
     get_growth_record, save_feedback_record, update_growth_c_axis
 )
+from src.usage_log import log_ext_usage  # COST-1計測用（計測完了後に削除）
 
 _BUSINESS_KEYWORDS = ['ビジネス', '事業', '経営', '戦略', '市場', '売上', '顧客']
 _SOCIAL_KEYWORDS = ['少子化', '人口', '社会', '政策', '環境', '教育']
@@ -580,10 +582,15 @@ class PersonaManager:
                 try:
                     import openai
                     client = openai.OpenAI(api_key=openai_key, timeout=30.0)
+                    _t0 = time.time()                                            # COST-1
                     res = client.embeddings.create(
                         model="text-embedding-3-small",
                         input=truncate_to_tokens(text),
                     )
+                    log_ext_usage("embedding_learn", "openai",
+                                  model="text-embedding-3-small",
+                                  tokens=getattr(getattr(res, "usage", None), "total_tokens", None),
+                                  ms=int((time.time()-_t0)*1000))                # COST-1
                     update_learn_data_embedding(learn_id, res.data[0].embedding)
                 except Exception as e:
                     print(f"Embedding非同期生成失敗（テキストは保存済）: {e}")
@@ -603,10 +610,16 @@ class PersonaManager:
             try:
                 import openai
                 client = openai.OpenAI(api_key=openai_key)
+                _t0 = time.time()                                                # COST-1
                 res = client.embeddings.create(
                     model="text-embedding-3-small",
                     input=topic
                 )
+                log_ext_usage("embedding_rag", "openai",
+                              model="text-embedding-3-small",
+                              tokens=getattr(getattr(res, "usage", None), "total_tokens", None),
+                              ms=int((time.time()-_t0)*1000),
+                              pid=persona_id)                                    # COST-1
                 results = search_learn_data(persona_id, user_id, res.data[0].embedding, limit=5)
                 if results:
                     return '\n\n'.join([r['content'] for r in results])
